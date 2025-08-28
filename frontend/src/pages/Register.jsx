@@ -1,4 +1,6 @@
-// src/pages/Register.jsx
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React,{useState} from "react";
 import { register } from "../api";
 import { useNavigate, Link } from "react-router-dom";

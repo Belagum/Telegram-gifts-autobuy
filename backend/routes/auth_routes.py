@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova orig
+
 from time import perf_counter
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import Session

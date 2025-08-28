@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova orig
+
 from flask import Blueprint, jsonify
 
 bp_misc = Blueprint("misc", __name__)

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { me, onUnauthorized } from "./api";

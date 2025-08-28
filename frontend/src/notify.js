@@ -1,4 +1,6 @@
-// notify.js
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import { toast } from "react-toastify";
 
 const TOAST_MIN_INTERVAL_MS = 1000;

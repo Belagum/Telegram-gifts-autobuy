@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import GiftsPage from "./pages/GiftsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import React from "react";

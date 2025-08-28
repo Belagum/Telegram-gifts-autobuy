@@ -1,4 +1,6 @@
-// src/pages/SettingsPage.jsx
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React from "react";
 import { getSettings, setSettings } from "../api";
 

@@ -1,4 +1,6 @@
-// src/components/AccountList.jsx
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React,{useEffect,useState,useRef,useLayoutEffect}from"react";
 import {toast}from"react-toastify";
 import {refreshAccountStream, apiFetch}from"../api";

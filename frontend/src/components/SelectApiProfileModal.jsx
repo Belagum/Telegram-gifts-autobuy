@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React, {useState} from "react";
 import { renameApiProfile, deleteApiProfile } from "../api";
 import { showError, showSuccess } from "../notify";

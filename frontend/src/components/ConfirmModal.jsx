@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React,{useEffect} from "react";
 import { createPortal } from "react-dom";
 import { useModal } from "../ui/ModalStack.jsx";

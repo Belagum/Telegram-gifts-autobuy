@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova orig
+
 import secrets
 from functools import wraps
 from datetime import datetime, timezone

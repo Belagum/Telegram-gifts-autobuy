@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 *{box-sizing:border-box}
 body{font-family:system-ui,Arial,sans-serif;margin:0;padding:20px;background:#0b0f14;color:#e6e6e6}
 .wrap{max-width:900px;margin:0 auto}
@@ -51,7 +54,6 @@ button:active{transform:translateY(0) scale(.97)}
 
 .modal-title.center{text-align:center}
 
-/* ===== Accounts grid ===== */
 .list-accounts{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
@@ -66,11 +68,9 @@ button:active{transform:translateY(0) scale(.97)}
   box-shadow:0 6px 18px rgba(0,0,0,0.08);
 }
 
-/* ===== Skeletons (силуэты) ===== */
 .skeleton-grid{
   display:grid;
   gap:12px;
-  /* важно: совпасть с .list-accounts по minmax, чтобы количество колонок было одинаковым */
   grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
   grid-column: 1 / -1;
 }
@@ -109,7 +109,6 @@ button:active{transform:translateY(0) scale(.97)}
 .sk-updated{width:60%;height:10px;opacity:.8}
 .sk-button{width:110px;height:34px;border-radius:10px;margin-top:12px}
 
-/* ===== Кнопка с прогресс-слайдером ===== */
 .btn{
   position:relative;
   display:inline-flex;
@@ -139,9 +138,9 @@ button:active{transform:translateY(0) scale(.97)}
   100%{transform:translateX(30%)}
 }
 
-/* Пустое состояние */
+
 .empty{padding:16px;border:1px dashed #223;border-radius:8px;text-align:center}
-/* Тумблер */
+
 .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .switch input{position:absolute;opacity:0;width:0;height:0;margin:0}
 .switch__track{position:relative;width:44px;height:24px;border-radius:999px;background:#121a25;border:1px solid #223;transition:background .15s,border-color .15s}

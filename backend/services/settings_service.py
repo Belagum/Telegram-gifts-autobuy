@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova orig
+
 from typing import Optional, Dict
 
 from sqlalchemy.orm import Session

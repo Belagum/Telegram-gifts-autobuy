@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React from "react";
 import { listGifts, refreshGifts, getGiftsSettings, setGiftsSettings, listAccounts } from "../api";
 import lottie from "lottie-web";

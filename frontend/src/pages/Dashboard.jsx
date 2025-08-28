@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova orig
+
 import React,{useEffect,useState} from "react";
 import openCentered from "../utils/openCentered.js";
 import { me, listAccounts, listApiProfiles, getGiftsSettings, setGiftsSettings } from "../api";

@@ -208,3 +208,5 @@ npm run build   # dist/
 
 ---
 
+## Лицензия
+Apache-2.0 © 2025 Vova Orig. См. файл LICENSE. Доп. уведомления — в NOTICE.

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova orig
+
 import asyncio
 import os, json, time, threading, hashlib
 from queue import Queue

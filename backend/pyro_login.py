@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova orig
+
 from datetime import datetime, timezone
 import os, secrets, glob, threading, asyncio
 from dataclasses import dataclass

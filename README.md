@@ -1,317 +1,194 @@
-# GiftBuyer — README
+# GiftBuyer
 
-## Назначение
-
-Веб-панель для работы с Telegram-аккаунтами (через Pyrogram): добавление аккаунтов по телефону, сохранение сессий, просмотр имени/username и баланса звёзд. UI — React (Vite), backend — Flask + SQLAlchemy + Pyrogram.
-Поддерживаются **несколько API-профилей** (api\_id/api\_hash) на пользователя: можно создавать, переименовывать, выбирать при добавлении аккаунта и удалять (если не используется).
+Небольшая веб-панель для работы с Telegram-аккаунтами (через Pyrogram): добавление аккаунтов по телефону, хранение сессий, просмотр имени/username и баланса звёзд.
+Стек: **Flask + SQLAlchemy + Pyrogram** (backend) и **React + Vite** (frontend).
 
 ---
 
-## Требования
+## Что умеет
 
-* Python 3.11+
-* Node.js 20+ и npm
-* Windows / macOS / Linux
-  (ниже команды для Windows; на \*nix замените активацию venv и пути)
+* Регистрация/логин в панели (cookie-токен, 7 дней).
+* Несколько **API-профилей** (api\_id/api\_hash) на пользователя: создать, переименовать, удалить (если не используется).
+* Добавление Telegram-аккаунта по телефону (код из TG, при необходимости — 2FA пароль).
+* Чтение профиля/username и баланса звёзд.
+* Фоновое «обновление по давности» и ручное обновление аккаунта (стрим событий **NDJSON**).
+* Аккуратные анимации перестановки карточек в списке аккаунтов.
 
 ---
 
-## Структура
+## Структура проекта
 
 ```
 GiftBuyer/
   backend/
-    app.py              # точка входа Flask
-    db.py               # engine, session, Base
-    models.py           # User, SessionToken, ApiProfile, Account
-    auth.py             # hash/verify, JWT-like токены, декораторы
-    pyro_login.py       # логин через Pyrogram, звёзды
-    routes/             # bp_auth, bp_acc, bp_misc
-    sessions/           # .session файлы Pyrogram (создаётся автоматически)
+    app.py                  # создание Flask-приложения
+    auth.py                 # хеширование паролей, выдача токена, @auth_required
+    db.py                   # engine, scoped_session, init_db()
+    logger.py               # loguru + интеграция с Flask
+    models.py               # User, SessionToken, ApiProfile, Account (+ token_default_exp)
+    pyro_login.py           # менеджер логина через Pyrogram (код/2FA), создание Account
+    services/
+      accounts_service.py   # фоновые обновления/стрим, чтение/очистка сессий
+    routes/
+      auth_routes.py        # /api/auth/* (register, login, logout)
+      account_routes.py     # /api/* (me, accounts, refresh, apiprofiles, login flow)
+      misc_routes.py        # /api/health
+    sessions/               # сюда кладутся .session файлы Pyrogram
     requirements.txt
     __init__.py
+
   frontend/
-    package.json
-    vite.config.js
+    index.html
     src/
-      ui/ModalStack.jsx # стек модалок
-      ...
-  README.md
+      api.js                # единая обёртка fetch (credentials=include, 401→событие)
+      App.jsx               # защита маршрутов + реакция на 401
+      main.jsx              # роутер, тосты, ModalProvider
+      styles.css
+      notify.js             # один «умный» тост: pending/success/error
+      ui/
+        ModalStack.jsx      # стек модалок (см. ниже)
+      pages/
+        Login.jsx           # вход (кнопка со спиннером)
+        Register.jsx        # регистрация (кнопка со спиннером)
+        Dashboard.jsx       # список аккаунтов + модалки добавления
+      components/
+        AccountList.jsx           # сетка карточек (+ анимация перестановок)
+        AddApiModal.jsx           # создание API-профиля
+        SelectApiProfileModal.jsx # выбор/переименование/удаление API-профиля
+        AddAccountModal.jsx       # вход по телефону (код/2FA), отмена
+        ConfirmModal.jsx          # подтверждение удаления
+    package.json
+    vite.config.js (обычно — прокси /api → http://localhost:5000)
 ```
+
+> **Сессии Pyrogram** находятся в `backend/sessions/user_<user_id>/<phone>.session`. Папка добавлена в `.gitignore`.
 
 ---
 
-## Backend — установка и запуск
+## Как это работает (коротко)
 
-### 1) Зависимости
+* **Аутентификация панели**
+  `POST /api/auth/login` проверяет username/password и **выдаёт токен** (один активный на пользователя). Токен кладётся в httpOnly-cookie `auth_token` на 7 дней. Все приватные эндпоинты помечены `@auth_required` — читаем токен из заголовка `Authorization: Bearer` **или** из cookie, валидируем по БД.
 
-```bat
+* **API-профили**
+  Пользователь создаёт профиль (`api_id`, `api_hash`, опционально `name`). Внутри пользователя запрещены дубликаты по `api_id` и по `api_hash`. Профиль нельзя удалить, если он привязан к аккаунтам.
+
+* **Добавление аккаунта**
+
+  1. Отправляем код в Telegram (`/api/auth/send_code`).
+  2. Подтверждаем код (`/api/auth/confirm_code`), при 2FA — пароль (`/api/auth/confirm_password`).
+  3. Создаётся/обновляется запись `Account`, `.session` сохраняется в `backend/sessions/...`.
+
+* **Обновление аккаунтов**
+
+  * Фоновое: при запросе `/api/accounts?wait=1` сервер, если данные устарели, запускает обновление и либо ждёт до 25 сек, либо отвечает `{"state":"refreshing"}`.
+  * Ручное: `/api/account/<id>/refresh` — стрим `application/x-ndjson` со стадиями/ошибками и финальным `{"done":true,"account":...}`. При невалидной сессии аккаунт удаляется.
+
+* **Список аккаунтов**
+  Клиент аккуратно сортирует по `last_checked_at` и анимирует перестановки (карточка «поднимается» вверх, остальные каскадно смещаются).
+
+---
+
+## Первый запуск (локально)
+
+### 1) Backend
+
+```bash
 cd backend
 python -m venv .venv
+# Windows:
 .\.venv\Scripts\activate
+# Linux/macOS:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
+# (опционально) свой секрет:
+# set SECRET_KEY=your-secret   # Windows CMD
+# export SECRET_KEY=your-secret # bash/zsh
+
+# Запуск как модуля (важно для импортов пакета backend)
+python -m backend.app
+# слушает http://localhost:5000
 ```
 
-### 2) Запуск (терминал)
-
-Запускаем **как модуль**, чтобы корректно работали пакетные импорты:
-
-```bat
-cd ..         REM перейти в корень GiftBuyer
-backend\.venv\Scripts\python.exe -m backend.app
-```
-
-Сервер: `http://localhost:5000`.
-
-### 3) Запуск (PyCharm)
-
-* Run → Edit Configurations… → **+ Python**
-
-  * **Run kind**: *Module name*
-  * **Module name**: `backend.app`
-  * **Working directory**: путь к корню `GiftBuyer`
-  * **Interpreter**: `…\GiftBuyer\backend\.venv\Scripts\python.exe`
-  * Включить: *Add content roots to PYTHONPATH*, *Add source roots to PYTHONPATH*.
-* OK → Run.
-
----
-
-## Frontend — установка и запуск
-
-```bat
-cd frontend
-npm i
-npm run dev
-```
-
-Фронтенд: `http://localhost:5173`
-В `vite.config.js` настроен прокси на `/api` → `http://localhost:5000`.
-
----
-
-## Продакшен-деплой (минимум)
-
-### Вариант A: один сервер (Linux), Nginx как reverse proxy
-
-1. **Собрать фронтенд**:
+### 2) Frontend
 
 ```bash
 cd frontend
-npm ci
-npm run build           # создаст dist/
+npm i
+npm run dev
+# открой http://localhost:5173
 ```
 
-2. **Поднять backend**:
+> Если фронт и бэкенд на разных порталах в dev, в `vite.config.js` настрой прокси:
+>
+> ```js
+> export default defineConfig({
+>   server: { proxy: { '/api': 'http://localhost:5000' } }
+> })
+> ```
 
-* Linux (systemd + gunicorn):
+### 3) Проверка
 
-  ```bash
-  cd backend
-  python -m venv .venv
-  . .venv/bin/activate
-  pip install -r requirements.txt gunicorn
-  # запуск (отладочно)
-  gunicorn -w 2 -b 127.0.0.1:5000 'app:create_app()'
-  ```
-
-  Пример unit-файла `/etc/systemd/system/giftbuyer.service`:
-
-  ```
-  [Unit]
-  Description=GiftBuyer backend
-  After=network.target
-
-  [Service]
-  WorkingDirectory=/opt/GiftBuyer/backend
-  Environment=PYTHONUNBUFFERED=1
-  ExecStart=/opt/GiftBuyer/backend/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 'app:create_app()'
-  Restart=on-failure
-  User=www-data
-  Group=www-data
-
-  [Install]
-  WantedBy=multi-user.target
-  ```
-
-  ```bash
-  systemctl daemon-reload
-  systemctl enable --now giftbuyer
-  ```
-
-* Windows: используйте `waitress` или NSSM:
-
-  ```bat
-  pip install waitress
-  waitress-serve --listen=127.0.0.1:5000 app:create_app
-  ```
-
-3. **Nginx** (статик + прокси API):
-
-```
-server {
-  listen 80;
-  server_name your.domain;
-
-  root /opt/GiftBuyer/frontend/dist;
-  index index.html;
-
-  location /api/ {
-    proxy_pass http://127.0.0.1:5000/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-  }
-
-  location / {
-    try_files $uri /index.html;
-  }
-}
-```
-
-Подключите HTTPS (Certbot/Caddy — на ваш вкус).
-
-### Вариант B: два процесса вручную (Windows)
-
-* Backend: `backend\.venv\Scripts\python.exe -m backend.app`
-* Frontend: `cd frontend && npm run build && npx serve -s dist -l 5173`
-  И использовать Nginx/Apache/traefik для проксирования `/api` → `:5000`.
+1. Открой `http://localhost:5173`, зарегистрируйся/войдите.
+2. Добавь **API-профиль** (api\_id/api\_hash из my.telegram.org).
+3. Нажми «Добавить аккаунт», введи телефон → код → (если нужно) 2FA пароль.
+4. Обновляй аккаунт кнопкой «Обновить» — смотри стрим стадий и итоговые данные.
 
 ---
 
-## Данные и хранение
+## Коротко про продакшен
 
-* **БД**: SQLite `backend/app.db`.
-* **Таблицы** (минимум):
-
-  * `users`: `id`, `username`, `password_hash`.
-  * `session_tokens`: один активный токен на устройство/браузер; при новом входе старые токены для этого устройства инвалидируются; `DELETE /api/auth/logout` удаляет текущий токен.
-  * `api_profiles`: `id`, `user_id`, `api_id`, `api_hash`, `name`.
-    Уникальность: `(user_id, api_id)` **и** `(user_id, api_hash)`.
-    Нельзя создать дубликат по одному из полей. Удаление запрещено, если профиль привязан к аккаунтам.
-  * `accounts`: `id`, `user_id`, `api_profile_id`, `phone`, `session_path`, `first_name`, `username`, `stars_amount`, `stars_nanos`.
-* **Pyrogram-сессии**: `backend/sessions/user_<user_id>/<phone>.session`.
-  Если логин отменён/ошибка — временная сессия удаляется.
+* Собери фронт: `cd frontend && npm ci && npm run build` (появится `dist/`).
+* Подними backend (gunicorn/waitress/uvicorn — на ваш вкус).
+* Любой reverse-proxy (Nginx/Caddy) раздаёт статику из `frontend/dist` и проксирует `/api` → backend.
 
 ---
 
-## Логика работы
+## Зачем и как устроен стек модалок
 
-### Аутентификация (панель)
+**Задача:** открывать вложенные модалки (например, «Удалить?» поверх «Выбор API профиля»), чтобы:
 
-* Регистрация/логин простые (username/password).
-* После логина фронт хранит токен в `localStorage`, отправляет `Authorization: Bearer ...`.
-* Для «одного устройства — один токен» сервер инвалидирует старый токен при новом входе с того же клиента (или при logout).
+* по **Esc** закрывалась **только верхняя** модалка,
+* клики по фону не «пробивали» к нижней,
+* базовая модалка **не исчезала**, а временно скрывалась.
 
-### API-профили (my.telegram.org)
+**Реализация (`ui/ModalStack.jsx`):**
 
-* Кнопка «Добавить аккаунт» открывает выбор API-профиля.
-* Модалка «Выбери API профиль»:
+* `ModalProvider` хранит **стек** `{id, onClose}` и вешает **один** обработчик `Esc` на документ.
+* `useModal(onClose)` регистрирует модалку и отдаёт:
 
-  * список профилей, можно переименовать (inline), удалить (с подтверждением),
-  * проверка на дубликаты: нельзя повторить `api_id` или `api_hash` внутри одного пользователя,
-  * кнопка «Добавить новый API» — отдельная модалка, поля `api_id`, `api_hash`, опц. `name`.
-* При удалении профиль нельзя удалить, если он используется существующими аккаунтами.
+  * `isTop` — текущая верхняя,
+  * `hidden` — надо ли спрятать модалку (когда поверх открыта другая),
+  * `suspendAllExceptSelf()` / `resumeAll()` — временно «заглушить» остальные.
+* `ConfirmModal` рендерится через **portal** в `document.body` и на время показывает себя единственной (включает `suspendAllExceptSelf()`).
 
-### Добавление Telegram-аккаунта
-
-1. Выбор API-профиля.
-2. Ввод телефона → отправка кода (`auth.sendCode`).
-3. Ввод кода:
-
-   * если включена 2FA — запрашивается пароль,
-   * в случае ошибок телеги (`PHONE_NUMBER_BANNED` и т.п.) фронт показывает код/сообщение.
-4. Успех → сохраняем:
-
-   * `.session` в `backend/sessions/...`,
-   * профиль аккаунта в БД (имя, username),
-   * баланс звёзд (через `payments.GetStarsStatus`).
-5. Отмена/ошибка → сессия удаляется.
+Итого: любая модалка может поверх открыть confirm — UX остаётся предсказуемым, без «двойных» обработчиков и гонок событий.
 
 ---
 
-## Стек модалок (почему и как)
+## Полезные заметки
 
-Задача: когда открывается модалка подтверждения (например, «Удалить API профиль?»), она должна:
-
-* рендериться **поверх** текущей модалки,
-* закрываться по **Esc** и клику по фону,
-* **не** закрывать родительскую модалку насовсем и **не** ловить её обработчики.
-
-Решение: собственный стек модалок.
-
-### Компоненты
-
-* `ModalProvider` (контекст):
-
-  * хранит `stack` открытых модалок (`[{id, onClose}]`),
-  * глобально обрабатывает `Esc`: закрывается **верхняя** модалка,
-  * поле `suspender`: id модалки, которая «скрывает» остальные (не демонтирует, а говорит им не рендериться).
-
-* `useModal(onClose)`:
-
-  * регистрирует модалку в стеке, возвращает:
-
-    * `isTop` — текущая модалка верхняя,
-    * `hidden` — модалку нужно временно спрятать (когда поверх открылась confirm),
-    * `suspendAllExceptSelf()` / `resumeAll()` — включить/снять «приглушение» остальных.
-
-* `ConfirmModal`:
-
-  * отрисовывается **через портал** (`createPortal`) в `document.body`,
-  * при маунте делает `suspendAllExceptSelf()`, при размонте — `resumeAll()`.
-
-* Базовые модалки (`SelectApiProfileModal`, `AddApiModal`, `AddAccountModal`):
-
-  * используют `useModal`,
-  * при `hidden` — не рендерятся (или частично, если внутри них открыт `ConfirmModal` — это учтено).
-
-Итог: ESC закрывает только верхнюю, клик по фону — тоже. При открытии Confirm базовая модалка «замораживается» и не мешает.
-
----
-
-## Уведомления
-
-Используется `react-toastify`. Обёртка `showPromise(p, pending, success, error)` отображает тосты «в процессе/успех/ошибка» для промиса.
-Ошибки от Telegram (например, `PHONE_NUMBER_BANNED`) проходят до фронта и показываются пользователю.
-
----
-
-## Частые проблемы
-
-* **Не открывается модалка подтверждения / всё пропадает.**
-  Проверьте, что `ModalProvider` оборачивает всё приложение (`main.jsx`) и **нет дублей** `ModalProvider/useModal` в других файлах. `ConfirmModal` должен импортировать `useModal` только из `ui/ModalStack.jsx` и рендериться через портал.
-* **Бесконечные рендеры / Maximum update depth exceeded.**
-  В `ModalProvider.register` обязательно проверяется наличие id в стеке, а обработчик `keydown` один, без зависимостей на весь `ctx`.
-* **`Table 'users' is already defined` при запуске.**
-  Запускайте `python -m backend.app`, проверьте `backend/__init__.py`, удалите `__pycache__`.
-* **`PhoneNumberBanned` и т.п. при логине Telegram.**
-  В тосте показывается код и текст ошибки. Сессия удаляется, аккаунт не добавляется.
-* **Windows asyncio loop.**
-  В `pyro_login.py` на Windows выставляется `WindowsSelectorEventLoopPolicy`, чтобы Pyrogram корректно создавал event loop.
-
----
-
-## Сброс/очистка
-
-* Удалить все сессии Pyrogram: удалить папку `backend/sessions/`.
-* Сбросить БД: удалить `backend/app.db` (все данные будут потеряны).
+* Токен хранится в **httpOnly-cookie** `auth_token`, 7 дней. Новый логин инвалидирует прежний токен пользователя.
+* `/api/accounts` отдаёт `{"state":"ready","accounts":[...]}` или `{"state":"refreshing"}`.
+  Клиент опрашивает «умно» (без спама), а на 401 — глобально редиректит на `/login`.
+* Сессии Pyrogram и БД (`backend/app.db`) добавлены в `.gitignore`. Для «чистого» старта — удали эти файлы/папки.
 
 ---
 
 ## Быстрый чек-лист
 
-```bat
-REM Backend
+```bash
+# Backend
 cd backend
 python -m venv .venv
-.\.venv\Scripts\activate
+.\.venv\Scripts\activate  # или source .venv/bin/activate
 pip install -r requirements.txt
-cd ..
-backend\.venv\Scripts\python.exe -m backend.app
+python -m backend.app
 
-REM Frontend
+# Frontend
 cd frontend
 npm i
 npm run dev
+# → http://localhost:5173
 ```
-
-Открыть `http://localhost:5173`, зарегистрироваться, добавить API-профиль, добавить аккаунт, проверить список.

@@ -1,18 +1,30 @@
+Вот обновлённый **README.md** под текущую структуру и функциональность проекта.
+
+---
+
 # GiftBuyer
 
-Небольшая веб-панель для работы с Telegram-аккаунтами (через Pyrogram): добавление аккаунтов по телефону, хранение сессий, просмотр имени/username и баланса звёзд.
+Небольшая веб-панель для работы с Telegram-аккаунтами (Pyrogram): добавление аккаунтов, хранение сессий, просмотр баланса звёзд, просмотр и авто-обновление **подарков** c предпросмотром **.tgs (Lottie)**.
 Стек: **Flask + SQLAlchemy + Pyrogram** (backend) и **React + Vite** (frontend).
 
 ---
 
-## Что умеет
+## Возможности
 
-* Регистрация/логин в панели (cookie-токен, 7 дней).
-* Несколько **API-профилей** (api\_id/api\_hash) на пользователя: создать, переименовать, удалить (если не используется).
+* Регистрация/логин в панели (httpOnly cookie-токен, 7 дней).
+* Несколько **API-профилей** (api\_id/api\_hash) на пользователя: создать/переименовать/удалить.
 * Добавление Telegram-аккаунта по телефону (код из TG, при необходимости — 2FA пароль).
-* Чтение профиля/username и баланса звёзд.
-* Фоновое «обновление по давности» и ручное обновление аккаунта (стрим событий **NDJSON**).
-* Аккуратные анимации перестановки карточек в списке аккаунтов.
+* Просмотр имени/username, премиума и баланса звёзд.
+* Ручное обновление аккаунта со стримом стадий (**NDJSON**).
+* **Подарки (Gifts):**
+
+  * список доступных подарков, ленивая подгрузка карточек;
+  * кнопка «Обновить» и фоновое авто-обновление;
+  * **SSE-стрим** обновлений от сервера;
+  * предпросмотр .tgs (Lottie) с кешированием на сервере.
+* **Настройки пользователя:** хранение **Bot token** (нужен для скачивания превью .tgs).
+  Если токена нет, на странице «Подарки» отображается карточка с предложением открыть «Настройки».
+* Аккуратные UI-мелочи: тумблер-переключатель, центрированное всплывающее окно (для /gifts и /settings).
 
 ---
 
@@ -21,75 +33,62 @@
 ```
 GiftBuyer/
   backend/
-    app.py                  # создание Flask-приложения
-    auth.py                 # хеширование паролей, выдача токена, @auth_required
-    db.py                   # engine, scoped_session, init_db()
-    logger.py               # loguru + интеграция с Flask
-    models.py               # User, SessionToken, ApiProfile, Account (+ token_default_exp)
-    pyro_login.py           # менеджер логина через Pyrogram (код/2FA), создание Account
-    services/
-      accounts_service.py   # фоновые обновления/стрим, чтение/очистка сессий
-    routes/
-      auth_routes.py        # /api/auth/* (register, login, logout)
-      account_routes.py     # /api/* (me, accounts, refresh, apiprofiles, login flow)
-      misc_routes.py        # /api/health
-    sessions/               # сюда кладутся .session файлы Pyrogram
+    app.py
+    auth.py
+    db.py
+    logger.py
+    models.py
     requirements.txt
-    __init__.py
-
+    routes/
+      __init__.py
+      auth_routes.py
+      account_routes.py
+      misc_routes.py
+      gifts.py          # API подарков + Lottie-кеш + SSE
+      settings.py       # API настроек пользователя (bot token)
+    services/
+      __init__.py
+      accounts_service.py
+      gifts_service.py  # воркер подарков, SSE-шина, merge, hash и т.д.
+      settings_service.py
+    sessions/           # .session файлы Pyrogram  (gitignored)
+    instance/
+      gifts_cache/      # кеш .tgs (gzip) по file_id / unique_id (gitignored)
+    migrate_app_db.py   # миграция БД (создаёт user_settings)
   frontend/
     index.html
     src/
-      api.js                # единая обёртка fetch (credentials=include, 401→событие)
-      App.jsx               # защита маршрутов + реакция на 401
-      main.jsx              # роутер, тосты, ModalProvider
+      api.js            # обёртка fetch + 401-хэндлер
+      App.jsx
+      auth.js
+      main.jsx
+      notify.js
       styles.css
-      notify.js             # один «умный» тост: pending/success/error
+      utils/
+        openCentered.js
       ui/
-        ModalStack.jsx      # стек модалок (см. ниже)
+        ModalStack.jsx
       pages/
-        Login.jsx           # вход (кнопка со спиннером)
-        Register.jsx        # регистрация (кнопка со спиннером)
-        Dashboard.jsx       # список аккаунтов + модалки добавления
+        Dashboard.jsx
+        GiftsPage.jsx
+        SettingsPage.jsx
+        Login.jsx
+        Register.jsx
       components/
-        AccountList.jsx           # сетка карточек (+ анимация перестановок)
-        AddApiModal.jsx           # создание API-профиля
-        SelectApiProfileModal.jsx # выбор/переименование/удаление API-профиля
-        AddAccountModal.jsx       # вход по телефону (код/2FA), отмена
-        ConfirmModal.jsx          # подтверждение удаления
+        AccountList.jsx
+        AddApiModal.jsx
+        AddAccountModal.jsx
+        SelectApiProfileModal.jsx
+        ConfirmModal.jsx
     package.json
-    vite.config.js (обычно — прокси /api → http://localhost:5000)
+    package-lock.json
 ```
 
-> **Сессии Pyrogram** находятся в `backend/sessions/user_<user_id>/<phone>.session`. Папка добавлена в `.gitignore`.
+> Папки `backend/sessions/`, `backend/instance/` (и её `gifts_cache/`), а также временные файлы данных подарков игнорируются в Git.
 
 ---
 
-## Как это работает (коротко)
-
-* **Аутентификация панели**
-  `POST /api/auth/login` проверяет username/password и **выдаёт токен** (один активный на пользователя). Токен кладётся в httpOnly-cookie `auth_token` на 7 дней. Все приватные эндпоинты помечены `@auth_required` — читаем токен из заголовка `Authorization: Bearer` **или** из cookie, валидируем по БД.
-
-* **API-профили**
-  Пользователь создаёт профиль (`api_id`, `api_hash`, опционально `name`). Внутри пользователя запрещены дубликаты по `api_id` и по `api_hash`. Профиль нельзя удалить, если он привязан к аккаунтам.
-
-* **Добавление аккаунта**
-
-  1. Отправляем код в Telegram (`/api/auth/send_code`).
-  2. Подтверждаем код (`/api/auth/confirm_code`), при 2FA — пароль (`/api/auth/confirm_password`).
-  3. Создаётся/обновляется запись `Account`, `.session` сохраняется в `backend/sessions/...`.
-
-* **Обновление аккаунтов**
-
-  * Фоновое: при запросе `/api/accounts?wait=1` сервер, если данные устарели, запускает обновление и либо ждёт до 25 сек, либо отвечает `{"state":"refreshing"}`.
-  * Ручное: `/api/account/<id>/refresh` — стрим `application/x-ndjson` со стадиями/ошибками и финальным `{"done":true,"account":...}`. При невалидной сессии аккаунт удаляется.
-
-* **Список аккаунтов**
-  Клиент аккуратно сортирует по `last_checked_at` и анимирует перестановки (карточка «поднимается» вверх, остальные каскадно смещаются).
-
----
-
-## Первый запуск (локально)
+## Установка и запуск
 
 ### 1) Backend
 
@@ -98,18 +97,32 @@ cd backend
 python -m venv .venv
 # Windows:
 .\.venv\Scripts\activate
-# Linux/macOS:
+# macOS/Linux:
 # source .venv/bin/activate
 
 pip install -r requirements.txt
-# (опционально) свой секрет:
-# set SECRET_KEY=your-secret   # Windows CMD
-# export SECRET_KEY=your-secret # bash/zsh
+```
 
-# Запуск как модуля (важно для импортов пакета backend)
+**(один раз) миграция БД** — создаём таблицу `user_settings`:
+
+```bash
+python migrate_app_db.py
+# по умолчанию меняет backend/app.db, если вы используете другой путь — укажите его:
+# python migrate_app_db.py path/to/app.db
+```
+
+Запуск:
+
+```bash
 python -m backend.app
 # слушает http://localhost:5000
 ```
+
+Переменные окружения (необязательно):
+
+* `SECRET_KEY` — секрет Flask.
+* `GIFTS_DIR` — путь к JSON со снимком подарков (по умолчанию `gifts_data` в корне backend).
+* `GIFTS_CACHE_DIR` — каталог кеша .tgs (по умолчанию `backend/instance/gifts_cache`).
 
 ### 2) Frontend
 
@@ -117,78 +130,81 @@ python -m backend.app
 cd frontend
 npm i
 npm run dev
-# открой http://localhost:5173
+# http://localhost:5173
 ```
 
-> Если фронт и бэкенд на разных порталах в dev, в `vite.config.js` настрой прокси:
->
-> ```js
-> export default defineConfig({
->   server: { proxy: { '/api': 'http://localhost:5000' } }
-> })
-> ```
+Для дев-режима прокси `/api` → `http://localhost:5000` задаётся в `vite.config.js` (если нужен).
 
-### 3) Проверка
+---
+
+## Быстрый старт
 
 1. Открой `http://localhost:5173`, зарегистрируйся/войдите.
-2. Добавь **API-профиль** (api\_id/api\_hash из my.telegram.org).
-3. Нажми «Добавить аккаунт», введи телефон → код → (если нужно) 2FA пароль.
-4. Обновляй аккаунт кнопкой «Обновить» — смотри стрим стадий и итоговые данные.
+2. Создай **API-профиль** (api\_id/api\_hash из my.telegram.org).
+3. Добавь аккаунт (телефон → код → при необходимости 2FA пароль).
+4. Открой **Подарки**:
+
+   * кнопка «Обновить» подтянет список;
+   * включи «Автообновление», чтобы воркер периодически актуализировал данные.
+5. Для превью .tgs зайди в **Настройки** и укажи **Bot token**.
+   Токен используется только для скачивания и кеширования превью (Lottie JSON извлекается из `.tgs` на сервере и кешируется в `instance/gifts_cache`).
 
 ---
 
-## Коротко про продакшен
+## Как устроены «Подарки»
 
-* Собери фронт: `cd frontend && npm ci && npm run build` (появится `dist/`).
-* Подними backend (gunicorn/waitress/uvicorn — на ваш вкус).
-* Любой reverse-proxy (Nginx/Caddy) раздаёт статику из `frontend/dist` и проксирует `/api` → backend.
+* `services/gifts_service.py`
 
----
+  * воркер на пользователя: собирает подарки с его аккаунтов, мёржит по `id`, пишет снимок JSON;
+  * считает компактный `hash` и шлёт события в `gifts_event_bus` только при изменениях;
+  * единичное обновление `refresh_once()` отдаёт свежие данные и пушит событие.
+* `routes/gifts.py`
 
-## Зачем и как устроен стек модалок
-
-**Задача:** открывать вложенные модалки (например, «Удалить?» поверх «Выбор API профиля»), чтобы:
-
-* по **Esc** закрывалась **только верхняя** модалка,
-* клики по фону не «пробивали» к нижней,
-* базовая модалка **не исчезала**, а временно скрывалась.
-
-**Реализация (`ui/ModalStack.jsx`):**
-
-* `ModalProvider` хранит **стек** `{id, onClose}` и вешает **один** обработчик `Esc` на документ.
-* `useModal(onClose)` регистрирует модалку и отдаёт:
-
-  * `isTop` — текущая верхняя,
-  * `hidden` — надо ли спрятать модалку (когда поверх открыта другая),
-  * `suspendAllExceptSelf()` / `resumeAll()` — временно «заглушить» остальные.
-* `ConfirmModal` рендерится через **portal** в `document.body` и на время показывает себя единственной (включает `suspendAllExceptSelf()`).
-
-Итого: любая модалка может поверх открыть confirm — UX остаётся предсказуемым, без «двойных» обработчиков и гонок событий.
+  * `GET /api/gifts` — текущий снимок;
+  * `POST /api/gifts/refresh` — ручное обновление (или NDJSON-стрим по `Accept`);
+  * `GET /api/gifts/sticker.lottie?file_id=...&uniq=...` — отдаёт Lottie JSON из кешированного `.tgs`
+    (если кеша нет — скачивает через **Bot token** текущего пользователя; при отсутствии токена возвращает `409 {"error":"no_bot_token"}`);
+  * `GET /api/gifts/stream` — SSE-стрим событий изменений.
+* Кеш .tgs шардуется по SHA-1(file\_id/uniq), лежит в `instance/gifts_cache/`.
 
 ---
 
-## Полезные заметки
+## Страница «Настройки»
 
-* Токен хранится в **httpOnly-cookie** `auth_token`, 7 дней. Новый логин инвалидирует прежний токен пользователя.
-* `/api/accounts` отдаёт `{"state":"ready","accounts":[...]}` или `{"state":"refreshing"}`.
-  Клиент опрашивает «умно» (без спама), а на 401 — глобально редиректит на `/login`.
-* Сессии Pyrogram и БД (`backend/app.db`) добавлены в `.gitignore`. Для «чистого» старта — удали эти файлы/папки.
+* `SettingsPage.jsx` — простая форма с одним полем **Bot token** (type=password) и кнопкой «Сохранить» (фикс внизу, на всю ширину).
+  После сохранения окно закрывается/фокус уходит.
+* `routes/settings.py` / `services/settings_service.py` — получение/сохранение настроек в таблицу `user_settings`.
 
 ---
 
-## Быстрый чек-лист
+## Сборка продакшена
 
 ```bash
-# Backend
-cd backend
-python -m venv .venv
-.\.venv\Scripts\activate  # или source .venv/bin/activate
-pip install -r requirements.txt
-python -m backend.app
-
-# Frontend
+# фронт
 cd frontend
-npm i
-npm run dev
-# → http://localhost:5173
+npm ci
+npm run build   # dist/
+
+# бэкенд запускается любым WSGI/ASGI сервером, статику dist/ можно раздавать через Nginx/Caddy,
+# а /api проксировать на backend.
 ```
+
+---
+
+## Полезно знать
+
+* Токен аутентификации панели — только в httpOnly-cookie, фронт его не видит.
+* Сессии Pyrogram хранятся в `backend/sessions/user_<id>/...` (gitignore).
+* Если нет ни одного аккаунта — кнопки «Подарки» (в Dashboard) и элементы автообновления на Gifts скрываются.
+* Предпросмотры .tgs кешируются навсегда (immutable Cache-Control); ключ — `file_unique_id`, при его отсутствии — `file_id`.
+
+---
+
+## Троблшутинг
+
+* **Нет предпросмотров .tgs:** убедись, что в «Настройках» сохранён валидный Bot token.
+  Запрос `/api/gifts/sticker.lottie` без токена вернёт `409 {"error":"no_bot_token"}`.
+* **SQLite миграция не сработала:** запусти `python backend/migrate_app_db.py` и проверь, что файл `backend/app.db` доступен на запись.
+
+---
+

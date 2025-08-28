@@ -65,7 +65,7 @@ def _lock_for(session_path: str) -> threading.RLock:
         if lk is None:
             lk = threading.RLock()
             _session_locks[session_path] = lk
-            logger.debug("accounts: created lock for session {}", _sess_name(session_path))
+            logger.debug(f"accounts: created lock for session {_sess_name(session_path)}")
         return lk
 
 def _purge_session_files(session_path: str) -> None:
@@ -81,22 +81,27 @@ def _purge_session_files(session_path: str) -> None:
         pass
 
 def _delete_account_and_session(db: Session, acc: Account) -> None:
-    logger.warning("accounts: deleting invalid session & account (acc_id={}, session={})",
-                   acc.id, _sess_name(acc.session_path))
+    logger.warning(
+        f"accounts: deleting invalid session & account (acc_id={acc.id}, session={_sess_name(acc.session_path)})"
+    )
     _purge_session_files(acc.session_path)
     try:
         db.delete(acc); db.commit()
     except Exception:
-        logger.exception("accounts: failed to delete account (acc_id={})", acc.id)
+        logger.exception(f"accounts: failed to delete account (acc_id={acc.id})")
         db.rollback()
 
+
 async def _fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str):
-    logger.debug("accounts: connecting (session={})", _sess_name(session_path))
+    logger.debug(f"accounts: connecting (session={_sess_name(session_path)})")
     async with Client(session_path, api_id=api_id, api_hash=api_hash) as c:
         me = await c.get_me()
         stars = await c.get_stars_balance()
-        logger.debug("accounts: fetched profile & stars (session={}, stars={})", _sess_name(session_path), int(stars))
+        logger.debug(
+            f"accounts: fetched profile & stars (session={_sess_name(session_path)}, stars={int(stars)})"
+        )
         return me, int(stars)
+
 
 def _should_refresh(now:datetime, lc:Optional[datetime])->bool:
     if lc and lc.tzinfo is None: lc=lc.replace(tzinfo=timezone.utc)
@@ -118,71 +123,98 @@ def any_stale(db:Session, user_id:int)->bool:
         if _should_refresh(now, lc): return True
     return False
 
-def refresh_account(db:Session, acc:Account)->Account|None:
-    lk=_lock_for(acc.session_path); t0=time.perf_counter()
-    logger.info("accounts.refresh: start (acc_id={}, session={})", acc.id, _sess_name(acc.session_path))
+def refresh_account(db: Session, acc: Account) -> Account | None:
+    lk = _lock_for(acc.session_path); t0 = time.perf_counter()
+    logger.info(f"accounts.refresh: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         async def work():
-            me,stars=await _fetch_profile_and_stars(acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash)
-            acc.first_name=getattr(me,"first_name",None); acc.username=getattr(me,"username",None)
-            acc.stars_amount=int(stars); acc.stars_nanos=0; acc.last_checked_at=datetime.now(timezone.utc)
-            db.commit(); return acc
+            me, stars = await _fetch_profile_and_stars(
+                acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
+            )
+            acc.first_name = getattr(me, "first_name", None)
+            acc.username = getattr(me, "username", None)
+            acc.stars_amount = int(stars)
+            acc.stars_nanos = 0
+            acc.last_checked_at = datetime.now(timezone.utc)
+            db.commit()
+            return acc
         try:
-            res=asyncio.run(work()); dt=(time.perf_counter()-t0)*1000
-            logger.info("accounts.refresh: done (acc_id={}, stars={}, dt_ms={:.0f})", acc.id, res.stars_amount, dt)
+            res = asyncio.run(work()); dt = (time.perf_counter() - t0) * 1000
+            logger.info(f"accounts.refresh: done (acc_id={acc.id}, stars={res.stars_amount}, dt_ms={dt:.0f})")
             return res
         except AuthKeyUnregistered:
-            logger.warning("accounts.refresh: AUTH_KEY_UNREGISTERED -> remove (acc_id={}, session={})", acc.id, _sess_name(acc.session_path))
-            _delete_account_and_session(db, acc); return None
-        except Exception: logger.exception("accounts.refresh: failed (acc_id={}, session={})", acc.id, _sess_name(acc.session_path)); raise
+            logger.warning(
+                f"accounts.refresh: AUTH_KEY_UNREGISTERED -> remove (acc_id={acc.id}, session={_sess_name(acc.session_path)})"
+            )
+            _delete_account_and_session(db, acc)
+            return None
+        except Exception:
+            logger.exception(
+                f"accounts.refresh: failed (acc_id={acc.id}, session={_sess_name(acc.session_path)})"
+            )
+            raise
 
 
-def _refresh_user_accounts_worker(user_id:int):
-    st=_user_state(user_id)
+def _refresh_user_accounts_worker(user_id: int):
+    st = _user_state(user_id)
     with st.cv:
-        if st.refreshing: return
-        st.refreshing=True
-    db2=SessionLocal()
+        if st.refreshing:
+            return
+        st.refreshing = True
+    db2 = SessionLocal()
     try:
-        now=datetime.now(timezone.utc)
-        rows=db2.query(Account).filter(Account.user_id==user_id).order_by(Account.id.desc()).all()
+        now = datetime.now(timezone.utc)
+        rows = db2.query(Account).filter(Account.user_id == user_id).order_by(Account.id.desc()).all()
         for r in rows:
             try:
-                if _should_refresh(now, r.last_checked_at): refresh_account(db2, r)
-            except Exception: logger.exception("accounts.bg_refresh: failed (acc_id=%s)", r.id)
+                if _should_refresh(now, r.last_checked_at):
+                    refresh_account(db2, r)
+            except Exception:
+                logger.exception(f"accounts.bg_refresh: failed (acc_id={r.id})")
     finally:
         db2.close()
-        with st.cv: st.refreshing=False; st.rev+=1; st.cv.notify_all()
+        with st.cv:
+            st.refreshing = False
+            st.rev += 1
+            st.cv.notify_all()
 
 def schedule_user_refresh(user_id:int)->None:
     threading.Thread(target=_refresh_user_accounts_worker, args=(user_id,), daemon=True).start()
 
 def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash: str):
     lk = _lock_for(acc.session_path)
-    logger.info("accounts.stream: start (acc_id={}, session={})", acc.id, _sess_name(acc.session_path))
+    logger.info(f"accounts.stream: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         yield {"stage": "connect", "message": "Соединяюсь…"}; time.sleep(0.5)
         try:
             me, stars = asyncio.run(_fetch_profile_and_stars(acc.session_path, api_id, api_hash))
         except AuthKeyUnregistered:
             _delete_account_and_session(db, acc)
-            yield {"error": "session_invalid", "error_code": "AUTH_KEY_UNREGISTERED", "detail": "Сессия невалидна. Авторизуйтесь заново."}
-            logger.warning("accounts.stream: AUTH_KEY_UNREGISTERED -> removed (acc_id={})", acc.id)
+            yield {
+                "error": "session_invalid",
+                "error_code": "AUTH_KEY_UNREGISTERED",
+                "detail": "Сессия невалидна. Авторизуйтесь заново."
+            }
+            logger.warning(f"accounts.stream: AUTH_KEY_UNREGISTERED -> removed (acc_id={acc.id})")
             return
         except Exception as e:
-            logger.exception("accounts.stream: unexpected error (acc_id={})", acc.id)
+            logger.exception(f"accounts.stream: unexpected error (acc_id={acc.id})")
             yield {"error": "internal_error", "detail": str(e)}
             return
+
         yield {"stage": "profile", "message": "Проверяю профиль…"}; time.sleep(0.5)
         yield {"stage": "stars", "message": "Проверяю звёзды…"}; time.sleep(0.5)
+
         acc.first_name = getattr(me, "first_name", None)
         acc.username = getattr(me, "username", None)
         acc.stars_amount = int(stars)
         acc.stars_nanos = 0
         acc.last_checked_at = datetime.now(timezone.utc)
         db.commit()
-        logger.debug("accounts.stream: saved (acc_id={}, stars={})", acc.id, acc.stars_amount)
+
+        logger.debug(f"accounts.stream: saved (acc_id={acc.id}, stars={acc.stars_amount})")
         yield {"stage": "save", "message": "Сохраняю…"}; time.sleep(0.5)
+
         yield {
             "done": True,
             "message": "Готово",
@@ -195,4 +227,4 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
                 "last_checked_at": acc.last_checked_at.isoformat(timespec="seconds"),
             }
         }
-        logger.info("accounts.stream: done (acc_id={}, session={})", acc.id, _sess_name(acc.session_path))
+        logger.info(f"accounts.stream: done (acc_id={acc.id}, session={_sess_name(acc.session_path)})")

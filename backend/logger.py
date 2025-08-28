@@ -1,4 +1,3 @@
-# backend/logger.py
 import os
 import sys
 import logging
@@ -39,13 +38,11 @@ def setup_logging(level: str | None = None) -> None:
         colorize=True,
         backtrace=False,
         diagnose=False,
-        enqueue=False,   # включи True если будет мультипроцессный сервер
+        enqueue=False,
     )
 
-    # Перенаправляем stdlib logging -> loguru
     logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
 
-    # Шумные либы на INFO/WARNING (настрой по вкусу)
     logging.getLogger("werkzeug").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)

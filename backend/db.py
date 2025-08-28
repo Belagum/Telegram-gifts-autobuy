@@ -10,15 +10,14 @@ ENGINE = create_engine(
     pool_pre_ping=True,
 )
 
-# Применяем полезные PRAGMA на каждом подключении
 @event.listens_for(ENGINE, "connect")
 def _set_sqlite_pragmas(dbapi_conn, _):
     cur = dbapi_conn.cursor()
     try:
-        cur.execute("PRAGMA journal_mode=WAL;")     # лучше параллелизм
-        cur.execute("PRAGMA synchronous=NORMAL;")   # компромисс скорость/надёжность
-        cur.execute("PRAGMA foreign_keys=ON;")      # FK-ограничения
-        cur.execute("PRAGMA busy_timeout=30000;")   # 30s ожидание вместо immediate fail
+        cur.execute("PRAGMA journal_mode=WAL;")
+        cur.execute("PRAGMA synchronous=NORMAL;")
+        cur.execute("PRAGMA foreign_keys=ON;")
+        cur.execute("PRAGMA busy_timeout=30000;")
     except Exception:
         logger.exception("Failed to apply SQLite PRAGMAs")
     finally:
@@ -27,7 +26,6 @@ def _set_sqlite_pragmas(dbapi_conn, _):
 class Base(DeclarativeBase):
     pass
 
-# expire_on_commit=False  объекты не протухают сразу после коммита
 SessionLocal = scoped_session(
     sessionmaker(bind=ENGINE, autoflush=False, autocommit=False, expire_on_commit=False)
 )
@@ -46,7 +44,6 @@ def get_db():
             db.close()
             logger.debug("DB session closed")
         finally:
-            # чистим scoped_session биндинг для текущего потока
             SessionLocal.remove()
 
 def init_db():

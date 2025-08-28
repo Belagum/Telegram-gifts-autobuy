@@ -21,7 +21,6 @@ def verify_password(h: str, p: str) -> bool:
 
 
 def issue_token(db: Session, user_id: int) -> str:
-    # один активный токен на пользователя
     db.query(SessionToken).filter(SessionToken.user_id == user_id).delete()
     token = secrets.token_urlsafe(48)
     row = SessionToken(
@@ -33,10 +32,7 @@ def issue_token(db: Session, user_id: int) -> str:
     db.commit()
 
     logger.info(
-        "Issued token for user={user_id} exp={exp} tok={tok}",
-        user_id=user_id,
-        exp=row.expires_at.isoformat(),
-        tok=f"{token[:8]}…",
+        f"Issued token for user={user_id} exp={row.expires_at.isoformat()} tok={token[:8]}…"
     )
     return token
 
@@ -53,9 +49,8 @@ def auth_required(f):
 
         if not token:
             logger.warning(
-                "No Authorization header/cookie on {m} {p} from {ip}",
-                m=request.method, p=request.path,
-                ip=request.headers.get("X-Forwarded-For", request.remote_addr),
+                f"No Authorization header/cookie on {request.method} {request.path} "
+                f"from {request.headers.get('X-Forwarded-For', request.remote_addr)}"
             )
             return jsonify({"error": "unauthorized"}), 401
 
@@ -70,17 +65,19 @@ def auth_required(f):
                 .first()
             )
             if not row:
-                logger.warning("Auth failed (token not found/expired) on {m} {p}", m=request.method, p=request.path)
+                logger.warning(f"Auth failed (token not found/expired) on {request.method} {request.path}")
                 return jsonify({"error": "unauthorized"}), 401
 
             request.user_id = row.user_id
             kw["db"] = db
-            logger.debug("Auth OK: user={uid} {m} {p}", uid=row.user_id, m=request.method, p=request.path)
+            logger.debug(f"Auth OK: user={row.user_id} {request.method} {request.path}")
             return f(*a, **kw)
         except Exception:
-            logger.exception("Unhandled error inside auth wrapper for {m} {p}", m=request.method, p=request.path)
+            logger.exception(f"Unhandled error inside auth wrapper for {request.method} {request.path}")
             raise
         finally:
-            try: db_gen.close()
-            except Exception: logger.exception("Failed to close DB generator in auth wrapper")
+            try:
+                db_gen.close()
+            except Exception:
+                logger.exception("Failed to close DB generator in auth wrapper")
     return inner

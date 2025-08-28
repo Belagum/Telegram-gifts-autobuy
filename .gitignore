@@ -1,0 +1,113 @@
+# =========================
+# ОС / редакторы / IDE
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.orig
+
+.idea/
+.vscode/
+.vscode-test/
+*.iml
+.history/
+
+# =========================
+# Python (backend)
+# =========================
+# виртуальные окружения
+venv/
+.venv/
+env/
+ENV/
+.pyenv/
+.python-version
+
+# байткод / кеши
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.ipynb_checkpoints/
+
+# пакеты/метаданные
+*.egg-info/
+*.egg
+dist/
+build/
+
+# зависимости/локальные конфиги
+.env
+.env.*.local
+.env.local
+!.env.example
+
+# логи и временные
+*.log
+logs/
+tmp/
+temp/
+cache/
+*.tmp
+
+# базы/локальные данные
+*.sqlite
+*.sqlite3
+*.db
+instance/
+# если нужен пустой instance/, добавь instance/.gitkeep и исключение:
+#!instance/.gitkeep
+
+# Pyrogram / Telegram sessions
+session/
+*.session
+*.session-*
+*-journal
+*-wal
+*-shm
+
+# =========================
+# Node / Frontend (React, Vite/Webpack и пр.)
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json.lck
+.pnpm-store/
+
+# билд-артефакты
+dist/
+build/
+.out/
+.out-static/
+
+# кэши тулзов
+.cache/
+.parcel-cache/
+.vite/
+vite.cache/
+coverage/
+.nyc_output/
+
+# линтеры/бандлеры
+.eslintcache
+.stylelintcache
+.turbo/
+.next/
+.nuxt/
+.svelte-kit/
+
+# локальные env для фронта
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example
+
+docker-compose.override.yml
+.docker/

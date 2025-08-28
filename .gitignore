@@ -111,3 +111,6 @@ coverage/
 
 docker-compose.override.yml
 .docker/
+
+gifts_data/
+instance/

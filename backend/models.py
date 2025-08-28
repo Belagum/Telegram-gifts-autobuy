@@ -13,6 +13,18 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(256))
     accounts: Mapped[list["Account"]] = relationship("Account", back_populates="user", cascade="all,delete")
     apis: Mapped[list["ApiProfile"]] = relationship("ApiProfile", back_populates="user", cascade="all,delete")
+    gifts_autorefresh: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        index=True
+    )
 
 class SessionToken(Base):
     __tablename__ = "session_tokens"

@@ -1,6 +1,5 @@
 import asyncio, time, os, threading, glob
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 import re
 
 from sqlalchemy.orm import Session
@@ -120,10 +119,10 @@ async def _fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str
         return me, int(stars), premium, until
 
 
-
-def _should_refresh(now:datetime, lc:Optional[datetime])->bool:
-    if lc and lc.tzinfo is None: lc=lc.replace(tzinfo=timezone.utc)
-    return (lc is None) or ((now-lc)>timedelta(minutes=STALE_MINUTES))
+def _should_refresh(now: datetime, lc: datetime | None) -> bool:
+    if lc and lc.tzinfo is None:
+        lc = lc.replace(tzinfo=timezone.utc)
+    return lc is None or (now - lc) > timedelta(minutes=STALE_MINUTES)
 
 def read_accounts(db:Session, user_id:int)->list[dict]:
     rows=db.query(Account).filter(Account.user_id==user_id).order_by(Account.id.desc()).all()

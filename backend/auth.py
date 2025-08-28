@@ -1,4 +1,3 @@
-# backend/auth.py
 import secrets
 from functools import wraps
 from datetime import datetime, timezone

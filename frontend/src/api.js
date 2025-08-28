@@ -135,3 +135,29 @@ export async function cancelLogin(login_id){
     body: JSON.stringify({ login_id }),
   });
 }
+// GIFTS
+export async function getGiftsSettings(){ return jget("/api/gifts/settings"); }
+export async function setGiftsSettings(auto_refresh){ return jget("/api/gifts/settings", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ auto_refresh }) }); }
+export async function listGifts(){ return jget("/api/gifts"); }
+export async function refreshGifts(){ return jget("/api/gifts/refresh", { method:"POST" }); }
+export function giftsStream(onEvent){
+  const es = new EventSource("/api/gifts/stream", { withCredentials: true });
+  es.addEventListener("gifts", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      onEvent?.(data);
+    } catch {}
+  });
+  es.onerror = () => {
+  };
+  return () => es.close();
+}
+// SETTINGS
+export async function getSettings(){ return jget(`${base}/settings`); }
+export async function setSettings(bot_token){
+  return jget(`${base}/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bot_token })
+  });
+}

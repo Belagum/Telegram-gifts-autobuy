@@ -5,3 +5,4 @@ PyJWT
 Werkzeug
 kurigram
 TgCrypto
+httpx

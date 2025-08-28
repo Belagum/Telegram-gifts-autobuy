@@ -2,6 +2,9 @@ import os
 
 from flask import Flask
 from flask_cors import CORS
+
+from backend.routes.gifts import bp_gifts
+from backend.routes.settings import bp_settings
 from .db import init_db
 from .routes.auth_routes import bp_auth
 from .routes.account_routes import bp_acc
@@ -23,6 +26,8 @@ def create_app() -> Flask:
     app.register_blueprint(bp_misc)
     app.register_blueprint(bp_auth)
     app.register_blueprint(bp_acc)
+    app.register_blueprint(bp_gifts)
+    app.register_blueprint(bp_settings)
 
     logger.info("Flask app initialized")
     return app

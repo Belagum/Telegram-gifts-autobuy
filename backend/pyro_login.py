@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 import os, secrets, glob, threading, asyncio
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy.orm import Session
 from pyrogram import Client
@@ -48,7 +47,7 @@ class PendingLogin:
     api_hash: str
     loop: _LoopThread
     client: Client
-    phone_code_hash: Optional[str] = None
+    phone_code_hash: str | None = None
 
 
 class PyroLoginManager:

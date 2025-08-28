@@ -208,7 +208,7 @@ export default function AccountList({accounts:initial}){
                 : "Премиум: ❌"}
             </div>
             <div className="muted" style={{marginTop:8}}>Обновлено: {fmt(a.last_checked_at)}</div>
-            <div style={{marginTop:10}}>
+            <div style={{marginTop:10,display:"flex",gap:8,flexWrap:"wrap"}}>
               <button onClick={()=>doRefresh(a.id)} disabled={isLoading} className={`btn ${isLoading?"btn--progress":""}`}>
                 {isLoading?"Обновляю…":"Обновить"}
               </button>

@@ -1,3 +1,5 @@
+import GiftsPage from "./pages/GiftsPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -19,6 +21,8 @@ createRoot(document.getElementById("root")).render(
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<Dashboard />} />
+          <Route path="/gifts" element={<GiftsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

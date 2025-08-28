@@ -1,6 +1,6 @@
-// src/pages/Dashboard.jsx
 import React,{useEffect,useState} from "react";
-import { me, listAccounts, listApiProfiles } from "../api";
+import openCentered from "../utils/openCentered.js";
+import { me, listAccounts, listApiProfiles, getGiftsSettings, setGiftsSettings } from "../api";
 import AccountList from "../components/AccountList.jsx";
 import AddApiModal from "../components/AddApiModal.jsx";
 import AddAccountModal from "../components/AddAccountModal.jsx";
@@ -15,6 +15,9 @@ export default function Dashboard(){
   const [openSelect,setOpenSelect]=useState(false);
   const [openAcc,setOpenAcc]=useState(false);
   const [apiProfileId,setApiProfileId]=useState(null);
+  const [autoGifts,setAutoGifts]=useState(false);
+  const openGifts=()=> openCentered("/gifts","gifts",520,700);
+  const openSettings=()=> openCentered("/settings","settings",520,420);
 
   const load=async()=>{
     await me();
@@ -39,10 +42,16 @@ export default function Dashboard(){
 
   const done=()=>{ setOpenAcc(false); setApiProfileId(null); load(); };
 
+  const hasAcc = Array.isArray(accounts) && accounts.length>0;
+
   return (
     <>
-      <div className="header">
-        <h2>TG Gifts</h2><div className="spacer"/><button onClick={startAdd}>Добавить аккаунт</button>
+      <div className="header" style={{marginBottom:12, gap:12}}>
+        <h2 style={{margin:0}}>TG Gifts</h2>
+        <div className="spacer"/>
+        <button onClick={openSettings}>Настройки</button>
+        {hasAcc && <button onClick={openGifts}>Подарки</button>}
+        <button onClick={startAdd}>Добавить аккаунт</button>
       </div>
 
       <AccountList accounts={accounts}/>

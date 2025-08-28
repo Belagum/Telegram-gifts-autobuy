@@ -1,6 +1,9 @@
 from sqlalchemy import Integer, String, ForeignKey, BigInteger, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timedelta, timezone
+
+from sqlalchemy.sql.sqltypes import Boolean
+
 from .db import Base
 
 class User(Base):
@@ -39,24 +42,21 @@ class ApiProfile(Base):
 
 class Account(Base):
     __tablename__ = "accounts"
-    __table_args__ = (UniqueConstraint("user_id","phone", name="u_user_phone"),)
+    __table_args__ = (UniqueConstraint("user_id", "phone", name="u_user_phone"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     api_profile_id: Mapped[int] = mapped_column(ForeignKey("api_profiles.id", ondelete="CASCADE"), index=True)
     phone: Mapped[str] = mapped_column(String(32))
-    username: Mapped[str|None] = mapped_column(String(64), nullable=True)
-    first_name: Mapped[str|None] = mapped_column(String(128), nullable=True)
-    stars_amount: Mapped[int] = mapped_column(BigInteger, default=0)
-    stars_nanos: Mapped[int] = mapped_column(Integer, default=0)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    stars_amount: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    is_premium: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     session_path: Mapped[str] = mapped_column(String(256))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     user: Mapped["User"] = relationship("User", back_populates="accounts")
     api_profile: Mapped["ApiProfile"] = relationship("ApiProfile", back_populates="accounts")
+
 
 def token_default_exp(days:int=7)->datetime:
     return datetime.now(timezone.utc) + timedelta(days=days)

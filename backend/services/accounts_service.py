@@ -97,10 +97,11 @@ async def _fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str
     async with Client(session_path, api_id=api_id, api_hash=api_hash) as c:
         me = await c.get_me()
         stars = await c.get_stars_balance()
+        premium = bool(getattr(me, "is_premium", False))
         logger.debug(
-            f"accounts: fetched profile & stars (session={_sess_name(session_path)}, stars={int(stars)})"
+            f"accounts: fetched profile & stars (session={_sess_name(session_path)}, stars={int(stars)}, premium={premium})"
         )
-        return me, int(stars)
+        return me, int(stars), premium
 
 
 def _should_refresh(now:datetime, lc:Optional[datetime])->bool:
@@ -113,8 +114,17 @@ def read_accounts(db:Session, user_id:int)->list[dict]:
     for r in rows:
         dt=r.last_checked_at
         if dt and dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
-        out.append({"id":r.id,"phone":r.phone,"username":r.username,"first_name":r.first_name,"stars":float(r.stars_amount),"last_checked_at":dt.isoformat(timespec="seconds") if dt else None})
+        out.append({
+            "id":r.id,
+            "phone":r.phone,
+            "username":r.username,
+            "first_name":r.first_name,
+            "is_premium": bool(r.is_premium),
+            "stars": float(r.stars_amount),
+            "last_checked_at":dt.isoformat(timespec="seconds") if dt else None
+        })
     return out
+
 
 def any_stale(db:Session, user_id:int)->bool:
     now=datetime.now(timezone.utc)
@@ -128,11 +138,12 @@ def refresh_account(db: Session, acc: Account) -> Account | None:
     logger.info(f"accounts.refresh: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         async def work():
-            me, stars = await _fetch_profile_and_stars(
+            me, stars, premium = await _fetch_profile_and_stars(
                 acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
             )
             acc.first_name = getattr(me, "first_name", None)
             acc.username = getattr(me, "username", None)
+            acc.is_premium = bool(premium)
             acc.stars_amount = int(stars)
             acc.stars_nanos = 0
             acc.last_checked_at = datetime.now(timezone.utc)
@@ -187,7 +198,7 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
     with lk:
         yield {"stage": "connect", "message": "Соединяюсь…"}; time.sleep(0.5)
         try:
-            me, stars = asyncio.run(_fetch_profile_and_stars(acc.session_path, api_id, api_hash))
+            me, stars, premium = asyncio.run(_fetch_profile_and_stars(acc.session_path, api_id, api_hash))
         except AuthKeyUnregistered:
             _delete_account_and_session(db, acc)
             yield {
@@ -207,12 +218,13 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
 
         acc.first_name = getattr(me, "first_name", None)
         acc.username = getattr(me, "username", None)
+        acc.is_premium = bool(premium)
         acc.stars_amount = int(stars)
         acc.stars_nanos = 0
         acc.last_checked_at = datetime.now(timezone.utc)
         db.commit()
 
-        logger.debug(f"accounts.stream: saved (acc_id={acc.id}, stars={acc.stars_amount})")
+        logger.debug(f"accounts.stream: saved (acc_id={acc.id}, stars={acc.stars_amount}, premium={acc.is_premium})")
         yield {"stage": "save", "message": "Сохраняю…"}; time.sleep(0.5)
 
         yield {
@@ -223,6 +235,7 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
                 "phone": acc.phone,
                 "username": acc.username,
                 "first_name": acc.first_name,
+                "is_premium": bool(acc.is_premium),
                 "stars": float(acc.stars_amount),
                 "last_checked_at": acc.last_checked_at.isoformat(timespec="seconds"),
             }

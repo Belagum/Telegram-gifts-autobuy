@@ -202,7 +202,11 @@ export default function AccountList({accounts:initial}){
             <div className="title">{a.first_name||"Без имени"}</div>
             <div>@{a.username||"—"}</div>
             <div>Звёзды: {a.stars}</div>
-            <div>Премиум: {a.is_premium ? "✅" : "❌"}</div>
+            <div>
+              {a.is_premium
+                ? `Премиум: ✅ (до ${a.premium_until})`
+                : "Премиум: ❌"}
+            </div>
             <div className="muted" style={{marginTop:8}}>Обновлено: {fmt(a.last_checked_at)}</div>
             <div style={{marginTop:10}}>
               <button onClick={()=>doRefresh(a.id)} disabled={isLoading} className={`btn ${isLoading?"btn--progress":""}`}>

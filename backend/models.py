@@ -51,6 +51,7 @@ class Account(Base):
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     stars_amount: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
     is_premium: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    premium_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
     session_path: Mapped[str] = mapped_column(String(256))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

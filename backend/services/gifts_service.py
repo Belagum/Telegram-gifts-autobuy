@@ -4,6 +4,8 @@
 import asyncio
 import os, json, time, threading, hashlib
 from queue import Queue
+import sqlite3
+from collections import defaultdict
 
 from pyrogram import Client
 from sqlalchemy.orm import Session
@@ -14,6 +16,8 @@ from ..logger import logger
 
 _GIFTS_THREADS: dict[int, dict] = {}
 _GIFTS_DIR = os.getenv("GIFTS_DIR", "gifts_data")
+SESSION_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
+def _lock_for_session(path:str)->threading.Lock: return SESSION_LOCKS[os.path.abspath(path)]
 
 class NoAccountsError(Exception): pass
 
@@ -27,22 +31,32 @@ def _ensure_dir()->None:
         pass
 
 async def _list_gifts_for_account(session_path: str, api_id: int, api_hash: str) -> list[dict]:
-    async with Client(session_path, api_id=api_id, api_hash=api_hash, no_updates=True) as c:
-        gifts = await c.get_available_gifts()
-        out = []
-        for g in gifts or []:
-            st = getattr(g, "sticker", None)
-            out.append({
-                "id": int(getattr(g, "id", 0)),
-                "price": int(getattr(g, "price", 0)),
-                "is_limited": bool(getattr(g, "is_limited", False)),
-                "available_amount": int(getattr(g, "available_amount", 0)) if getattr(g, "is_limited", False) else None,
-                "require_premium": bool(getattr(getattr(g, "raw", None), "require_premium", False)),
-                "sticker_file_id": getattr(st, "file_id", None),
-                "sticker_unique_id": getattr(st, "file_unique_id", None),
-                "sticker_mime": getattr(st, "mime_type", None),
-            })
-        return out
+    lock = _lock_for_session(session_path)
+    backoff = 0.4
+    for attempt in range(5):
+        try:
+            with lock:
+                async with Client(session_path, api_id=api_id, api_hash=api_hash, no_updates=True) as c:
+                    gifts = await c.get_available_gifts()
+            out=[]
+            for g in gifts or []:
+                st=getattr(g,"sticker",None)
+                out.append({
+                    "id": int(getattr(g,"id",0)),
+                    "price": int(getattr(g,"price",0)),
+                    "is_limited": bool(getattr(g,"is_limited",False)),
+                    "available_amount": int(getattr(g,"available_amount",0)) if getattr(g,"is_limited",False) else None,
+                    "require_premium": bool(getattr(getattr(g,"raw",None),"require_premium",False)),
+                    "sticker_file_id": getattr(st,"file_id",None),
+                    "sticker_unique_id": getattr(st,"file_unique_id",None),
+                    "sticker_mime": getattr(st,"mime_type",None),
+                })
+            return out
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e).lower() and attempt<4:
+                await asyncio.sleep(backoff); backoff*=2; continue
+            raise
+
 
 def _merge_new(prev:list[dict], cur:list[dict])->list[dict]:
     by_id={x["id"]:x for x in prev}

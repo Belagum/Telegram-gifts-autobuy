@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import os, secrets, glob, threading, asyncio
 from dataclasses import dataclass
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pyrogram import Client
 from pyrogram.errors import SessionPasswordNeeded, RPCError
@@ -194,20 +195,62 @@ class PyroLoginManager:
             try: self._purge(p.session_path)
             except Exception: pass
 
+
     def _finalize(self, db: Session, p: PendingLogin, me, stars: int) -> None:
+        tg_id = int(getattr(me, "id", 0)) or None
+
+        # пробуем найти по (user_id, phone)
         acc = db.query(Account).filter(Account.user_id == p.user_id, Account.phone == p.phone).first()
+
+        if not acc and tg_id:
+            acc = db.get(Account, tg_id)
+            if not acc:
+                acc = Account(
+                    id=tg_id,
+                    user_id=p.user_id,
+                    api_profile_id=p.api_profile_id,
+                    phone=p.phone,
+                    session_path=p.session_path,
+                )
+                db.add(acc)
+            else:
+                acc.user_id = p.user_id
+                acc.api_profile_id = p.api_profile_id
+                acc.phone = p.phone
+                acc.session_path = p.session_path
+
         if not acc:
             acc = Account(
                 user_id=p.user_id,
                 api_profile_id=p.api_profile_id,
                 phone=p.phone,
-                session_path=p.session_path
+                session_path=p.session_path,
             )
             db.add(acc)
+
         acc.username = getattr(me, "username", None)
         acc.first_name = getattr(me, "first_name", None)
         acc.stars_amount = int(stars)
         acc.stars_nanos = 0
         acc.session_path = p.session_path
         acc.last_checked_at = datetime.now(timezone.utc)
-        db.commit()
+
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if tg_id:
+                acc = db.get(Account, tg_id)
+                if acc:
+                    acc.user_id = p.user_id
+                    acc.api_profile_id = p.api_profile_id
+                    acc.phone = p.phone
+                    acc.session_path = p.session_path
+                    acc.username = getattr(me, "username", None)
+                    acc.first_name = getattr(me, "first_name", None)
+                    acc.stars_amount = int(stars)
+                    acc.stars_nanos = 0
+                    acc.last_checked_at = datetime.now(timezone.utc)
+                    db.commit()
+            else:
+                raise

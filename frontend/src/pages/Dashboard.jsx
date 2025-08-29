@@ -3,7 +3,7 @@
 
 import React,{useEffect,useState} from "react";
 import openCentered from "../utils/openCentered.js";
-import { me, listAccounts, listApiProfiles, getGiftsSettings, setGiftsSettings } from "../api";
+import { me, listAccounts, listApiProfiles } from "../api";
 import AccountList from "../components/AccountList.jsx";
 import AddApiModal from "../components/AddApiModal.jsx";
 import AddAccountModal from "../components/AddAccountModal.jsx";
@@ -12,22 +12,23 @@ import { useNavigate } from "react-router-dom";
 
 export default function Dashboard(){
   const nav = useNavigate();
-  const [accounts,setAccounts]=useState(undefined);
+  const [accounts,setAccounts]=useState([]); // было undefined
   const [apiProfiles,setApiProfiles]=useState([]);
   const [openApi,setOpenApi]=useState(false);
   const [openSelect,setOpenSelect]=useState(false);
   const [openAcc,setOpenAcc]=useState(false);
   const [apiProfileId,setApiProfileId]=useState(null);
-  const [autoGifts,setAutoGifts]=useState(false);
+
   const openGifts=()=> openCentered("/gifts","gifts",520,700);
   const openSettings=()=> openCentered("/settings","settings",520,420);
 
   const load=async()=>{
     await me();
     const res=await listAccounts();
-    const a=res?.accounts;
-    setAccounts(Array.isArray(a)? a : undefined);
+    const a = res?.items ?? res?.accounts ?? [];
+    setAccounts(Array.isArray(a) ? a : []);
   };
+
   const refreshProfiles=async()=>{
     const {items}=await listApiProfiles();
     setApiProfiles(items||[]);
@@ -45,7 +46,7 @@ export default function Dashboard(){
 
   const done=()=>{ setOpenAcc(false); setApiProfileId(null); load(); };
 
-  const hasAcc = Array.isArray(accounts) && accounts.length>0;
+  const hasAcc = accounts?.length > 0;
 
   return (
     <>
@@ -57,7 +58,7 @@ export default function Dashboard(){
         <button onClick={startAdd}>Добавить аккаунт</button>
       </div>
 
-      <AccountList accounts={accounts}/>
+      <AccountList accounts={accounts||[]} />
 
       {openSelect && (
         <SelectApiProfileModal

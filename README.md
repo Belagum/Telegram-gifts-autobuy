@@ -1,5 +1,3 @@
-Вот обновлённый **README.md** под текущую структуру и функциональность проекта.
-
 ---
 
 # GiftBuyer
@@ -51,6 +49,7 @@ GiftBuyer/
       accounts_service.py
       gifts_service.py  # воркер подарков, SSE-шина, merge, hash и т.д.
       settings_service.py
+      notify_gifts_service.py # отсылает уведомления о новых подарках
     sessions/           # .session файлы Pyrogram  (gitignored)
     instance/
       gifts_cache/      # кеш .tgs (gzip) по file_id / unique_id (gitignored)

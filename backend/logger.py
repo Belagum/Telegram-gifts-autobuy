@@ -15,19 +15,17 @@ _FMT = (
 )
 
 class _InterceptHandler(logging.Handler):
+    _DROP_PREFIXES = ("pyrogram",)
+
     def emit(self, record: logging.LogRecord) -> None:
+        if any(record.name.startswith(p) for p in self._DROP_PREFIXES):
+            return  # игнорим полностью
         try:
             level = _logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
+        _logger.opt(depth=6, exception=record.exc_info).log(level, record.getMessage())
 
-        frame, depth = logging.currentframe(), 2
-        # поднимаемся выше внутренних стеков logging
-        while frame and frame.f_code.co_filename == logging.__file__:
-            frame = frame.f_back
-            depth += 1
-
-        _logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 def setup_logging(level: str | None = None) -> None:
     level = (level or os.getenv("LOG_LEVEL") or "INFO").upper()
@@ -48,7 +46,6 @@ def setup_logging(level: str | None = None) -> None:
 
     logging.getLogger("werkzeug").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 def bind_flask(app) -> None:
 

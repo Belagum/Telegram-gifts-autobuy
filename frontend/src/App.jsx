@@ -16,18 +16,36 @@ export default function App(){
     return unsub;
   },[nav]);
 
-  React.useEffect(()=>{
-    const pub = loc.pathname.startsWith("/login") || loc.pathname.startsWith("/register");
-    if (pub) { setReady(true); return; }
-    if (subOnceRef.current) return;
-    subOnceRef.current = true;
-    let ab = false;
-    (async ()=>{
-      try { await me(); if (!ab) setReady(true); }
-      catch { if (!ab) nav("/login", { replace: true }); }
+React.useEffect(() => {
+  const pub = loc.pathname.startsWith("/login") || loc.pathname.startsWith("/register");
+  let aborted = false;
+
+  if (pub) {
+    (async () => {
+      try {
+        await me();
+        if (!aborted) nav("/", { replace: true });
+      } catch {
+        if (!aborted) setReady(true);
+      }
     })();
-    return ()=>{ ab = true; };
-  },[loc.pathname, nav]);
+    return () => { aborted = true; };
+  }
+
+  if (subOnceRef.current) return;
+  subOnceRef.current = true;
+
+  let aborted2 = false;
+  (async () => {
+    try {
+      await me();
+      if (!aborted2) setReady(true);
+    } catch {
+      if (!aborted2) nav("/login", { replace: true });
+    }
+  })();
+  return () => { aborted2 = true; };
+}, [loc.pathname, nav]);
 
   if (!ready) return null;
   return <div className="wrap"><Outlet/></div>;

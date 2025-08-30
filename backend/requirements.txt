@@ -1,7 +1,6 @@
 Flask
 Flask-Cors
 SQLAlchemy
-PyJWT
 Werkzeug
 kurigram
 TgCrypto

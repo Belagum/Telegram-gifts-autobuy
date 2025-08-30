@@ -1,20 +1,37 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2025 Vova orig
+// Copyright 2025 Vova Orig
 
 import React from "react";
 import { getSettings, setSettings } from "../api";
 
+function tailFromId(v){
+  const d = String(v ?? "").replace(/\D+/g,"");
+  return d.startsWith("100") ? d.slice(3) : d;
+}
+
 export default function SettingsPage(){
   const [token,setToken]=React.useState("");
+  const [chatTail,setChatTail]=React.useState("");
   const [saving,setSaving]=React.useState(false);
 
-  React.useEffect(()=>{ (async()=>{ try{ const r=await getSettings(); setToken(r.bot_token||""); }catch{} })(); },[]);
+  React.useEffect(()=>{ (async()=>{ try{
+    const r=await getSettings();
+    setToken(r.bot_token||"");
+    setChatTail(tailFromId(r.notify_chat_id));
+  }catch{} })(); },[]);
+
+  const onChatChange = (e)=>{
+    const raw = e.target.value || "";
+    const d = raw.replace(/\D+/g,"");
+    setChatTail(d.startsWith("100") ? d.slice(3) : d);
+  };
 
   const save=async()=>{
     if (saving) return;
     setSaving(true);
     try{
-      await setSettings(token||null);
+      const chatId = chatTail ? `-100${chatTail}` : null;
+      await setSettings(token||null, chatId);
       window.close();
     }finally{
       setSaving(false);
@@ -28,7 +45,7 @@ export default function SettingsPage(){
         <div className="spacer"/>
       </div>
 
-      <div className="card" style={{padding:12,display:"grid",gap:8}}>
+      <div className="card" style={{padding:12,display:"grid",gap:8,marginBottom:12}}>
         <div className="title">Bot token</div>
         <input
           type="password"
@@ -39,10 +56,23 @@ export default function SettingsPage(){
         <div className="muted" style={{fontSize:12}}>Используется для уведомлений и скачивания превью.</div>
       </div>
 
-      <div style={{
-        position:"fixed", left:0, right:0, bottom:0,
-        padding:12, background:"#0f141b", borderTop:"1px solid #223"
-      }}>
+      <div className="card" style={{padding:12,display:"grid",gap:8,marginBottom:12}}>
+        <div className="title">ID чата для уведомлений</div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{padding:"0 8px",border:"1px solid #223",borderRadius:6,height:36,display:"flex",alignItems:"center"}}>-100</div>
+          <input
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="XXXXXXXXXXXX"
+            value={chatTail}
+            onChange={onChatChange}
+            style={{flex:1}}
+          />
+        </div>
+        <div className="muted" style={{fontSize:12}}>Можно вставить полный ID — префикс будет добавлен автоматически.</div>
+      </div>
+
+      <div style={{position:"fixed",left:0,right:0,bottom:0,padding:12,background:"#0f141b",borderTop:"1px solid #223"}}>
         <button onClick={save} disabled={saving} style={{width:"100%",height:44}}>
           {saving ? "Сохраняю…" : "Сохранить"}
         </button>

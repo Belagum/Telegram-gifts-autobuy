@@ -10,7 +10,7 @@ from .tg_clients_service import tg_call
 
 PROBE_CALL_TIMEOUT = 6.0
 
-def _norm_ch_id(v)->int:
+def norm_ch_id(v)->int:
     s=str(v or "").strip()
     if not s: raise ValueError("invalid channel id")
     if s.startswith("-100"):
@@ -93,7 +93,7 @@ def list_channels(db:Session, user_id:int)->list[dict]:
     return [{"id":r.id,"channel_id":int(r.channel_id),"title":r.title or "","price_min":r.price_min,"price_max":r.price_max,"supply_min":r.supply_min,"supply_max":r.supply_max} for r in rows]
 
 def create_channel(db:Session, user_id:int, channel_id, price_min, price_max, supply_min, supply_max, title_input:str|None)->dict:
-    try: ch_id=_norm_ch_id(channel_id)
+    try: ch_id=norm_ch_id(channel_id)
     except ValueError as e: return {"error":"bad_channel_id","detail":str(e)}
     try:
         price_min, price_max=_coerce_range("price_min","price_max",price_min,price_max)

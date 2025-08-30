@@ -157,11 +157,11 @@ export function giftsStream(onEvent){
 }
 // SETTINGS
 export async function getSettings(){ return jget(`${base}/settings`); }
-export async function setSettings(bot_token){
+export async function setSettings(bot_token, notify_chat_id){
   return jget(`${base}/settings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bot_token })
+    body: JSON.stringify({ bot_token, notify_chat_id })
   });
 }
 // CHANNELS

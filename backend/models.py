@@ -36,6 +36,7 @@ class UserSettings(Base):
     __tablename__ = "user_settings"
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
     bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    notify_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

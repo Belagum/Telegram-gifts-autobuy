@@ -10,7 +10,6 @@ _FMT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
     "<lvl>{level:<8}</lvl> | "
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-    "<magenta>{process.name}:{thread.name}</magenta> - "
     "<lvl>{message}</lvl>"
 )
 

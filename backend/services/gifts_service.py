@@ -14,7 +14,6 @@ from .tg_clients_service import tg_call, tg_shutdown
 
 GIFTS_THREADS: dict[int, dict] = {}
 _GIFTS_DIR = os.getenv("GIFTS_DIR", "gifts_data")
-REFRESH_PERIOD = float(os.getenv("GIFTS_REFRESH_PERIOD", "15.0"))   # сек между циклами
 ACC_TTL = float(os.getenv("GIFTS_ACCS_TTL", "60.0"))
 
 class NoAccountsError(Exception): pass

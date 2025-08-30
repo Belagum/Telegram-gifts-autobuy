@@ -11,9 +11,9 @@ from backend.logger import setup_logging, bind_flask, logger
 
 from backend.routes.gifts import bp_gifts
 from backend.routes.settings import bp_settings
-from backend.routes.auth_routes import bp_auth
-from backend.routes.account_routes import bp_acc
-from backend.routes.misc_routes import bp_misc
+from backend.routes.auth import bp_auth
+from backend.routes.account import bp_acc
+from backend.routes.misc import bp_misc
 
 from backend.services.gifts_service import start_user_gifts, stop_user_gifts, GIFTS_THREADS
 

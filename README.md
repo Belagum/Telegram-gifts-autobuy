@@ -37,9 +37,9 @@ GiftBuyer/
     requirements.txt
     routes/
       __init__.py
-      auth_routes.py
-      account_routes.py
-      misc_routes.py
+      auth.py
+      account.py
+      misc.py
       gifts.py          # API подарков + Lottie-кеш + SSE
       settings.py       # API настроек пользователя (bot token)
     services/

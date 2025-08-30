@@ -231,7 +231,6 @@ class PyroLoginManager:
         acc.username = getattr(me, "username", None)
         acc.first_name = getattr(me, "first_name", None)
         acc.stars_amount = int(stars)
-        acc.stars_nanos = 0
         acc.session_path = p.session_path
         acc.last_checked_at = datetime.now(timezone.utc)
 
@@ -249,7 +248,6 @@ class PyroLoginManager:
                     acc.username = getattr(me, "username", None)
                     acc.first_name = getattr(me, "first_name", None)
                     acc.stars_amount = int(stars)
-                    acc.stars_nanos = 0
                     acc.last_checked_at = datetime.now(timezone.utc)
                     db.commit()
             else:

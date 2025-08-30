@@ -1,23 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-import asyncio, time, os, threading, glob
+import asyncio, time, os, threading, glob, re
 from datetime import datetime, timedelta, timezone
-import re
 
 from sqlalchemy.orm import Session
 from pyrogram import Client
 from pyrogram.errors import AuthKeyUnregistered
 from pyrogram.raw.functions.help import GetPremiumPromo
 
+from .tg_clients_service import tg_call
 from ..models import Account
 from ..logger import logger
 from ..db import SessionLocal
-
+from .session_locks_service import session_lock_for
 STALE_MINUTES = 60
 
-_session_locks: dict[str, threading.RLock] = {}
-_session_locks_guard = threading.Lock()
 
 class _UserState:
     __slots__ = ("refreshing", "rev", "cv")
@@ -69,15 +67,6 @@ def wait_until_ready(user_id: int, timeout_sec: float) -> bool:
 def _sess_name(path: str) -> str:
     return os.path.basename(path or "") or "unknown.session"
 
-def _lock_for(session_path: str) -> threading.RLock:
-    with _session_locks_guard:
-        lk = _session_locks.get(session_path)
-        if lk is None:
-            lk = threading.RLock()
-            _session_locks[session_path] = lk
-            logger.debug(f"accounts: created lock for session {_sess_name(session_path)}")
-        return lk
-
 def _purge_session_files(session_path: str) -> None:
     try:
         for p in (session_path, session_path + "-journal", session_path + "-shm", session_path + "-wal"):
@@ -102,24 +91,19 @@ def _delete_account_and_session(db: Session, acc: Account) -> None:
         db.rollback()
 
 
-async def _fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str):
-    logger.debug(f"accounts: connecting (session={_sess_name(session_path)})")
-    async with Client(session_path, api_id=api_id, api_hash=api_hash) as c:
-        me = await c.get_me()
-        stars = await c.get_stars_balance()
-        premium = bool(getattr(me, "is_premium", False))
-        status_text = None
-        if premium:
-            try:
-                promo = await c.invoke(GetPremiumPromo())
-                status_text = getattr(promo, "status_text", None)
-            except Exception:
-                status_text = None
-        until = _extract_premium_until_str(status_text or "") if premium else None
-        logger.debug(
-            f"accounts: fetched profile & stars (session={_sess_name(session_path)}, stars={int(stars)}, premium={premium}, until={until})"
-        )
-        return me, int(stars), premium, until
+async def _fetch_profile_and_stars(session_path:str, api_id:int, api_hash:str):
+    me = await tg_call(session_path, api_id, api_hash, lambda c: c.get_me())
+    stars = await tg_call(session_path, api_id, api_hash, lambda c: c.get_stars_balance())
+    premium = bool(getattr(me, "is_premium", False))
+    status_text = None
+    if premium:
+        try:
+            promo = await tg_call(session_path, api_id, api_hash, lambda c: c.invoke(GetPremiumPromo()))
+            status_text = getattr(promo, "status_text", None)
+        except Exception:
+            status_text = None
+    until = _extract_premium_until_str(status_text or "") if premium else None
+    return me, int(stars), premium, until
 
 
 def _should_refresh(now: datetime, lc: datetime | None) -> bool:
@@ -156,7 +140,7 @@ def any_stale(db:Session, user_id:int)->bool:
 
 # services/accounts_service.py — запись в БД и отдельный стейт в стриме; убран stars_nanos
 def refresh_account(db: Session, acc: Account) -> Account | None:
-    lk = _lock_for(acc.session_path); t0 = time.perf_counter()
+    lk = session_lock_for(acc.session_path); t0 = time.perf_counter()
     logger.info(f"accounts.refresh: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         async def work():
@@ -216,7 +200,7 @@ def schedule_user_refresh(user_id:int)->None:
     threading.Thread(target=_refresh_user_accounts_worker, args=(user_id,), daemon=True).start()
 
 def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash: str):
-    lk = _lock_for(acc.session_path)
+    lk = session_lock_for(acc.session_path)
     logger.info(f"accounts.stream: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         yield {"stage": "connect", "message": "Соединяюсь…"}; time.sleep(0.5)

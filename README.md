@@ -48,6 +48,8 @@ GiftBuyer/
       gifts_service.py  # воркер подарков, SSE-шина, merge, hash и т.д.
       settings_service.py
       notify_gifts_service.py # отсылает уведомления о новых подарках
+      session_locks_service.py  # глобальный лок по абсолютному пути .session; используется только для start/stop клиента
+      tg_clients.py             # единый Pyrogram-клиент на session_path + раннер вызовов (tg_call, tg_shutdown); сериализация запросов между потоками/loop'ами
     sessions/           # .session файлы Pyrogram  (gitignored)
     instance/
       gifts_cache/      # кеш .tgs (gzip) по file_id / unique_id (gitignored)

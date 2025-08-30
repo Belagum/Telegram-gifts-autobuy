@@ -2,24 +2,18 @@
 # Copyright 2025 Vova orig
 
 import asyncio
-import os, json, time, threading, hashlib, random
-from collections import defaultdict
+import os, json, time, threading, hashlib
 from queue import Queue
-import sqlite3
-from typing import Optional
-from pyrogram import Client
 from sqlalchemy.orm import Session, joinedload
 
 from .notify_gifts_service import broadcast_new_gifts
 from ..db import SessionLocal
 from ..models import Account
 from ..logger import logger
+from .tg_clients_service import tg_call, tg_shutdown
 
 GIFTS_THREADS: dict[int, dict] = {}
 _GIFTS_DIR = os.getenv("GIFTS_DIR", "gifts_data")
-_CLIENTS: dict[str, dict[int, "_ClientBox"]] = {}
-_CLIENTS_LOCK = threading.Lock()
-_SESSION_LOCKS: dict[str, threading.Lock] = defaultdict(threading.Lock)
 REFRESH_PERIOD = float(os.getenv("GIFTS_REFRESH_PERIOD", "15.0"))   # сек между циклами
 ACC_TTL = float(os.getenv("GIFTS_ACCS_TTL", "60.0"))
 
@@ -89,131 +83,23 @@ class _GiftsEventBus:
 
 gifts_event_bus=_GiftsEventBus()
 
-# ---------- persistent clients ----------
-
-class _ClientBox:
-    def __init__(self, session_path:str, api_id:int, api_hash:str):
-        self.session_path = os.path.abspath(session_path)
-        self.api_id = api_id
-        self.api_hash = api_hash
-        self.client: Optional[Client] = None
-        self.thread_id = threading.get_ident()
-        self._loop = None
-        self.init_lock: Optional[asyncio.Lock] = None
-        self.call_lock: Optional[asyncio.Lock] = None
-        self.last_call = 0.0
-
-    def ensure_locks(self)->None:
-        loop = asyncio.get_running_loop()
-        if self._loop is not loop:
-            self._loop = loop
-            self.init_lock = asyncio.Lock()
-            self.call_lock = asyncio.Lock()
-
-async def _get_box(session_path:str, api_id:int, api_hash:str)->_ClientBox:
-    key = os.path.abspath(session_path)
-    tid = threading.get_ident()
-    with _CLIENTS_LOCK:
-        by_thread = _CLIENTS.setdefault(key, {})
-        box = by_thread.get(tid)
-        if not box:
-            box = _ClientBox(key, api_id, api_hash)
-            by_thread[tid] = box
-    box.ensure_locks()
-    async with box.init_lock:  # type: ignore[arg-type]
-        if box.client is None or not getattr(box.client, "is_connected", False):
-            # сериализация доступа к файлу сессии между потоками
-            with _SESSION_LOCKS[key]:
-                backoff = 0.2
-                for attempt in range(6):
-                    try:
-                        box.client = Client(box.session_path, api_id=box.api_id, api_hash=box.api_hash, no_updates=True)
-                        await box.client.start()
-                        break
-                    except sqlite3.OperationalError as e:
-                        if "database is locked" in str(e).lower() and attempt < 5:
-                            await asyncio.sleep(backoff)
-                            backoff = min(backoff * 2, 2.0)
-                            continue
-                        raise
-    return box
-
-
-async def _shutdown_clients(paths:set[str])->None:
-    cur_tid = threading.get_ident()
-    for p in list(paths):
-        key = os.path.abspath(p)
-        with _CLIENTS_LOCK:
-            by_thread = _CLIENTS.get(key) or {}
-            box = by_thread.get(cur_tid)
-        if not box:
-            continue
-        try:
-            with _SESSION_LOCKS[key]:
-                if box.client:
-                    backoff = 0.2
-                    for attempt in range(6):
-                        try:
-                            await box.client.stop()
-                            break
-                        except sqlite3.OperationalError as e:
-                            if "database is locked" in str(e).lower() and attempt < 5:
-                                await asyncio.sleep(backoff)
-                                backoff = min(backoff*2, 2.0)
-                                continue
-                            raise
-        except Exception:
-            pass
-        finally:
-            with _CLIENTS_LOCK:
-                by_thread.pop(cur_tid, None)
-                if not by_thread:
-                    _CLIENTS.pop(key, None)
-
 
 async def _list_gifts_for_account_persist(session_path:str, api_id:int, api_hash:str)->list[dict]:
-    box=await _get_box(session_path, api_id, api_hash)
-    rl=0.8
-    backoff=0.4
-    for attempt in range(5):
-        try:
-            async with box.call_lock:
-                now=asyncio.get_running_loop().time()
-                delay=max(0.0, box.last_call+rl-now)
-                if delay>0: await asyncio.sleep(delay)
-                gifts=await box.client.get_available_gifts()
-                box.last_call=asyncio.get_running_loop().time()
-            out=[]
-            for g in gifts or []:
-                out.append({
-                    "id": int(getattr(g, "id", 0)),
-                    "price": int(getattr(g, "price", 0)),
-                    "is_limited": bool(getattr(g, "is_limited", False)),
-                    "available_amount": int(getattr(g, "available_amount", 0)) if getattr(g, "is_limited",
-                                                                                          False) else None,
-                    "total_amount": (
-                            getattr(g, "total_amount", None) or
-                            getattr(getattr(g, "raw", None), "total_amount", None)
-                    ),
-                    "require_premium": bool(getattr(getattr(g, "raw", None), "require_premium", False)),
-                    "sticker_file_id": getattr(getattr(g, "sticker", None), "file_id", None),
-                    "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
-                    "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
-                })
-
-            return out
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e).lower() and attempt<4:
-                await asyncio.sleep(backoff); backoff*=2; continue
-            raise
-        except Exception:
-            if attempt<4:
-                await asyncio.sleep(backoff+random.random()*0.2)
-                backoff=min(backoff*2,3.0); continue
-            raise
-
-
-# ---------- worker ----------
+    gifts = await tg_call(session_path, api_id, api_hash, lambda c: c.get_available_gifts(), min_interval=0.8)
+    out=[]
+    for g in gifts or []:
+        out.append({
+            "id": int(getattr(g, "id", 0)),
+            "price": int(getattr(g, "price", 0)),
+            "is_limited": bool(getattr(g, "is_limited", False)),
+            "available_amount": int(getattr(g, "available_amount", 0)) if getattr(g, "is_limited", False) else None,
+            "total_amount": getattr(g, "total_amount", None) or getattr(getattr(g, "raw", None), "total_amount", None),
+            "require_premium": bool(getattr(getattr(g, "raw", None), "require_premium", False)),
+            "sticker_file_id": getattr(getattr(g, "sticker", None), "file_id", None),
+            "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
+            "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
+        })
+    return out
 
 async def _worker_async(uid:int)->None:
     logger.info(f"gifts.worker: start (user_id={uid})")
@@ -227,7 +113,7 @@ async def _worker_async(uid:int)->None:
     last_hash=_hash_items(merged_all)
     try:
         while not stop_evt.is_set():
-            now=time.monotonic()
+            now=time.perf_counter()
             if not accs or (now-accs_loaded_at)>=ACC_TTL:
                 db:Session=SessionLocal()
                 try:
@@ -248,48 +134,38 @@ async def _worker_async(uid:int)->None:
             step=max(3.0/float(n),0.2)
             a=accs[i]
             try:
-                disk_items = _read_json(_gifts_path(uid))
-                prev_ids = {int(x.get("id", 0)) for x in disk_items if isinstance(x.get("id"), int)}
-
-                gifts = await _list_gifts_for_account_persist(a.session_path, a.api_profile.api_id,
-                                                              a.api_profile.api_hash)
-                merged_all = _merge_new(disk_items or [], gifts)
-
-                added = [g for g in merged_all if isinstance(g.get("id"), int) and g["id"] not in prev_ids]
+                disk_items=_read_json(_gifts_path(uid))
+                prev_ids={int(x.get("id",0)) for x in disk_items if isinstance(x.get("id"),int)}
+                gifts=await _list_gifts_for_account_persist(a.session_path, a.api_profile.api_id, a.api_profile.api_hash)
+                merged_all=_merge_new(disk_items or [], gifts)
+                added=[g for g in merged_all if isinstance(g.get("id"),int) and g["id"] not in prev_ids]
             except Exception:
                 logger.exception(f"gifts.worker: fetch failed (acc_id={a.id})")
-                gifts = []
-                added = []
-
-            # лог итерации
+                gifts=[]; added=[]
             try:
-                logger.info(
-                    f"gifts.worker: iter user_id={uid} acc_id={a.id} "
-                    f"gifts_now={len(gifts)} total_cached={len(merged_all)} new={len(added)}"
-                )
+                logger.info(f"gifts.worker: iter user_id={uid} acc_id={a.id} gifts_now={len(gifts)} total_cached={len(merged_all)} new={len(added)}")
             except Exception:
                 pass
-
             new_hash=_hash_items(merged_all)
             if new_hash!=last_hash:
                 last_hash=new_hash
                 _write_json(_gifts_path(uid), merged_all)
                 gifts_event_bus.publish(uid, {"items": merged_all, "count": len(merged_all), "hash": new_hash})
                 if added:
-                    try:
-                        await broadcast_new_gifts(added)
-                    except Exception:
-                        logger.exception("gifts.notify failed")
+                    try: await broadcast_new_gifts(added)
+                    except Exception: logger.exception("gifts.notify failed")
             i=(i+1)%n
             await asyncio.sleep(step)
     finally:
         try:
-            await _shutdown_clients(known_paths)
+            await tg_shutdown(known_paths)
         finally:
             logger.info(f"gifts.worker: stop (user_id={uid})")
 
 
-def _run_worker(uid:int)->None: asyncio.run(_worker_async(uid))
+
+def _run_worker(uid:int) -> None:
+    asyncio.run(_worker_async(uid))
 
 def start_user_gifts(uid:int)->None:
     if uid in GIFTS_THREADS: return

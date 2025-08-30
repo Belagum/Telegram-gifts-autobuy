@@ -164,3 +164,12 @@ export async function setSettings(bot_token){
     body: JSON.stringify({ bot_token })
   });
 }
+// CHANNELS
+export async function listChannels(){ return jget(`${base}/channels`); }
+export async function createChannel(data){
+  return jget(`${base}/channel`, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(data) });
+}
+export async function updateChannel(id, data){
+  return jget(`${base}/channel/${id}`, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(data) });
+}
+export async function deleteChannel(id){ return jget(`${base}/channel/${id}`, { method:"DELETE" }); }

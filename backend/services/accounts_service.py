@@ -5,7 +5,6 @@ import asyncio, time, os, threading, glob, re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
-from pyrogram import Client
 from pyrogram.errors import AuthKeyUnregistered
 from pyrogram.raw.functions.help import GetPremiumPromo
 
@@ -91,7 +90,7 @@ def _delete_account_and_session(db: Session, acc: Account) -> None:
         db.rollback()
 
 
-async def _fetch_profile_and_stars(session_path:str, api_id:int, api_hash:str):
+async def fetch_profile_and_stars(session_path:str, api_id:int, api_hash:str):
     me = await tg_call(session_path, api_id, api_hash, lambda c: c.get_me())
     stars = await tg_call(session_path, api_id, api_hash, lambda c: c.get_stars_balance())
     premium = bool(getattr(me, "is_premium", False))
@@ -129,8 +128,6 @@ def read_accounts(db:Session, user_id:int)->list[dict]:
         })
     return out
 
-
-
 def any_stale(db:Session, user_id:int)->bool:
     now=datetime.now(timezone.utc)
     rows=db.query(Account.last_checked_at).filter(Account.user_id==user_id).all()
@@ -138,13 +135,12 @@ def any_stale(db:Session, user_id:int)->bool:
         if _should_refresh(now, lc): return True
     return False
 
-# services/accounts_service.py — запись в БД и отдельный стейт в стриме; убран stars_nanos
 def refresh_account(db: Session, acc: Account) -> Account | None:
     lk = session_lock_for(acc.session_path); t0 = time.perf_counter()
     logger.info(f"accounts.refresh: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         async def work():
-            me, stars, premium, until = await _fetch_profile_and_stars(
+            me, stars, premium, until = await fetch_profile_and_stars(
                 acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
             )
             acc.first_name = getattr(me, "first_name", None)
@@ -205,7 +201,7 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
     with lk:
         yield {"stage": "connect", "message": "Соединяюсь…"}; time.sleep(0.5)
         try:
-            me, stars, premium, until = asyncio.run(_fetch_profile_and_stars(acc.session_path, api_id, api_hash))
+            me, stars, premium, until = asyncio.run(fetch_profile_and_stars(acc.session_path, api_id, api_hash))
         except AuthKeyUnregistered:
             _delete_account_and_session(db, acc)
             yield {"error":"session_invalid","error_code":"AUTH_KEY_UNREGISTERED","detail":"Сессия невалидна. Авторизуйтесь заново."}

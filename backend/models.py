@@ -9,6 +9,20 @@ from sqlalchemy.sql.sqltypes import Boolean
 
 from .db import Base
 
+class Channel(Base):
+    __tablename__ = "channels"
+    __table_args__ = (UniqueConstraint("user_id","channel_id", name="u_user_channel"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    channel_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    title: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    price_min: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    price_max: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    supply_min: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    supply_max: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), index=True)
+
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

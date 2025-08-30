@@ -4,6 +4,7 @@
 from datetime import datetime, timezone
 import os, secrets, glob, threading, asyncio
 from dataclasses import dataclass
+from .services.accounts_service import fetch_profile_and_stars
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -121,22 +122,16 @@ class PyroLoginManager:
 
         async def go():
             try:
-                await p.client.sign_in(
-                    phone_number=p.phone,
-                    phone_code_hash=p.phone_code_hash or "",
-                    phone_code=code
-                )
+                await p.client.sign_in(phone_number=p.phone, phone_code_hash=p.phone_code_hash or "", phone_code=code)
             except SessionPasswordNeeded:
                 return {"need_2fa": True}
-            me = await p.client.get_me()
-            stars = int(await p.client.get_stars_balance())
-            return {"me": me, "stars": stars}
+            return await fetch_profile_and_stars(p.session_path, p.api_id, p.api_hash)
 
         try:
             r = p.loop.run(go())
-            if r.get("need_2fa"):
+            if isinstance(r, dict) and r.get("need_2fa"):
                 return r
-            me, stars = r["me"], r["stars"]
+            me, stars, premium, until = r
         except RPCError as e:
             self._cleanup_pending(p, purge=True)
             return _rpc(e)
@@ -144,7 +139,7 @@ class PyroLoginManager:
             self._cleanup_pending(p, purge=True)
             return {"error": "unexpected", "detail": str(e), "http": 500}
 
-        self._finalize(db, p, me, stars)
+        self._finalize(db, p, me, stars, premium, until)
         self._cleanup_pending(p)
         del self._p[login_id]
         return {"ok": True}
@@ -156,13 +151,10 @@ class PyroLoginManager:
 
         async def go():
             await p.client.check_password(password)
-            me = await p.client.get_me()
-            stars = int(await p.client.get_stars_balance())
-            return {"me": me, "stars": stars}
+            return await fetch_profile_and_stars(p.session_path, p.api_id, p.api_hash)
 
         try:
-            r = p.loop.run(go())
-            me, stars = r["me"], r["stars"]
+            me, stars, premium, until = p.loop.run(go())
         except RPCError as e:
             self._cleanup_pending(p, purge=True)
             return _rpc(e)
@@ -170,7 +162,7 @@ class PyroLoginManager:
             self._cleanup_pending(p, purge=True)
             return {"error": "unexpected", "detail": str(e), "http": 500}
 
-        self._finalize(db, p, me, stars)
+        self._finalize(db, p, me, stars, premium, until)
         self._cleanup_pending(p)
         del self._p[login_id]
         return {"ok": True}
@@ -195,42 +187,30 @@ class PyroLoginManager:
             try: self._purge(p.session_path)
             except Exception: pass
 
-
-    def _finalize(self, db: Session, p: PendingLogin, me, stars: int) -> None:
+    def _finalize(self, db: Session, p: PendingLogin, me, stars: int, premium: bool, until: str | None) -> None:
         tg_id = int(getattr(me, "id", 0)) or None
-
-        # пробуем найти по (user_id, phone)
         acc = db.query(Account).filter(Account.user_id == p.user_id, Account.phone == p.phone).first()
-
         if not acc and tg_id:
             acc = db.get(Account, tg_id)
             if not acc:
-                acc = Account(
-                    id=tg_id,
-                    user_id=p.user_id,
-                    api_profile_id=p.api_profile_id,
-                    phone=p.phone,
-                    session_path=p.session_path,
-                )
+                acc = Account(id=tg_id, user_id=p.user_id, api_profile_id=p.api_profile_id, phone=p.phone,
+                              session_path=p.session_path)
                 db.add(acc)
             else:
                 acc.user_id = p.user_id
                 acc.api_profile_id = p.api_profile_id
                 acc.phone = p.phone
                 acc.session_path = p.session_path
-
         if not acc:
-            acc = Account(
-                user_id=p.user_id,
-                api_profile_id=p.api_profile_id,
-                phone=p.phone,
-                session_path=p.session_path,
-            )
+            acc = Account(user_id=p.user_id, api_profile_id=p.api_profile_id, phone=p.phone,
+                          session_path=p.session_path)
             db.add(acc)
 
         acc.username = getattr(me, "username", None)
         acc.first_name = getattr(me, "first_name", None)
         acc.stars_amount = int(stars)
+        acc.is_premium = bool(premium)
+        acc.premium_until = until
         acc.session_path = p.session_path
         acc.last_checked_at = datetime.now(timezone.utc)
 
@@ -248,6 +228,8 @@ class PyroLoginManager:
                     acc.username = getattr(me, "username", None)
                     acc.first_name = getattr(me, "first_name", None)
                     acc.stars_amount = int(stars)
+                    acc.is_premium = bool(premium)
+                    acc.premium_until = until
                     acc.last_checked_at = datetime.now(timezone.utc)
                     db.commit()
             else:

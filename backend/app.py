@@ -8,6 +8,7 @@ from flask_cors import CORS
 from backend.db import init_db, SessionLocal
 from backend.models import User
 from backend.logger import setup_logging, bind_flask, logger
+from backend.routes.channels import bp_channels
 
 from backend.routes.gifts import bp_gifts
 from backend.routes.settings import bp_settings
@@ -34,10 +35,9 @@ def _stop_all_gifts()->None:
     logger.info("gifts.bootstrap: stopped all workers")
 
 def _should_boot()->bool:
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true": return True
-    if os.environ.get("FLASK_ENV") == "production": return True
     if os.environ.get("GIFTBUYER_BOOT_WORKERS") == "1": return True
-    return False
+    return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+
 
 def create_app()->Flask:
     init_db()
@@ -51,6 +51,7 @@ def create_app()->Flask:
     app.register_blueprint(bp_acc)
     app.register_blueprint(bp_gifts)
     app.register_blueprint(bp_settings)
+    app.register_blueprint(bp_channels)
 
     if _should_boot() and not _BOOTSTRAPPED.is_set():
         _BOOTSTRAPPED.set()

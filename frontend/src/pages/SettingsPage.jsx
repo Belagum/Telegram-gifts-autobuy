@@ -26,17 +26,21 @@ export default function SettingsPage(){
     setChatTail(d.startsWith("100") ? d.slice(3) : d);
   };
 
-  const save=async()=>{
-    if (saving) return;
-    setSaving(true);
-    try{
+    const save = async () => {
+      if (saving) return;
+      setSaving(true);
+      const tokenTrim = (token || "").trim();
       const chatId = chatTail ? `-100${chatTail}` : null;
-      await setSettings(token||null, chatId);
-      window.close();
-    }finally{
-      setSaving(false);
-    }
-  };
+      try {
+        await setSettings(tokenTrim || null, chatId); // null = очистить
+      } catch (e) {
+        // опционально показать тост
+      } finally {
+        setSaving(false);
+        window.close();
+      }
+    };
+
 
   return (
     <div className="wrap" style={{paddingBottom:76}}>

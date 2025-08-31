@@ -26,9 +26,18 @@ def set_user_settings(user_id: int, bot_token: Optional[str], notify_chat_id: Op
         if not s:
             s = UserSettings(user_id=user_id)
             db.add(s)
-        s.bot_token = (bot_token or None) if (bot_token or "").strip() else None
-        s.notify_chat_id = norm_ch_id(notify_chat_id)
+
+        token_norm = (bot_token or "").strip() or None
+
+        if notify_chat_id is None or str(notify_chat_id).strip() == "":
+            chat_norm = None
+        else:
+            chat_norm = norm_ch_id(notify_chat_id)
+
+        s.bot_token = token_norm
+        s.notify_chat_id = chat_norm
         db.commit()
         return {"bot_token": s.bot_token, "notify_chat_id": s.notify_chat_id}
     finally:
         db.close()
+

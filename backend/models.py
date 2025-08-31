@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-from sqlalchemy import Integer, String, ForeignKey, BigInteger, DateTime, UniqueConstraint
+from sqlalchemy import Integer, String, ForeignKey, BigInteger, DateTime, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timedelta, timezone
 
@@ -37,12 +37,8 @@ class UserSettings(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
     bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notify_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        index=True
-    )
+    buy_target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)  # NEW
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), index=True)
 
 class SessionToken(Base):
     __tablename__ = "session_tokens"

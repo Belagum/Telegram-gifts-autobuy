@@ -19,10 +19,14 @@ def settings_set(db: Session):
     d = request.get_json(silent=True) or {}
     token = d.get("bot_token")
     chat = d.get("notify_chat_id")
+    target = d.get("buy_target_id")
     if token is not None and not isinstance(token, str): return jsonify({"error":"bot_token_type"}), 400
     if chat is not None and not isinstance(chat, (str,int)): return jsonify({"error":"notify_chat_id_type"}), 400
+    if target is not None and not isinstance(target, (str,int)): return jsonify({"error":"buy_target_id_type"}), 400
     try:
-        out = set_user_settings(request.user_id, (token or "").strip() or None, chat)
-    except ValueError:
-        return jsonify({"error":"notify_chat_id_invalid"}), 400
+        out = set_user_settings(request.user_id, (token or "").strip() or None, chat, target)
+    except ValueError as e:
+        msg = str(e)
+        if "channel" in msg or "100" in msg: return jsonify({"error":"notify_chat_id_invalid"}), 400
+        return jsonify({"error":"buy_target_id_invalid"}), 400
     return jsonify({"ok": True, "settings": out})

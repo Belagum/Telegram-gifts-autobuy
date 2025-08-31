@@ -318,68 +318,50 @@ async def _plan_purchases(
     accs: List[Account],
     gifts: List[Dict],
     stars_left: Dict[int, int],
-    stats: Dict
+    stats: Dict,
+    forced_cid: int | None = None
 ) -> List[Dict]:
-    gifts_sorted = list(gifts or [])
-    gifts_sorted.sort(key=_sort_key)
-
-    # локальный бюджет только для планирования
+    gifts_sorted = list(gifts or []); gifts_sorted.sort(key=_sort_key)
     budget = {a.id: stars_left.get(a.id, 0) for a in accs}
-
-    # сколько можно купить (для лимиток смотрим available_amount)
-    remain_by_gift: Dict[int, int] = {}
+    remain_by_gift = {}
     for g in gifts_sorted:
         gid = int(g.get("id") or 0)
-        if gid <= 0:
-            continue
+        if gid <= 0: continue
         remain_by_gift[gid] = max(0, _gift_avail(g))
-
     plan: List[Dict] = []
 
     for acc in sorted(accs, key=lambda a: budget.get(a.id, 0), reverse=True):
         bal = budget.get(acc.id, 0)
-        if bal <= 0:
-            continue
+        if bal <= 0: continue
 
         for g in gifts_sorted:
-            gid = int(g.get("id") or 0)
-            price = _gift_price(g)
-            sup_raw = _gift_supply_raw(g)
+            gid = int(g.get("id") or 0); price = _gift_price(g); sup_raw = _gift_supply_raw(g)
+            if gid <= 0 or price <= 0: continue
+            if remain_by_gift.get(gid, 0) <= 0: continue
 
-            if gid <= 0 or price <= 0:
-                continue
-            if remain_by_gift.get(gid, 0) <= 0:
-                continue
-
-            ch = _best_channel_for_gift(g, chans)
-            if not ch:
-                stats["plan_skips"].append(
-                    {"gift_id": gid, "reason": "no_channel_match", "details": [f"supply={sup_raw} price={price}"]}
-                )
-                continue
+            if forced_cid is not None:
+                cid = int(forced_cid)
+            else:
+                ch = _best_channel_for_gift(g, chans)
+                if not ch:
+                    stats["plan_skips"].append({"gift_id": gid, "reason": "no_channel_match", "details": [f"supply={sup_raw} price={price}"]})
+                    continue
+                cid = int(ch.channel_id)
 
             max_qty = min(remain_by_gift[gid], bal // price)
             if max_qty <= 0:
                 if bal < price:
-                    stats["plan_skips"].append(
-                        {"gift_id": gid, "reason": "not_enough_stars_account", "details": [f"acc={acc.id} bal={bal} need={price}"]}
-                    )
+                    stats["plan_skips"].append({"gift_id": gid, "reason": "not_enough_stars_account", "details": [f"acc={acc.id} bal={bal} need={price}"]})
                 continue
 
             for _ in range(int(max_qty)):
-                plan.append({
-                    "account_id": acc.id,
-                    "channel_id": int(ch.channel_id),
-                    "gift_id": gid,
-                    "price": price,
-                    "supply": sup_raw,
-                })
-                stats["channels"][int(ch.channel_id)]["planned"] += 1
+                plan.append({"account_id": acc.id, "channel_id": cid, "gift_id": gid, "price": price, "supply": sup_raw})
+                stats["channels"].setdefault(cid, {"row_id": None, "purchased": [], "failed": [], "reasons": [], "planned": 0})
+                stats["channels"][cid]["planned"] += 1
                 stats["accounts"][acc.id]["planned"] += 1
                 bal -= price
                 remain_by_gift[gid] -= 1
-                if bal < price or remain_by_gift[gid] <= 0:
-                    break
+                if bal < price or remain_by_gift[gid] <= 0: break
 
         budget[acc.id] = bal
 
@@ -427,33 +409,31 @@ async def _execute_plan(
 
 # сама покупка
 async def autobuy_new_gifts(user_id: int, gifts: List[Dict]) -> Dict:
-    # основная темка
     db: Session = SessionLocal()
     try:
         u = db.get(User, user_id)
         if not u or not bool(getattr(u, "gifts_autorefresh", False)):
             logger.info(f"autobuy:skip user_id={user_id} reason=autorefresh_off")
-            return {"purchased": [], "skipped": len(gifts or []),
-                    "stats": {"channels": {}, "accounts": {}, "global_skips": [{"reason": "autorefresh_off"}]}}
+            return {"purchased": [], "skipped": len(gifts or []), "stats": {"channels": {}, "accounts": {}, "global_skips": [{"reason": "autorefresh_off"}]}}
         chans: List[Channel] = (db.query(Channel).filter(Channel.user_id==user_id).order_by(Channel.id.asc()).all())
-        accs: List[Account] = (db.query(Account).options(joinedload(Account.api_profile))
-                               .filter(Account.user_id==user_id).order_by(Account.id.asc()).all())
+        accs: List[Account] = (db.query(Account).options(joinedload(Account.api_profile)).filter(Account.user_id==user_id).order_by(Account.id.asc()).all())
+        us = db.get(UserSettings, user_id)
+        forced_cid = int(us.buy_target_id) if (us and us.buy_target_id is not None) else None
     finally:
         db.close()
 
-    if not chans:
-        logger.info(f"autobuy:skip user_id={user_id} reason=no_channels")
-        return {"purchased": [], "skipped": len(gifts or []),
-                "stats": {"channels": {}, "accounts": {}, "global_skips": [{"reason":"no_channels"}]}}
-
     if not accs:
         logger.info(f"autobuy:skip user_id={user_id} reason=no_accounts")
-        return {"purchased": [], "skipped": len(gifts or []),
-                "stats": {"channels": {}, "accounts": {}, "global_skips": [{"reason":"no_accounts"}]}}
+        return {"purchased": [], "skipped": len(gifts or []), "stats": {"channels": {}, "accounts": {}, "global_skips": [{"reason":"no_accounts"}]}}
+
+    if forced_cid is None and not chans:
+        logger.info(f"autobuy:skip user_id={user_id} reason=no_channels")
+        return {"purchased": [], "skipped": len(gifts or []), "stats": {"channels": {}, "accounts": {}, "global_skips": [{"reason":"no_channels"}]}}
 
     stats = _init_stats(chans, accs)
+    if forced_cid is not None:
+        stats["channels"].setdefault(int(forced_cid), {"row_id": None, "purchased": [], "failed": [], "reasons": [], "planned": 0})
 
-    # балики
     stars_left: Dict[int, int] = {}
     for a in accs:
         bal = await _stars_for(a)
@@ -461,41 +441,19 @@ async def autobuy_new_gifts(user_id: int, gifts: List[Dict]) -> Dict:
         stats["accounts"][a.id]["balance_start"] = bal
     logger.info(f"autobuy:balances user_id={user_id} total={sum(stars_left.values())} details={{{', '.join(f'{k}:{v}' for k,v in stars_left.items())}}}")
 
-    # входные подарки: считаем все как новые для отчета но в план пойдут тока лимитные
     raw_items = list(gifts or [])
-    considered_for_report = raw_items[:]  # чтобы анлимиты тоже отразились как пропущенные
+    considered_for_report = raw_items[:]
 
-    # глобальные скипы (сразу анлимитки и ересь скипаем)
     for g in raw_items:
-        gid = int(g.get("id") or 0)
-        price = _gift_price(g)
-        lim = bool(g.get("is_limited", False))
-        sup_raw = _gift_supply_raw(g)
-        if gid <= 0 or price <= 0:
-            stats["global_skips"].append({"gift_id": gid, "reason": "invalid/price"})
-            continue
-        if not lim:
-            stats["global_skips"].append({"gift_id": gid, "reason": "unlimited"})
-            continue
-        if sup_raw is None:
-            # лимитка без total_amount считается невалидной
-            stats["global_skips"].append({"gift_id": gid, "reason": "no_supply_for_limited"})
-            continue
+        gid = int(g.get("id") or 0); price = _gift_price(g); lim = bool(g.get("is_limited", False)); sup_raw = _gift_supply_raw(g)
+        if gid <= 0 or price <= 0: stats["global_skips"].append({"gift_id": gid, "reason": "invalid/price"}); continue
+        if not lim: stats["global_skips"].append({"gift_id": gid, "reason": "unlimited"}); continue
+        if sup_raw is None: stats["global_skips"].append({"gift_id": gid, "reason": "no_supply_for_limited"}); continue
 
-    # список для плана: только валидные лимитки
-    items_for_plan = [
-        g for g in raw_items
-        if int(g.get("id") or 0) > 0
-        and _gift_price(g) > 0
-        and bool(g.get("is_limited", False)) is True
-        and _gift_supply_raw(g) is not None
-    ]
+    items_for_plan = [g for g in raw_items if int(g.get("id") or 0) > 0 and _gift_price(g) > 0 and bool(g.get("is_limited", False)) is True and _gift_supply_raw(g) is not None]
     items_for_plan.sort(key=_sort_key)
 
-    # планирование
-    plan = await _plan_purchases(chans, accs, items_for_plan, stars_left, stats)
-
-    # исполнение
+    plan = await _plan_purchases(chans, accs, items_for_plan, stars_left, stats, forced_cid=forced_cid)
     await _execute_plan(plan, accs, stats, stars_left)
 
     # финал

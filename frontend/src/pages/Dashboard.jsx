@@ -22,7 +22,7 @@ export default function Dashboard(){
   const [apiProfileId,setApiProfileId]=useState(null);
 
   const openGifts=()=> openCentered("/gifts","gifts",520,700);
-  const openSettings=()=> openCentered("/settings","settings",520,500);
+  const openSettings=()=> openCentered("/settings","settings",520,600);
 
   const load=async()=>{ await me(); const res=await listAccounts(); const a=res?.items??res?.accounts??[]; setAccounts(Array.isArray(a)?a:[]); };
   const refreshProfiles=async()=>{ const {items}=await listApiProfiles(); setApiProfiles(items||[]); };

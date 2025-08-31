@@ -77,7 +77,7 @@ async def _ensure_cached(http: httpx.AsyncClient, token: str, g: Dict) -> Option
         if got.status_code != 200 or not got.content:
             logger.warning(f"notify:file dl fail code={got.status_code} size={len(got.content) if got.content else 0}")
             return None
-        tmp = path + ".tmp"
+        tmp = f"{path}.tmp"
         with open(tmp, "wb") as f:
             f.write(got.content)
         os.replace(tmp, path)

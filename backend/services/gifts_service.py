@@ -37,7 +37,7 @@ def _read_json(path:str)->list[dict]:
 
 def _write_json(path:str, data:list[dict])->None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = path + ".tmp"
+    tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=0)
     os.replace(tmp, path)
 
@@ -137,6 +137,9 @@ async def _worker_async(uid:int)->None:
                 finally:
                     db.close()
             n=len(accs)
+            if n == 0:
+                await asyncio.sleep(1.0)
+                continue
             step=max(3.0/float(n),0.2)
             a=accs[i]
             try:
@@ -159,7 +162,7 @@ async def _worker_async(uid:int)->None:
                 gifts_event_bus.publish(uid, {"items": merged_all, "count": len(merged_all), "hash": new_hash})
 
                 if added:
-                    logger.info("gifts.worker: parallel start buy&notify items=%s", len(added))
+                    logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
 
                     buy_task = asyncio.create_task(autobuy_new_gifts(uid, added))
                     notify_future = asyncio.to_thread(_notify_run_blocking, added)
@@ -171,43 +174,46 @@ async def _worker_async(uid:int)->None:
                     buy_res, notify_res = await asyncio.gather(buy_task, notify_future, return_exceptions=True)
 
                     if isinstance(buy_res, Exception):
-                        logger.error("gifts.autobuy failed: %s: %s", type(buy_res).__name__, str(buy_res))
+                        logger.error(f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}")
                     else:
                         res = buy_res or res
                         stats = res.get("stats") or {}
 
                     if isinstance(notify_res, Exception):
-                        logger.error("gifts.notify failed (thread): %s: %s", type(notify_res).__name__, str(notify_res))
+                        logger.error(f"gifts.notify failed (thread): {type(notify_res).__name__}: {notify_res}")
                     else:
                         sent = int(notify_res or 0)
 
                     try:
-                        logger.info("gifts.worker: FINAL purchased=%s skipped=%s notified=%s",
-                                    len(res.get("purchased", [])), res.get("skipped"), sent)
-
+                        logger.info(
+                            f"gifts.worker: FINAL purchased={len(res.get('purchased', []))} "
+                            f"skipped={res.get('skipped')} notified={sent}"
+                        )
                         for cid, st in (stats.get("channels") or {}).items():
                             ok = len(st.get("purchased", []))
                             fail = len(st.get("failed", []))
                             rsn = len(st.get("reasons", []))
-                            logger.info("gifts.worker: FINAL channel=%s ok=%s fail=%s reasons=%s", cid, ok, fail, rsn)
+                            logger.info(f"gifts.worker: FINAL channel={cid} ok={ok} fail={fail} reasons={rsn}")
                             if fail:
-                                logger.info("gifts.worker: FINAL channel=%s failed_details=%s", cid, st.get("failed"))
+                                logger.info(f"gifts.worker: FINAL channel={cid} failed_details={st.get('failed')}")
                             if rsn:
-                                logger.info("gifts.worker: FINAL channel=%s reasons_details=%s", cid, st.get("reasons"))
+                                logger.info(f"gifts.worker: FINAL channel={cid} reasons_details={st.get('reasons')}")
 
                         for aid, st in (stats.get("accounts") or {}).items():
-                            logger.info("gifts.worker: FINAL account=%s spent=%s start=%s end=%s purchases=%s",
-                                        aid, st.get("spent", 0), st.get("balance_start", 0),
-                                        st.get("balance_end", 0), st.get("purchases", 0))
+                            logger.info(
+                                f"gifts.worker: FINAL account={aid} spent={st.get('spent', 0)} "
+                                f"start={st.get('balance_start', 0)} end={st.get('balance_end', 0)} "
+                                f"purchases={st.get('purchases', 0)}"
+                            )
 
                         gsk = stats.get("global_skips") or []
                         if gsk:
-                            logger.info("gifts.worker: FINAL global_skips n=%s details=%s", len(gsk), gsk)
+                            logger.info(f"gifts.worker: FINAL global_skips n={len(gsk)} details={gsk}")
                     except Exception:
                         logger.exception("gifts.worker: final summary log failed")
 
-                i = (i + 1) % n
-                await asyncio.sleep(step)
+            i = (i + 1) % n
+            await asyncio.sleep(step)
     finally:
         try:
             await tg_shutdown(known_paths)

@@ -171,50 +171,86 @@ async def _collect_dm_ids(uids: List[int]) -> Dict[int, List[int]]:
     return dm_ids_by_uid
 
 async def broadcast_new_gifts(gifts: List[Dict]) -> int:
-    if not gifts: return 0
-    targets = _collect_targets()  # [(uid, token, notify_chat_id)]
-    if not targets:
-        logger.info("notify:no targets")
+    if not gifts:
         return 0
-    uids = list({uid for uid, _, _ in targets})
-    logger.info(f"notify:gifts={len(gifts)} targets={len(targets)}")
 
-    # собрать DM ids (ЛС всех аккаунтов)
-    dm_ids_by_uid = await _collect_dm_ids(uids) or {}
+    targets = _collect_targets()  # [(uid, token, notify_chat_id)]
+
+    token_by_uid: Dict[int, str] = {}
+    try:
+        with closing(SessionLocal()) as db:
+            rows = (
+                db.query(User.id, UserSettings.bot_token)
+                  .join(UserSettings, User.id == UserSettings.user_id)
+                  .filter(User.gifts_autorefresh == True)
+                  .all()
+            )
+            for uid, tok in rows:
+                tok = (tok or "").strip()
+                if tok:
+                    token_by_uid[uid] = tok
+    except Exception:
+        logger.exception("notify:failed to fetch tokens from DB")
+
+    uids = sorted({u for u, _, _ in targets} | set(token_by_uid.keys()))
+    logger.info(f"notify:gifts={len(gifts)} targets={len(targets)} uids_for_dm={len(uids)}")
+
+    dm_ids_by_uid: Dict[int, List[int]] = {}
+    if uids:
+        try:
+            dm_ids_by_uid = await _collect_dm_ids(uids) or {}
+        except Exception:
+            logger.exception("notify:collect_dm_ids error")
+            dm_ids_by_uid = {}
 
     sent = 0
     async with httpx.AsyncClient(timeout=30) as http:
-        # отправляем в notify_chat_id без префлайтов, логируем payload
         for uid, token, chat in targets:
+            token = (token or token_by_uid.get(uid) or "").strip()
+            if not token:
+                logger.warning(f"notify:no token for uid={uid} (channel stage)")
+                continue
+            try:
+                chat = int(chat)
+            except Exception:
+                logger.warning(f"notify:bad notify_chat_id uid={uid} chat={repr(chat)}")
+                continue
+
             for g in gifts:
                 try:
                     logger.info(f"notify:try (channel) uid={uid} chat={chat} gift_id={g.get('id')}")
-                    await _notify_one(http, uid, token, int(chat), g); sent += 1
+                    await _notify_one(http, uid, token, chat, g)
+                    sent += 1
                 except Exception:
                     logger.exception(f"notify:channel send failed uid={uid} chat={chat} gift_id={g.get('id')}")
                 await asyncio.sleep(0.12)
 
-        # DM фолбек
         for uid in uids:
-            token = next((t for (u, t, _) in targets if u == uid), None)
+            token = (token_by_uid.get(uid)
+                     or next((t for (u, t, _) in targets if u == uid and t), "")
+                    ).strip()
             if not token:
-                logger.warning(f"notify:no token for uid={uid}")
+                logger.warning(f"notify:no token for uid={uid} (dm stage)")
                 continue
+
             dm_ids = dm_ids_by_uid.get(uid) or []
             if not dm_ids:
                 logger.warning(f"notify:no DM ids for uid={uid}")
                 continue
+
             for user_chat_id in dm_ids:
                 for g in gifts:
                     try:
                         logger.info(f"notify:try (dm) uid={uid} chat={user_chat_id} gift_id={g.get('id')}")
-                        await _notify_one(http, uid, token, int(user_chat_id), g); sent += 1
+                        await _notify_one(http, uid, token, int(user_chat_id), g)
+                        sent += 1
                     except Exception:
                         logger.exception(f"notify:dm send failed uid={uid} chat={user_chat_id} gift_id={g.get('id')}")
                     await asyncio.sleep(0.12)
 
     logger.info(f"notify:done sent={sent}")
     return sent
+
 
 
 def broadcast_new_gifts_sync(gifts: List[Dict]) -> int:

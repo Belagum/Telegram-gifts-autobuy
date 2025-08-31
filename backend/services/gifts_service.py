@@ -6,11 +6,12 @@ import os, json, time, threading, hashlib
 from queue import Queue
 from sqlalchemy.orm import Session, joinedload
 
-from .notify_gifts_service import broadcast_new_gifts
 from ..db import SessionLocal
 from ..models import Account
 from ..logger import logger
 from .tg_clients_service import tg_call, tg_shutdown
+from .autobuy_service import autobuy_new_gifts
+from .notify_gifts_service import broadcast_new_gifts
 
 GIFTS_THREADS: dict[int, dict] = {}
 _GIFTS_DIR = os.getenv("GIFTS_DIR", "gifts_data")
@@ -82,7 +83,6 @@ class _GiftsEventBus:
 
 gifts_event_bus=_GiftsEventBus()
 
-
 async def _list_gifts_for_account_persist(session_path:str, api_id:int, api_hash:str)->list[dict]:
     gifts = await tg_call(session_path, api_id, api_hash, lambda c: c.get_available_gifts(), min_interval=0.8)
     out=[]
@@ -99,6 +99,16 @@ async def _list_gifts_for_account_persist(session_path:str, api_id:int, api_hash
             "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
         })
     return out
+
+def _notify_run_blocking(items: list[dict]) -> int | Exception:
+    try:
+        return asyncio.run(broadcast_new_gifts(items))
+    except Exception as e:
+        try:
+            logger.exception("gifts.notify failed in thread")
+        except Exception:
+            pass
+        return e
 
 async def _worker_async(uid:int)->None:
     logger.info(f"gifts.worker: start (user_id={uid})")
@@ -126,9 +136,6 @@ async def _worker_async(uid:int)->None:
                     if i>=len(accs): i=0
                 finally:
                     db.close()
-                if not accs:
-                    await asyncio.sleep(3.0)
-                    continue
             n=len(accs)
             step=max(3.0/float(n),0.2)
             a=accs[i]
@@ -150,9 +157,63 @@ async def _worker_async(uid:int)->None:
                 last_hash=new_hash
                 _write_json(_gifts_path(uid), merged_all)
                 gifts_event_bus.publish(uid, {"items": merged_all, "count": len(merged_all), "hash": new_hash})
+                # backend/services/gifts_service.py — внутри _worker_async, замените весь if added: на это
+
                 if added:
-                    try: await broadcast_new_gifts(added)
-                    except Exception: logger.exception("gifts.notify failed")
+                    logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
+
+                    # покупка — в текущем loop
+                    buy_task = asyncio.create_task(autobuy_new_gifts(uid, added))
+
+                    # уведомления — в другом потоке + другом event loop
+                    notify_future = asyncio.to_thread(_notify_run_blocking, added)
+
+                    res = {"purchased": [], "skipped": len(added), "stats": {}}
+                    stats = {}
+                    sent = 0
+
+                    # ждём обе задачи; исключения не валят воркер
+                    buy_res, notify_res = await asyncio.gather(buy_task, notify_future, return_exceptions=True)
+
+                    # покупка
+                    if isinstance(buy_res, Exception):
+                        logger.error("gifts.autobuy failed: %s: %s", type(buy_res).__name__, str(buy_res))
+                    else:
+                        res = buy_res or res
+                        stats = res.get("stats") or {}
+
+                    # уведомления (возврат — int или Exception)
+                    if isinstance(notify_res, Exception):
+                        logger.error("gifts.notify failed (thread): %s: %s", type(notify_res).__name__, str(notify_res))
+                    else:
+                        sent = int(notify_res or 0)
+
+                    # финальная сводка
+                    try:
+                        logger.info("gifts.worker: FINAL purchased=%s skipped=%s notified=%s",
+                                    len(res.get("purchased", [])), res.get("skipped"), sent)
+
+                        for cid, st in (stats.get("channels") or {}).items():
+                            ok = len(st.get("purchased", []))
+                            fail = len(st.get("failed", []))
+                            rsn = len(st.get("reasons", []))
+                            logger.info("gifts.worker: FINAL channel=%s ok=%s fail=%s reasons=%s", cid, ok, fail, rsn)
+                            if fail: logger.info("gifts.worker: FINAL channel=%s failed_details=%s", cid,
+                                                 st.get("failed"))
+                            if rsn:  logger.info("gifts.worker: FINAL channel=%s reasons_details=%s", cid,
+                                                 st.get("reasons"))
+
+                        for aid, st in (stats.get("accounts") or {}).items():
+                            logger.info("gifts.worker: FINAL account=%s spent=%s start=%s end=%s purchases=%s",
+                                        aid, st.get("spent", 0), st.get("balance_start", 0),
+                                        st.get("balance_end", 0), st.get("purchases", 0))
+
+                        gsk = stats.get("global_skips") or []
+                        if gsk:
+                            logger.info("gifts.worker: FINAL global_skips n=%s details=%s", len(gsk), gsk)
+                    except Exception:
+                        logger.exception("gifts.worker: final summary log failed")
+
             i=(i+1)%n
             await asyncio.sleep(step)
     finally:
@@ -160,8 +221,6 @@ async def _worker_async(uid:int)->None:
             await tg_shutdown(known_paths)
         finally:
             logger.info(f"gifts.worker: stop (user_id={uid})")
-
-
 
 def _run_worker(uid:int) -> None:
     asyncio.run(_worker_async(uid))

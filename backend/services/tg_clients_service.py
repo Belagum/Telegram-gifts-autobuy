@@ -86,7 +86,7 @@ async def _ensure_started(path:str, api_id:int, api_hash:str) -> _Box:
                     await asyncio.sleep(backoff); backoff = min(backoff*2, _DBLOCK_MAX_BACKOFF)
             raise last_err or RuntimeError("pyrogram.start failed")
 
-        # важное: берём файловый лок в текущем потоке, а не внутри IO-треда
+        # берём файловый лок в текущем потоке, а не внутри ид треда
         with session_lock_for(key):
             await _run_in_loop(io, _start_with_retries())
         return box
@@ -117,13 +117,6 @@ async def tg_call(path:str, api_id:int, api_hash:str, op:Callable[[Client], Awai
     if not _loop_alive(box.loop):
         box = await _ensure_started(path, api_id, api_hash)
     return await _run_in_loop(box.loop, inner())  # type: ignore[arg-type]
-
-def tg_call_sync(path:str, api_id:int, api_hash:str, op:Callable[[Client], Awaitable[Any]], timeout:float|None=None, min_interval:float=0.0) -> Any:
-    io = _ensure_io_loop()
-    box_fut = asyncio.run_coroutine_threadsafe(_ensure_started(path, api_id, api_hash), io)
-    box_fut.result(timeout or 10.0)
-    fut = asyncio.run_coroutine_threadsafe(tg_call(path, api_id, api_hash, op, min_interval=min_interval, op_timeout=timeout), io)
-    return fut.result(timeout or 10.0)
 
 async def tg_stop(path:str) -> None:
     key = os.path.abspath(path)

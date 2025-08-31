@@ -1,6 +1,5 @@
-# backend/services/notify_gifts_service.py
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Vova
+# Copyright 2025 Vova orig
 
 import asyncio, os, hashlib, threading
 from contextlib import closing
@@ -172,51 +171,51 @@ async def _collect_dm_ids(uids: List[int]) -> Dict[int, List[int]]:
     return dm_ids_by_uid
 
 async def broadcast_new_gifts(gifts: List[Dict]) -> int:
-    if not gifts:
-        return 0
-    targets = _collect_targets()
+    if not gifts: return 0
+    targets = _collect_targets()  # [(uid, token, notify_chat_id)]
     if not targets:
         logger.info("notify:no targets")
         return 0
     uids = list({uid for uid, _, _ in targets})
     logger.info(f"notify:gifts={len(gifts)} targets={len(targets)}")
+
+    # собрать DM ids (ЛС всех аккаунтов)
     dm_ids_by_uid = await _collect_dm_ids(uids) or {}
 
     sent = 0
     async with httpx.AsyncClient(timeout=30) as http:
-        # Пытаемся слать в указанный канал/чат из настроек
+        # отправляем в notify_chat_id без префлайтов, логируем payload
         for uid, token, chat in targets:
             for g in gifts:
                 try:
-                    await _notify_one(http, uid, token, int(chat), g)
-                except Exception as e:
-                    logger.debug("notify:channel _notify_one fail uid=%s chat=%s err=%r", uid, chat, e, exc_info=True)
-                else:
-                    sent += 1
+                    logger.info(f"notify:try (channel) uid={uid} chat={chat} gift_id={g.get('id')}")
+                    await _notify_one(http, uid, token, int(chat), g); sent += 1
+                except Exception:
+                    logger.exception(f"notify:channel send failed uid={uid} chat={chat} gift_id={g.get('id')}")
                 await asyncio.sleep(0.12)
 
-        # Фолбек: ЛС каждому аккаунту пользователя
+        # DM фолбек
         for uid in uids:
             token = next((t for (u, t, _) in targets if u == uid), None)
             if not token:
-                logger.warning(f"notify:no token uid={uid}")
+                logger.warning(f"notify:no token for uid={uid}")
                 continue
             dm_ids = dm_ids_by_uid.get(uid) or []
             if not dm_ids:
-                logger.warning(f"notify:no DM ids uid={uid}")
+                logger.warning(f"notify:no DM ids for uid={uid}")
                 continue
             for user_chat_id in dm_ids:
                 for g in gifts:
                     try:
-                        await _notify_one(http, uid, token, int(user_chat_id), g)
-                    except Exception as e:
-                        logger.debug("notify:dm _notify_one fail uid=%s chat=%s err=%r", uid, user_chat_id, e, exc_info=True)
-                    else:
-                        sent += 1
+                        logger.info(f"notify:try (dm) uid={uid} chat={user_chat_id} gift_id={g.get('id')}")
+                        await _notify_one(http, uid, token, int(user_chat_id), g); sent += 1
+                    except Exception:
+                        logger.exception(f"notify:dm send failed uid={uid} chat={user_chat_id} gift_id={g.get('id')}")
                     await asyncio.sleep(0.12)
 
     logger.info(f"notify:done sent={sent}")
     return sent
+
 
 def broadcast_new_gifts_sync(gifts: List[Dict]) -> int:
     try:

@@ -14,11 +14,7 @@ _FMT = (
 )
 
 class _InterceptHandler(logging.Handler):
-    _DROP_PREFIXES = ("pyrogram",)
-
     def emit(self, record: logging.LogRecord) -> None:
-        if any(record.name.startswith(p) for p in self._DROP_PREFIXES):
-            return  # игнорим полностью
         try:
             level = _logger.level(record.levelname).name
         except ValueError:

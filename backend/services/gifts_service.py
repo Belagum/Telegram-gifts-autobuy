@@ -157,38 +157,30 @@ async def _worker_async(uid:int)->None:
                 last_hash=new_hash
                 _write_json(_gifts_path(uid), merged_all)
                 gifts_event_bus.publish(uid, {"items": merged_all, "count": len(merged_all), "hash": new_hash})
-                # backend/services/gifts_service.py — внутри _worker_async, замените весь if added: на это
 
                 if added:
-                    logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
+                    logger.info("gifts.worker: parallel start buy&notify items=%s", len(added))
 
-                    # покупка — в текущем loop
                     buy_task = asyncio.create_task(autobuy_new_gifts(uid, added))
-
-                    # уведомления — в другом потоке + другом event loop
                     notify_future = asyncio.to_thread(_notify_run_blocking, added)
 
                     res = {"purchased": [], "skipped": len(added), "stats": {}}
                     stats = {}
                     sent = 0
 
-                    # ждём обе задачи; исключения не валят воркер
                     buy_res, notify_res = await asyncio.gather(buy_task, notify_future, return_exceptions=True)
 
-                    # покупка
                     if isinstance(buy_res, Exception):
                         logger.error("gifts.autobuy failed: %s: %s", type(buy_res).__name__, str(buy_res))
                     else:
                         res = buy_res or res
                         stats = res.get("stats") or {}
 
-                    # уведомления (возврат — int или Exception)
                     if isinstance(notify_res, Exception):
                         logger.error("gifts.notify failed (thread): %s: %s", type(notify_res).__name__, str(notify_res))
                     else:
                         sent = int(notify_res or 0)
 
-                    # финальная сводка
                     try:
                         logger.info("gifts.worker: FINAL purchased=%s skipped=%s notified=%s",
                                     len(res.get("purchased", [])), res.get("skipped"), sent)
@@ -198,10 +190,10 @@ async def _worker_async(uid:int)->None:
                             fail = len(st.get("failed", []))
                             rsn = len(st.get("reasons", []))
                             logger.info("gifts.worker: FINAL channel=%s ok=%s fail=%s reasons=%s", cid, ok, fail, rsn)
-                            if fail: logger.info("gifts.worker: FINAL channel=%s failed_details=%s", cid,
-                                                 st.get("failed"))
-                            if rsn:  logger.info("gifts.worker: FINAL channel=%s reasons_details=%s", cid,
-                                                 st.get("reasons"))
+                            if fail:
+                                logger.info("gifts.worker: FINAL channel=%s failed_details=%s", cid, st.get("failed"))
+                            if rsn:
+                                logger.info("gifts.worker: FINAL channel=%s reasons_details=%s", cid, st.get("reasons"))
 
                         for aid, st in (stats.get("accounts") or {}).items():
                             logger.info("gifts.worker: FINAL account=%s spent=%s start=%s end=%s purchases=%s",
@@ -214,8 +206,8 @@ async def _worker_async(uid:int)->None:
                     except Exception:
                         logger.exception("gifts.worker: final summary log failed")
 
-            i=(i+1)%n
-            await asyncio.sleep(step)
+                i = (i + 1) % n
+                await asyncio.sleep(step)
     finally:
         try:
             await tg_shutdown(known_paths)

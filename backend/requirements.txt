@@ -5,3 +5,4 @@ Werkzeug
 kurigram
 TgCrypto
 httpx
+loguru

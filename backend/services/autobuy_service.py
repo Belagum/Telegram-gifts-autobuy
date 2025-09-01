@@ -12,6 +12,16 @@ from .tg_clients_service import tg_call
 
 INF_SUPPLY = 10**12  # псевдо-бесконечность для сравнений/сортировок
 
+def _per_user_cap(g: Dict) -> int:
+    try:
+        if not bool(g.get("limited_per_user")):
+            return INF_SUPPLY
+        v = g.get("per_user_available")
+        if v is None:
+            v = g.get("per_user_remains")
+        return max(0, int(v))
+    except Exception:
+        return 0
 
 def _ival_ok(v: int | None, lo: int | None, hi: int | None) -> bool:
     # для матчей supply==None считаем невалидным (анлимиты мы вообще скипаем до матчей)
@@ -329,6 +339,7 @@ async def _plan_purchases(
         if gid <= 0: continue
         remain_by_gift[gid] = max(0, _gift_avail(g))
     plan: List[Dict] = []
+    planned_by_acc_gid: Dict[Tuple[int,int], int] = {}
 
     for acc in sorted(accs, key=lambda a: budget.get(a.id, 0), reverse=True):
         bal = budget.get(acc.id, 0)
@@ -348,7 +359,15 @@ async def _plan_purchases(
                     continue
                 cid = int(ch.channel_id)
 
-            max_qty = min(remain_by_gift[gid], bal // price)
+            cap_total = _per_user_cap(g)
+            already = planned_by_acc_gid.get((acc.id, gid), 0)
+            cap_left = max(0, cap_total - already)
+
+            if cap_left <= 0:
+                stats["plan_skips"].append({"gift_id": gid, "reason": "per_user_cap_reached", "details": [f"acc={acc.id} cap={cap_total}"]})
+                continue
+
+            max_qty = min(remain_by_gift[gid], bal // price, cap_left)
             if max_qty <= 0:
                 if bal < price:
                     stats["plan_skips"].append({"gift_id": gid, "reason": "not_enough_stars_account", "details": [f"acc={acc.id} bal={bal} need={price}"]})
@@ -359,9 +378,10 @@ async def _plan_purchases(
                 stats["channels"].setdefault(cid, {"row_id": None, "purchased": [], "failed": [], "reasons": [], "planned": 0})
                 stats["channels"][cid]["planned"] += 1
                 stats["accounts"][acc.id]["planned"] += 1
+                planned_by_acc_gid[(acc.id, gid)] = planned_by_acc_gid.get((acc.id, gid), 0) + 1
                 bal -= price
                 remain_by_gift[gid] -= 1
-                if bal < price or remain_by_gift[gid] <= 0: break
+                if bal < price or remain_by_gift[gid] <= 0 or planned_by_acc_gid[(acc.id, gid)] >= cap_total: break
 
         budget[acc.id] = bal
 
@@ -369,6 +389,7 @@ async def _plan_purchases(
     logger.info(f"autobuy:plan size={len(plan)} remain_gifts={{ {head}{' ...' if len(remain_by_gift)>10 else ''} }}")
     stats["plan"] = plan
     return plan
+
 
 async def _execute_plan(
     plan: List[Dict],

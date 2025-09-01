@@ -56,11 +56,15 @@ def _hash_items(items:list[dict])->str:
             it.get("price"),
             it.get("is_limited"),
             it.get("available_amount"),
+            it.get("limited_per_user"),
+            it.get("per_user_remains"),
+            it.get("per_user_available"),
             it.get("require_premium"),
             it.get("sticker_file_id"),
             it.get("sticker_mime"),
         )).encode("utf-8"))
     return m.hexdigest()
+
 
 class _GiftsEventBus:
     def __init__(self):
@@ -87,18 +91,37 @@ async def _list_gifts_for_account_persist(session_path:str, api_id:int, api_hash
     gifts = await tg_call(session_path, api_id, api_hash, lambda c: c.get_available_gifts(), min_interval=0.8)
     out=[]
     for g in gifts or []:
+        raw = getattr(g, "raw", None)
+        is_limited = bool(getattr(g, "is_limited", False))
+        avail_total = int(getattr(g, "available_amount", 0)) if is_limited else None
+
+        limited_per_user = bool(getattr(raw, "limited_per_user", False))
+        per_user_remains = int(getattr(raw, "per_user_remains", 0)) if limited_per_user else None
+
+        if limited_per_user:
+            if isinstance(avail_total, int) and per_user_remains is not None:
+                per_user_available = min(avail_total, per_user_remains)
+            else:
+                per_user_available = per_user_remains
+        else:
+            per_user_available = avail_total
+
         out.append({
             "id": int(getattr(g, "id", 0)),
             "price": int(getattr(g, "price", 0)),
-            "is_limited": bool(getattr(g, "is_limited", False)),
-            "available_amount": int(getattr(g, "available_amount", 0)) if getattr(g, "is_limited", False) else None,
-            "total_amount": getattr(g, "total_amount", None) or getattr(getattr(g, "raw", None), "total_amount", None),
-            "require_premium": bool(getattr(getattr(g, "raw", None), "require_premium", False)),
+            "is_limited": is_limited,
+            "available_amount": avail_total,
+            "total_amount": getattr(g, "total_amount", None) or getattr(raw, "total_amount", None),
+            "require_premium": bool(getattr(raw, "require_premium", False)),
+            "limited_per_user": limited_per_user,
+            "per_user_remains": per_user_remains,
+            "per_user_available": per_user_available,
             "sticker_file_id": getattr(getattr(g, "sticker", None), "file_id", None),
             "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
             "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
         })
     return out
+
 
 def _notify_run_blocking(items: list[dict]) -> int | Exception:
     try:

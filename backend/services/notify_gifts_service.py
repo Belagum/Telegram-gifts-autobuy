@@ -118,15 +118,29 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: Dict)
 
 def _gift_text(g: Dict, chat: int) -> str:
     lim = bool(g.get("is_limited"))
-    return (
-        "Новый подарок\n"
-        f"ID: {g.get('id')}\n"
-        f"Цена: {g.get('price')}\n"
-        f"Premium: {'да' if g.get('require_premium') else 'нет'}\n"
-        f"Саплай: {g.get('total_amount') if lim else '∞'}\n"
-        f"Доступно: {g.get('available_amount') if lim else '∞'}\n"
-        f"Chat: {chat}"
-    )
+    avail_total = int(g.get("available_amount")) if lim and isinstance(g.get("available_amount"), int) else None
+    lpu = bool(g.get("limited_per_user"))
+    pu_rem = g.get("per_user_remains")
+    pu_av = g.get("per_user_available")
+    if pu_av is None:
+        a = avail_total if isinstance(avail_total, int) else None
+        r = int(pu_rem) if pu_rem is not None else None
+        pu_av = (min(a, r) if (a is not None and r is not None) else (r if r is not None else a)) if lpu else (avail_total if lim else None)
+
+    lines = [
+        "Новый подарок",
+        f"ID: {g.get('id')}",
+        f"Цена: {g.get('price')}",
+        f"Premium: {'да' if g.get('require_premium') else 'нет'}",
+        f"Саплай: {g.get('total_amount') if lim else '∞'}",
+        f"Доступно: {avail_total if lim else '∞'}",
+    ]
+    if lpu:
+        lines.append(f"Лимит на пользователя: остаток={pu_rem if pu_rem is not None else '—'} доступно={pu_av if pu_av is not None else '—'}")
+    else:
+        lines.append("Лимит на пользователя: безлимитно к пользователям")
+    lines.append(f"Chat: {chat}")
+    return "\n".join(lines)
 
 async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, g: Dict) -> None:
     base = f"https://api.telegram.org/bot{token}"

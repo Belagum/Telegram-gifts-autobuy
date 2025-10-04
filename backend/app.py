@@ -1,22 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova
 
-import os, atexit, threading
+import atexit
+import os
+import threading
+
 from flask import Flask
 from flask_cors import CORS
 
-from backend.db import init_db, SessionLocal
+from backend.db import SessionLocal, init_db
+from backend.logger import bind_flask, logger, setup_logging
 from backend.models import User
-from backend.logger import setup_logging, bind_flask, logger
-from backend.routes.channels import bp_channels
-
-from backend.routes.gifts import bp_gifts
-from backend.routes.settings import bp_settings
-from backend.routes.auth import bp_auth
 from backend.routes.account import bp_acc
+from backend.routes.auth import bp_auth
+from backend.routes.channels import bp_channels
+from backend.routes.gifts import bp_gifts
 from backend.routes.misc import bp_misc
-
-from backend.services.gifts_service import start_user_gifts, stop_user_gifts, GIFTS_THREADS
+from backend.routes.settings import bp_settings
+from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
 
 _BOOTSTRAPPED = threading.Event()
 

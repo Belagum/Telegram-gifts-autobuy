@@ -1,18 +1,33 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-import os, json, time, gzip, httpx, asyncio, threading, hashlib, shutil
-from pathlib import Path
+import asyncio
+import gzip
+import hashlib
+import json
+import os
+import shutil
+import threading
+import time
 from collections import defaultdict
+from pathlib import Path
 from queue import Queue
 
-from flask import Blueprint, request, jsonify, current_app, Response, stream_with_context
+import httpx
+from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from sqlalchemy.orm import Session
 
 from ..auth import auth_required
-from ..models import User, UserSettings
 from ..logger import logger
-from ..services.gifts_service import start_user_gifts, stop_user_gifts, read_user_gifts, refresh_once, gifts_event_bus, NoAccountsError
+from ..models import User, UserSettings
+from ..services.gifts_service import (
+    NoAccountsError,
+    gifts_event_bus,
+    read_user_gifts,
+    refresh_once,
+    start_user_gifts,
+    stop_user_gifts,
+)
 
 bp_gifts = Blueprint("gifts", __name__, url_prefix="/api")
 
@@ -36,7 +51,8 @@ def _save_atomic(path:Path, data:bytes)->None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp=path.with_suffix(path.suffix+".tmp")
     with open(tmp,"wb") as f:
-        f.write(data); f.flush(); os.fsync(f.fileno())
+        f.write(data); f.flush() 
+        os.fsync(f.fileno())
     os.replace(tmp,path)
 
 async def _botapi_download(file_id:str, token:str)->bytes:
@@ -44,11 +60,13 @@ async def _botapi_download(file_id:str, token:str)->bytes:
     api=f"https://api.telegram.org/bot{token}"
     base=f"https://api.telegram.org/file/bot{token}"
     async with httpx.AsyncClient(timeout=30) as http:
-        r=await http.get(f"{api}/getFile", params={"file_id":file_id}); r.raise_for_status()
+        r=await http.get(f"{api}/getFile", params={"file_id":file_id})
+        r.raise_for_status()
         p=r.json()
         if not (p.get("ok") and p.get("result") and p["result"].get("file_path")): raise RuntimeError("getFile error")
         fp=p["result"]["file_path"]
-        r2=await http.get(f"{base}/{fp}", follow_redirects=True); r2.raise_for_status()
+        r2=await http.get(f"{base}/{fp}", follow_redirects=True)
+        r2.raise_for_status()
         return r2.content
 
 def _run_async(coro)->bytes:
@@ -61,7 +79,9 @@ def _run_async(coro)->bytes:
                 nonlocal out,err
                 try: out=asyncio.run(coro)
                 except Exception as e: err=e
-            t=threading.Thread(target=_runner, daemon=True); t.start(); t.join()
+            t=threading.Thread(target=_runner, daemon=True)
+            t.start()
+            t.join()
             if err: raise err
             return out
     except RuntimeError:
@@ -110,7 +130,8 @@ def _promote_cached(src_key:str, dst_key:str)->Path|None:
         try:
             _link_or_copy(src, dst_path)
         except Exception:
-            logger.exception("promote cache failed"); return None
+            logger.exception("promote cache failed") 
+            return None
         return dst_path
 
 @bp_gifts.get("/gifts", endpoint="gifts_list")
@@ -193,7 +214,7 @@ def gifts_settings_set(db:Session):
 @auth_required
 def gifts_stream(db:Session):
     user_id=request.user_id
-    def sse(event:str,data:dict)->bytes: return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
+    def sse(event:str,data:dict)->bytes: return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
     q:Queue=gifts_event_bus.subscribe(user_id)
     @stream_with_context
     def gen():
@@ -207,7 +228,8 @@ def gifts_stream(db:Session):
                     if evt and evt.get("items") is not None: yield sse("gifts", evt)
                 except Exception: pass
                 if time.monotonic()-last_ping>25:
-                    yield b": ping\n\n"; last_ping=time.monotonic()
+                    yield b": ping\n\n" 
+                    last_ping=time.monotonic()
         finally:
             gifts_event_bus.unsubscribe(user_id,q)
     return Response(gen(), headers={

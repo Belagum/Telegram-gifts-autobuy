@@ -1,13 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-from sqlalchemy import Integer, String, ForeignKey, BigInteger, DateTime, UniqueConstraint, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Boolean
 
 from .db import Base
+
 
 class Channel(Base):
     __tablename__ = "channels"
@@ -20,8 +21,8 @@ class Channel(Base):
     price_max: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     supply_min: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     supply_max: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), index=True)
 
 class User(Base):
     __tablename__ = "users"
@@ -38,7 +39,7 @@ class UserSettings(Base):
     bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notify_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     buy_target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)  # NEW
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), index=True)
 
 class SessionToken(Base):
     __tablename__ = "session_tokens"
@@ -60,7 +61,7 @@ class ApiProfile(Base):
     name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         index=True
     )
     user: Mapped["User"] = relationship("User", back_populates="apis")
@@ -79,11 +80,11 @@ class Account(Base):
     is_premium: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     premium_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
     session_path: Mapped[str] = mapped_column(String(256))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     user: Mapped["User"] = relationship("User", back_populates="accounts")
     api_profile: Mapped["ApiProfile"] = relationship("ApiProfile", back_populates="accounts")
 
 
 def token_default_exp(days:int=7)->datetime:
-    return datetime.now(timezone.utc) + timedelta(days=days)
+    return datetime.now(UTC) + timedelta(days=days)

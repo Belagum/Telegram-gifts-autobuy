@@ -1,18 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-import asyncio, time, os, threading, glob, re
-from datetime import datetime, timedelta, timezone
+import asyncio
+import glob
+import os
+import re
+import threading
+import time
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy.orm import Session
 from pyrogram.errors import AuthKeyUnregistered
 from pyrogram.raw.functions.help import GetPremiumPromo
+from sqlalchemy.orm import Session
 
-from .tg_clients_service import tg_call
-from ..models import Account
-from ..logger import logger
 from ..db import SessionLocal
+from ..logger import logger
+from ..models import Account
 from .session_locks_service import session_lock_for
+from .tg_clients_service import tg_call
+
 STALE_MINUTES = 60
 
 
@@ -84,7 +90,8 @@ def _delete_account_and_session(db: Session, acc: Account) -> None:
     )
     _purge_session_files(acc.session_path)
     try:
-        db.delete(acc); db.commit()
+        db.delete(acc) 
+        db.commit()
     except Exception:
         logger.exception(f"accounts: failed to delete account (acc_id={acc.id})")
         db.rollback()
@@ -107,7 +114,7 @@ async def fetch_profile_and_stars(session_path:str, api_id:int, api_hash:str):
 
 def _should_refresh(now: datetime, lc: datetime | None) -> bool:
     if lc and lc.tzinfo is None:
-        lc = lc.replace(tzinfo=timezone.utc)
+        lc = lc.replace(tzinfo=UTC)
     return lc is None or (now - lc) > timedelta(minutes=STALE_MINUTES)
 
 def read_accounts(db:Session, user_id:int)->list[dict]:
@@ -115,7 +122,7 @@ def read_accounts(db:Session, user_id:int)->list[dict]:
     out=[]
     for r in rows:
         dt=r.last_checked_at
-        if dt and dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
+        if dt and dt.tzinfo is None: dt=dt.replace(tzinfo=UTC)
         out.append({
             "id":r.id,
             "phone":r.phone,
@@ -129,14 +136,15 @@ def read_accounts(db:Session, user_id:int)->list[dict]:
     return out
 
 def any_stale(db:Session, user_id:int)->bool:
-    now=datetime.now(timezone.utc)
+    now=datetime.now(UTC)
     rows=db.query(Account.last_checked_at).filter(Account.user_id==user_id).all()
     for (lc,) in rows:
         if _should_refresh(now, lc): return True
     return False
 
 def refresh_account(db: Session, acc: Account) -> Account | None:
-    lk = session_lock_for(acc.session_path); t0 = time.perf_counter()
+    lk = session_lock_for(acc.session_path)
+    t0 = time.perf_counter()
     logger.info(f"accounts.refresh: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
         async def work():
@@ -148,11 +156,12 @@ def refresh_account(db: Session, acc: Account) -> Account | None:
             acc.is_premium = premium
             acc.premium_until = until
             acc.stars_amount = int(stars)
-            acc.last_checked_at = datetime.now(timezone.utc)
+            acc.last_checked_at = datetime.now(UTC)
             db.commit()
             return acc
         try:
-            res = asyncio.run(work()); dt = (time.perf_counter() - t0) * 1000
+            res = asyncio.run(work()) 
+            dt = (time.perf_counter() - t0) * 1000
             logger.info(f"accounts.refresh: done (acc_id={acc.id}, stars={res.stars_amount}, dt_ms={dt:.0f})")
             return res
         except AuthKeyUnregistered:
@@ -177,7 +186,7 @@ def _refresh_user_accounts_worker(user_id: int):
         st.refreshing = True
     db2 = SessionLocal()
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         rows = db2.query(Account).filter(Account.user_id == user_id).order_by(Account.id.desc()).all()
         for r in rows:
             try:
@@ -199,7 +208,8 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
     lk = session_lock_for(acc.session_path)
     logger.info(f"accounts.stream: start (acc_id={acc.id}, session={_sess_name(acc.session_path)})")
     with lk:
-        yield {"stage": "connect", "message": "Соединяюсь…"}; time.sleep(0.5)
+        yield {"stage": "connect", "message": "Соединяюсь…"}
+        time.sleep(0.5)
         try:
             me, stars, premium, until = asyncio.run(fetch_profile_and_stars(acc.session_path, api_id, api_hash))
         except AuthKeyUnregistered:
@@ -212,20 +222,24 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
             yield {"error":"internal_error","detail":str(e)}
             return
 
-        yield {"stage":"profile","message":"Проверяю профиль…"}; time.sleep(0.5)
-        yield {"stage":"stars","message":"Проверяю звёзды…"}; time.sleep(0.5)
-        yield {"stage":"premium","message":"Проверяю премиум…"}; time.sleep(0.5)
+        yield {"stage":"profile","message":"Проверяю профиль…"} 
+        time.sleep(0.5)
+        yield {"stage":"stars","message":"Проверяю звёзды…"}
+        time.sleep(0.5)
+        yield {"stage":"premium","message":"Проверяю премиум…"}
+        time.sleep(0.5)
 
         acc.first_name = getattr(me, "first_name", None)
         acc.username = getattr(me, "username", None)
         acc.is_premium = premium
         acc.premium_until = until
         acc.stars_amount = int(stars)
-        acc.last_checked_at = datetime.now(timezone.utc)
+        acc.last_checked_at = datetime.now(UTC)
         db.commit()
 
         logger.debug(f"accounts.stream: saved (acc_id={acc.id}, stars={acc.stars_amount}, premium={acc.is_premium}, until={acc.premium_until})")
-        yield {"stage":"save","message":"Сохраняю…"}; time.sleep(0.5)
+        yield {"stage":"save","message":"Сохраняю…"}
+        time.sleep(0.5)
 
         yield {
             "done": True,

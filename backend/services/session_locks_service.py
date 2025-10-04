@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-import os, threading
-from typing import Dict
+import os
+import threading
 
-_LOCKS: Dict[str, threading.RLock] = {}
+_LOCKS: dict[str, threading.RLock] = {}
 _GUARD = threading.Lock()
 
 def session_lock_for(session_path: str) -> threading.RLock:

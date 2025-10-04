@@ -1,16 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-from datetime import datetime, timezone
-import os, secrets, glob, threading, asyncio
+import asyncio
+import glob
+import os
+import secrets
+import threading
 from dataclasses import dataclass
-from .services.accounts_service import fetch_profile_and_stars
+from datetime import UTC, datetime
 
+from pyrogram import Client
+from pyrogram.errors import RPCError, SessionPasswordNeeded
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from pyrogram import Client
-from pyrogram.errors import SessionPasswordNeeded, RPCError
-from .models import ApiProfile, Account
+
+from .models import Account, ApiProfile
+from .services.accounts_service import fetch_profile_and_stars
 
 SESS_ROOT = os.path.join(os.path.dirname(__file__), "sessions")
 os.makedirs(SESS_ROOT, exist_ok=True)
@@ -212,7 +217,7 @@ class PyroLoginManager:
         acc.is_premium = bool(premium)
         acc.premium_until = until
         acc.session_path = p.session_path
-        acc.last_checked_at = datetime.now(timezone.utc)
+        acc.last_checked_at = datetime.now(UTC)
 
         try:
             db.commit()
@@ -230,7 +235,7 @@ class PyroLoginManager:
                     acc.stars_amount = int(stars)
                     acc.is_premium = bool(premium)
                     acc.premium_until = until
-                    acc.last_checked_at = datetime.now(timezone.utc)
+                    acc.last_checked_at = datetime.now(UTC)
                     db.commit()
             else:
                 raise

@@ -2,22 +2,26 @@
 # Copyright 2025 Vova orig
 
 import re
-from typing import Optional, Dict
+
 from sqlalchemy.orm import Session
-from .channels_service import norm_ch_id
+
 from ..db import SessionLocal
 from ..models import UserSettings
+from .channels_service import norm_ch_id
+
 
 def _norm_peer_id(v) -> int:
     s = str(v or "").strip()
-    if not s: raise ValueError("invalid id")
+    if not s: 
+        raise ValueError("invalid id")
     neg = s.startswith("-")
     digits = re.sub(r"\D", "", s[1:] if neg else s)
-    if not digits: raise ValueError("invalid id")
+    if not digits:
+        raise ValueError("invalid id")
     n = int(digits)
     return -n if neg else n
 
-def read_user_settings(user_id: int) -> Dict[str, Optional[str | int | bool]]:
+def read_user_settings(user_id: int) -> dict[str, str | int | bool | None]:
     db: Session = SessionLocal()
     try:
         s = db.get(UserSettings, user_id)
@@ -29,12 +33,13 @@ def read_user_settings(user_id: int) -> Dict[str, Optional[str | int | bool]]:
     finally:
         db.close()
 
-def set_user_settings(user_id: int, bot_token: Optional[str], notify_chat_id: Optional[str | int], buy_target_id: Optional[str | int]) -> Dict[str, Optional[str | int | bool]]:
+def set_user_settings(user_id: int, bot_token: str | None, notify_chat_id: str | int | None, buy_target_id: str | int | None) -> dict[str, str | int | bool | None]:
     db: Session = SessionLocal()
     try:
         s = db.get(UserSettings, user_id)
         if not s:
-            s = UserSettings(user_id=user_id); db.add(s)
+            s = UserSettings(user_id=user_id) 
+            db.add(s)
 
         s.bot_token = ((bot_token or "").strip() or None)
 

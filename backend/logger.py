@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
+import logging
 import os
 import sys
-import logging
+
 from loguru import logger as _logger
 
 _FMT = (
@@ -69,7 +70,8 @@ def setup_logging(level: str | None = None) -> None:
 
 def bind_flask(app) -> None:
     import time
-    from flask import request, g, jsonify, send_file
+
+    from flask import g, jsonify, request, send_file
     from werkzeug.exceptions import HTTPException
 
     @app.before_request

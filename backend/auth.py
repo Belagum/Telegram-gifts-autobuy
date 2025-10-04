@@ -2,16 +2,16 @@
 # Copyright 2025 Vova orig
 
 import secrets
+from datetime import UTC, datetime
 from functools import wraps
-from datetime import datetime, timezone
 
-from flask import request, jsonify
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import jsonify, request
 from sqlalchemy.orm import Session
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import SessionToken, token_default_exp
 from .db import get_db
 from .logger import logger
+from .models import SessionToken, token_default_exp
 
 
 def hash_password(p: str) -> str:
@@ -56,13 +56,14 @@ def auth_required(f):
             )
             return jsonify({"error": "unauthorized"}), 401
 
-        db_gen = get_db(); db = next(db_gen)
+        db_gen = get_db() 
+        db = next(db_gen)
         try:
             row = (
                 db.query(SessionToken)
                 .filter(
                     SessionToken.token == token,
-                    SessionToken.expires_at > datetime.now(timezone.utc),
+                    SessionToken.expires_at > datetime.now(UTC),
                 )
                 .first()
             )

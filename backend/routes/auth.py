@@ -2,13 +2,14 @@
 # Copyright 2025 Vova orig
 
 from time import perf_counter
-from flask import Blueprint, request, jsonify
+
+from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
+from ..auth import auth_required, hash_password, issue_token, verify_password
 from ..db import get_db
-from ..models import User, SessionToken
-from ..auth import hash_password, verify_password, issue_token, auth_required
 from ..logger import logger
+from ..models import SessionToken, User
 
 bp_auth = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -17,7 +18,8 @@ bp_auth = Blueprint("auth", __name__, url_prefix="/api/auth")
 def register():
     from flask import make_response
     t0 = perf_counter()
-    db_gen = get_db(); db = next(db_gen)
+    db_gen = get_db()
+    db = next(db_gen)
     req_id = id(db)
     try:
         d = request.get_json(silent=True) or {}
@@ -31,7 +33,8 @@ def register():
             logger.warning(f"auth.register: username taken (req_id={req_id}, username='{u}')")
             return jsonify({"error": "username_taken"}), 409
         user = User(username=u, password_hash=hash_password(p))
-        db.add(user); db.commit()
+        db.add(user) 
+        db.commit()
         token = issue_token(db, user.id)
         dt = (perf_counter() - t0) * 1000
         logger.info(f"auth.register: ok (req_id={req_id}, user_id={user.id}, dt_ms={dt:.0f})")
@@ -52,7 +55,8 @@ def register():
 def login():
     from flask import make_response
     t0 = perf_counter()
-    db_gen = get_db(); db = next(db_gen)
+    db_gen = get_db() 
+    db = next(db_gen)
     req_id = id(db)
     try:
         d = request.get_json(silent=True) or {}

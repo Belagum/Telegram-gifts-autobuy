@@ -1,16 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-import asyncio, os, hashlib, threading
+import asyncio
+import hashlib
+import os
+import threading
 from contextlib import closing
-from typing import List, Dict, Tuple, Optional
+
 import httpx
 from sqlalchemy.orm import Session
 
-from .tg_clients_service import tg_call
 from ..db import SessionLocal
-from ..models import User, UserSettings, Account
 from ..logger import logger
+from ..models import Account, User, UserSettings
+from .tg_clients_service import tg_call
 
 _STICKERS_DIR = os.path.join(os.getenv("GIFTS_DIR", "gifts_data"), "stickers")
 
@@ -20,11 +23,11 @@ def _ensure_dir(p: str) -> None:
     except Exception:
         pass
 
-def _collect_targets() -> List[Tuple[int, str, int]]:
+def _collect_targets() -> list[tuple[int, str, int]]:
     db: Session = SessionLocal()
     try:
-        uids = [uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh == True).all()]
-        out: List[Tuple[int, str, int]] = []
+        uids = [uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh).all()]
+        out: list[tuple[int, str, int]] = []
         for uid in uids:
             s = db.get(UserSettings, uid)
             token = (getattr(s, "bot_token", "") or "").strip() if s else ""
@@ -42,12 +45,15 @@ def _collect_targets() -> List[Tuple[int, str, int]]:
 
 def _sticker_ext(mime: str | None) -> str:
     m = (mime or "").lower()
-    if "tgsticker" in m: return ".tgs"
-    if "webm" in m: return ".webm"
-    if "webp" in m: return ".webp"
+    if "tgsticker" in m: 
+        return ".tgs"
+    if "webm" in m: 
+        return ".webm"
+    if "webp" in m: 
+        return ".webp"
     return ".bin"
 
-def _sticker_cache_path(g: Dict) -> Optional[str]:
+def _sticker_cache_path(g: dict) -> str | None:
     fid = str(g.get("sticker_file_id") or "").strip()
     if not fid:
         return None
@@ -55,7 +61,7 @@ def _sticker_cache_path(g: Dict) -> Optional[str]:
     name = uniq if uniq else hashlib.md5(fid.encode("utf-8")).hexdigest()
     return os.path.join(_STICKERS_DIR, name + _sticker_ext(g.get("sticker_mime")))
 
-async def _ensure_cached(http: httpx.AsyncClient, token: str, g: Dict) -> Optional[str]:
+async def _ensure_cached(http: httpx.AsyncClient, token: str, g: dict) -> str | None:
     path = _sticker_cache_path(g)
     if not path:
         return None
@@ -87,7 +93,7 @@ async def _ensure_cached(http: httpx.AsyncClient, token: str, g: Dict) -> Option
         logger.exception("notify:cache error", exc_info=True)
         return None
 
-async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: Dict) -> bool:
+async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict) -> bool:
     path = await _ensure_cached(http, token, g)
     if not path:
         logger.warning(f"notify:no cache gift_id={g.get('id')}")
@@ -116,7 +122,7 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: Dict)
         logger.exception("notify:sendSticker error", exc_info=True)
         return False
 
-def _gift_text(g: Dict, chat: int) -> str:
+def _gift_text(g: dict, chat: int) -> str:
     lim = bool(g.get("is_limited"))
     avail_total = int(g.get("available_amount")) if lim and isinstance(g.get("available_amount"), int) else None
     lpu = bool(g.get("limited_per_user"))
@@ -142,7 +148,7 @@ def _gift_text(g: Dict, chat: int) -> str:
     lines.append(f"Chat: {chat}")
     return "\n".join(lines)
 
-async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, g: Dict) -> None:
+async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, g: dict) -> None:
     base = f"https://api.telegram.org/bot{token}"
     try:
         chat = int(chat)
@@ -166,8 +172,8 @@ async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, 
         logger.exception("notify:text error", exc_info=True)
     await asyncio.sleep(0.04)
 
-async def _collect_dm_ids(uids: List[int]) -> Dict[int, List[int]]:
-    dm_ids_by_uid: Dict[int, List[int]] = {}
+async def _collect_dm_ids(uids: list[int]) -> dict[int, list[int]]:
+    dm_ids_by_uid: dict[int, list[int]] = {}
     with closing(SessionLocal()) as db:
         for uid in uids:
             ids: set[int] = set()
@@ -176,7 +182,8 @@ async def _collect_dm_ids(uids: List[int]) -> Dict[int, List[int]]:
                 try:
                     me = await tg_call(a.session_path, a.api_profile.api_id, a.api_profile.api_hash, lambda c: c.get_me(), min_interval=0.5)
                     tid = int(getattr(me, "id", 0) or 0)
-                    if tid > 0: ids.add(tid)
+                    if tid > 0: 
+                        ids.add(tid)
                 except Exception:
                     logger.debug(f"notify:get_me fail acc_id={a.id}", exc_info=True)
                 await asyncio.sleep(0.05)
@@ -184,19 +191,19 @@ async def _collect_dm_ids(uids: List[int]) -> Dict[int, List[int]]:
             logger.info(f"notify:dm_ids uid={uid} count={len(dm_ids_by_uid[uid])}")
     return dm_ids_by_uid
 
-async def broadcast_new_gifts(gifts: List[Dict]) -> int:
+async def broadcast_new_gifts(gifts: list[dict]) -> int:
     if not gifts:
         return 0
 
     targets = _collect_targets()  # [(uid, token, notify_chat_id)]
 
-    token_by_uid: Dict[int, str] = {}
+    token_by_uid: dict[int, str] = {}
     try:
         with closing(SessionLocal()) as db:
             rows = (
                 db.query(User.id, UserSettings.bot_token)
                   .join(UserSettings, User.id == UserSettings.user_id)
-                  .filter(User.gifts_autorefresh == True)
+                  .filter(User.gifts_autorefresh)
                   .all()
             )
             for uid, tok in rows:
@@ -209,7 +216,7 @@ async def broadcast_new_gifts(gifts: List[Dict]) -> int:
     uids = sorted({u for u, _, _ in targets} | set(token_by_uid.keys()))
     logger.info(f"notify:gifts={len(gifts)} targets={len(targets)} uids_for_dm={len(uids)}")
 
-    dm_ids_by_uid: Dict[int, List[int]] = {}
+    dm_ids_by_uid: dict[int, list[int]] = {}
     if uids:
         try:
             dm_ids_by_uid = await _collect_dm_ids(uids) or {}
@@ -267,7 +274,7 @@ async def broadcast_new_gifts(gifts: List[Dict]) -> int:
 
 
 
-def broadcast_new_gifts_sync(gifts: List[Dict]) -> int:
+def broadcast_new_gifts_sync(gifts: list[dict]) -> int:
     try:
         loop = asyncio.get_running_loop()
         if loop.is_running():

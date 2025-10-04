@@ -2,15 +2,17 @@
 # Copyright 2025 Vova orig
 
 from time import perf_counter
-from flask import Blueprint, request, jsonify
+
+from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
+
 from ..auth import auth_required
 from ..logger import logger
 from ..services.channels_service import (
-    list_channels,
     create_channel,
-    update_channel,
     delete_channel,
+    list_channels,
+    update_channel,
 )
 
 bp_channels = Blueprint("channels", __name__, url_prefix="/api")

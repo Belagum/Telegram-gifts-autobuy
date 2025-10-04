@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
+
 from ..auth import auth_required
 from ..services.settings_service import read_user_settings, set_user_settings
 

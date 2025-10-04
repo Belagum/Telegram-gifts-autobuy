@@ -5,17 +5,24 @@ import json
 import re
 from time import perf_counter
 
-from flask import Blueprint, request, jsonify, Response, stream_with_context
+from flask import Blueprint, Response, jsonify, request, stream_with_context
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..auth import auth_required
-from ..models import User, ApiProfile, Account
-from ..services.accounts_service import any_stale, schedule_user_refresh, wait_until_ready, read_accounts, \
-    end_user_refresh, iter_refresh_steps_core, begin_user_refresh
-from ..pyro_login import PyroLoginManager
 from ..db import SessionLocal
 from ..logger import logger
+from ..models import Account, ApiProfile, User
+from ..pyro_login import PyroLoginManager
+from ..services.accounts_service import (
+    any_stale,
+    begin_user_refresh,
+    end_user_refresh,
+    iter_refresh_steps_core,
+    read_accounts,
+    schedule_user_refresh,
+    wait_until_ready,
+)
 
 bp_acc = Blueprint("accounts", __name__, url_prefix="/api")
 _logins = PyroLoginManager()
@@ -32,7 +39,8 @@ def _norm_phone(p: str) -> str:
 @bp_acc.get("/accounts", endpoint="accounts_list")
 @auth_required
 def accounts(db: Session):
-    t0 = perf_counter(); uid = request.user_id
+    t0 = perf_counter() 
+    uid = request.user_id
     wait = request.args.get("wait") in ("1", "true", "yes")
     logger.info(f"accounts.list: start (user_id={uid}, wait={wait})")
     try:
@@ -123,7 +131,8 @@ def create_apiprofile(db: Session):
             return jsonify({"error": "duplicate_api_hash", "existing_id": exist_hash.id}), 409
 
         ap = ApiProfile(user_id=uid, api_id=int(api_id), api_hash=str(api_hash), name=name)
-        db.add(ap); db.commit()
+        db.add(ap)
+        db.commit()
 
         dt = (perf_counter() - t0) * 1000
         logger.info(f"apiprofile.create: ok (user_id={uid}, id={ap.id}, dt_ms={dt:.0f})")
@@ -174,7 +183,8 @@ def delete_apiprofile(ap_id: int, db: Session):
         if cnt > 0:
             logger.warning(f"apiprofile.delete: in_use (user_id={uid}, ap_id={ap_id}, accounts={cnt})")
             return jsonify({"error": "api_profile_in_use", "accounts": int(cnt)}), 409
-        db.delete(ap); db.commit()
+        db.delete(ap) 
+        db.commit()
         dt = (perf_counter() - t0) * 1000
         logger.info(f"apiprofile.delete: ok (user_id={uid}, ap_id={ap_id}, dt_ms={dt:.0f})")
         return jsonify({"ok": True})

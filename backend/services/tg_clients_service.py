@@ -41,10 +41,12 @@ def _ensure_io_loop() -> asyncio.AbstractEventLoop:
         if _IO_LOOP and not _IO_LOOP.is_closed() and _IO_THREAD and _IO_THREAD.is_alive():
             return _IO_LOOP
         loop = asyncio.new_event_loop()
-        def _runner(): asyncio.set_event_loop(loop) 
-        loop.run_forever()
-        t = threading.Thread(target=_runner, name="tg-io", daemon=True) 
-        t.start()
+
+        def _runner() -> None:
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        t = threading.Thread(target=_runner, name="tg-io", daemon=True)
         _IO_LOOP, _IO_THREAD = loop, t
         return loop
 

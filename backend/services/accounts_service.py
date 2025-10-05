@@ -182,6 +182,7 @@ def _refresh_user_accounts_worker(user_id: int):
     st = _user_state(user_id)
     with st.cv:
         if st.refreshing:
+            logger.debug(f"accounts.bg_refresh: already refreshing (user_id={user_id})")
             return
         st.refreshing = True
     db2 = SessionLocal()
@@ -195,11 +196,15 @@ def _refresh_user_accounts_worker(user_id: int):
             except Exception:
                 logger.exception(f"accounts.bg_refresh: failed (acc_id={r.id})")
     finally:
-        db2.close()
-        with st.cv:
-            st.refreshing = False
-            st.rev += 1
-            st.cv.notify_all()
+        try:
+            db2.close()
+        except Exception:
+            logger.exception(f"accounts.bg_refresh: failed to close session (user_id={user_id})")
+        finally:
+            with st.cv:
+                st.refreshing = False
+                st.rev += 1
+                st.cv.notify_all()
 
 def schedule_user_refresh(user_id:int)->None:
     threading.Thread(target=_refresh_user_accounts_worker, args=(user_id,), daemon=True).start()

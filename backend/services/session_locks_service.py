@@ -7,6 +7,7 @@ import threading
 _LOCKS: dict[str, threading.RLock] = {}
 _GUARD = threading.Lock()
 
+
 def session_lock_for(session_path: str) -> threading.RLock:
     key = os.path.abspath(session_path or "")
     with _GUARD:

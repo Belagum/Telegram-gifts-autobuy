@@ -12,7 +12,7 @@ from .channels_service import norm_ch_id
 
 def _norm_peer_id(v) -> int:
     s = str(v or "").strip()
-    if not s: 
+    if not s:
         raise ValueError("invalid id")
     neg = s.startswith("-")
     digits = re.sub(r"\D", "", s[1:] if neg else s)
@@ -20,6 +20,7 @@ def _norm_peer_id(v) -> int:
         raise ValueError("invalid id")
     n = int(digits)
     return -n if neg else n
+
 
 def read_user_settings(user_id: int) -> dict[str, str | int | bool | None]:
     db: Session = SessionLocal()
@@ -33,27 +34,37 @@ def read_user_settings(user_id: int) -> dict[str, str | int | bool | None]:
     finally:
         db.close()
 
-def set_user_settings(user_id: int, bot_token: str | None, notify_chat_id: str | int | None, buy_target_id: str | int | None) -> dict[str, str | int | bool | None]:
+
+def set_user_settings(
+    user_id: int,
+    bot_token: str | None,
+    notify_chat_id: str | int | None,
+    buy_target_id: str | int | None,
+) -> dict[str, str | int | bool | None]:
     db: Session = SessionLocal()
     try:
         s = db.get(UserSettings, user_id)
         if not s:
-            s = UserSettings(user_id=user_id) 
+            s = UserSettings(user_id=user_id)
             db.add(s)
 
-        s.bot_token = ((bot_token or "").strip() or None)
+        s.bot_token = (bot_token or "").strip() or None
 
-        if notify_chat_id is None or str(notify_chat_id).strip()=="":
+        if notify_chat_id is None or str(notify_chat_id).strip() == "":
             s.notify_chat_id = None
         else:
             s.notify_chat_id = norm_ch_id(notify_chat_id)
 
-        if buy_target_id is None or str(buy_target_id).strip()=="":
+        if buy_target_id is None or str(buy_target_id).strip() == "":
             s.buy_target_id = None
         else:
             s.buy_target_id = _norm_peer_id(buy_target_id)
 
         db.commit()
-        return {"bot_token": s.bot_token, "notify_chat_id": s.notify_chat_id, "buy_target_id": s.buy_target_id}
+        return {
+            "bot_token": s.bot_token,
+            "notify_chat_id": s.notify_chat_id,
+            "buy_target_id": s.buy_target_id,
+        }
     finally:
         db.close()

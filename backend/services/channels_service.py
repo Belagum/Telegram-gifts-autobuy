@@ -13,158 +13,239 @@ from .tg_clients_service import tg_call
 
 PROBE_CALL_TIMEOUT = 6.0
 
-def norm_ch_id(v)->int:
+
+def norm_ch_id(v) -> int:
     s = str(v or "").strip()
-    if not s: 
+    if not s:
         raise ValueError("invalid channel id")
     if s.startswith("-100"):
-        tail = re.sub(r"\D","",s[4:])
-        if not tail: 
+        tail = re.sub(r"\D", "", s[4:])
+        if not tail:
             raise ValueError("invalid channel id")
-        return int("-100"+tail)
-    digits = re.sub(r"\D","",s)
-    if not digits: 
+        return int("-100" + tail)
+    digits = re.sub(r"\D", "", s)
+    if not digits:
         raise ValueError("invalid channel id")
-    return int("-100"+digits)
+    return int("-100" + digits)
 
-def _status_joined(st)->bool:
-    s=str(st or "").lower()
+
+def _status_joined(st) -> bool:
+    s = str(st or "").lower()
     return "left" not in s and "kicked" not in s
 
-def _int_or_none(v, name:str)->int|None:
-    if v is None: 
+
+def _int_or_none(v, name: str) -> int | None:
+    if v is None:
         return None
-    if isinstance(v, bool): 
+    if isinstance(v, bool):
         raise ValueError(f"{name} must be integer")
-    if isinstance(v, int): 
+    if isinstance(v, int):
         return v
     if isinstance(v, str):
         t = v.strip()
-        if t.lower()=="null": 
+        if t.lower() == "null":
             return None
-        if t == "": 
+        if t == "":
             raise ValueError(f"{name} must be integer")
-        if re.fullmatch(r"[+-]?\d+", t): 
+        if re.fullmatch(r"[+-]?\d+", t):
             return int(t)
     raise ValueError(f"{name} must be integer")
 
-def _coerce_range(lo_name:str, hi_name:str, lo, hi)->tuple[int|None,int|None]:
-    lo_i=_int_or_none(lo, lo_name)
-    hi_i=_int_or_none(hi, hi_name)
-    if lo_i is not None and hi_i is not None and lo_i>hi_i:
+
+def _coerce_range(lo_name: str, hi_name: str, lo, hi) -> tuple[int | None, int | None]:
+    lo_i = _int_or_none(lo, lo_name)
+    hi_i = _int_or_none(hi, hi_name)
+    if lo_i is not None and hi_i is not None and lo_i > hi_i:
         raise ValueError(f"{lo_name} must be <= {hi_name}")
     return lo_i, hi_i
 
-async def _safe_tg_call(acc:Account, fn, timeout:float):
+
+async def _safe_tg_call(acc: Account, fn, timeout: float):
     try:
-        return await tg_call(acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash, fn, op_timeout=timeout)
+        return await tg_call(
+            acc.session_path,
+            acc.api_profile.api_id,
+            acc.api_profile.api_hash,
+            fn,
+            op_timeout=timeout,
+        )
     except Exception as e:
-        logger.debug(f"channels.probe.call: err (acc_id={acc.id}, fn={getattr(fn,'__name__','lambda')}, {type(e).__name__})")
+        logger.debug(
+            "channels.probe.call: err (acc_id=%s, fn=%s, %s)",
+            acc.id,
+            getattr(fn, "__name__", "lambda"),
+            type(e).__name__,
+        )
         return None
 
-def _probe_one_account(acc:Account, ch_id:int)->tuple[str|None,bool]:
-    async def work(timeout:float)->tuple[str|None,bool]:
+
+def _probe_one_account(acc: Account, ch_id: int) -> tuple[str | None, bool]:
+    async def work(timeout: float) -> tuple[str | None, bool]:
         title = None
         joined = False
         m = await _safe_tg_call(acc, lambda c: c.get_chat_member(ch_id, "me"), timeout)
         if m is not None:
-            try: 
+            try:
                 joined = _status_joined(getattr(m, "status", None))
-            except Exception: 
+            except Exception:
                 joined = False
             try:
-                chat_obj = getattr(m,"chat",None)
-                if chat_obj and getattr(chat_obj, "title", None): 
+                chat_obj = getattr(m, "chat", None)
+                if chat_obj and getattr(chat_obj, "title", None):
                     title = chat_obj.title
-            except Exception: 
+            except Exception:
                 pass
         if not title:
-            chat=await _safe_tg_call(acc, lambda c: c.get_chat(ch_id), timeout)
-            if chat is not None and getattr(chat, "title" ,None): 
-                title=chat.title
+            chat = await _safe_tg_call(acc, lambda c: c.get_chat(ch_id), timeout)
+            if chat is not None and getattr(chat, "title", None):
+                title = chat.title
         return title, joined
-    t0=perf_counter()
+
+    t0 = perf_counter()
     try:
         title, joined = asyncio.run(work(PROBE_CALL_TIMEOUT))
-        dt=(perf_counter()-t0)*1000
-        logger.info(f"channels.probe: acc={acc.id}, ch_id={ch_id}, title={'yes' if title else 'no'}, joined={int(joined)}, dt_ms={dt:.0f}")
+        dt = (perf_counter() - t0) * 1000
+        logger.info(
+            "channels.probe: acc=%s, ch_id=%s, title=%s, joined=%s, dt_ms=%.0f",
+            acc.id,
+            ch_id,
+            "yes" if title else "no",
+            int(joined),
+            dt,
+        )
         return title, joined
     except Exception:
-        dt=(perf_counter()-t0)*1000
-        logger.warning(f"channels.probe: fail (acc_id={acc.id}, ch_id={ch_id}, dt_ms={dt:.0f}, err=Exception)")
+        dt = (perf_counter() - t0) * 1000
+        logger.warning(
+            "channels.probe: fail (acc_id=%s, ch_id=%s, dt_ms=%.0f, err=Exception)",
+            acc.id,
+            ch_id,
+            dt,
+        )
         return None, False
 
-def _probe_any_account(db:Session, user_id:int, ch_id:int)->tuple[str|None,bool]:
-    title=None
-    any_joined=False
-    accounts=(db.query(Account).filter(Account.user_id==user_id).order_by(Account.id.asc()).all())
+
+def _probe_any_account(db: Session, user_id: int, ch_id: int) -> tuple[str | None, bool]:
+    title = None
+    any_joined = False
+    accounts = db.query(Account).filter(Account.user_id == user_id).order_by(Account.id.asc()).all()
     if not accounts:
         logger.info(f"channels.probe: no_accounts (user_id={user_id})")
         return None, False
     for acc in accounts:
-        t,j=_probe_one_account(acc, ch_id)
-        if not title and t: 
-            title=t
-        if j: 
-            any_joined=True
+        t, j = _probe_one_account(acc, ch_id)
+        if not title and t:
+            title = t
+        if j:
+            any_joined = True
         break
-    logger.info(f"channels.probe.summary: user_id={user_id}, ch_id={ch_id}, title={'yes' if title else 'no'}, joined={int(any_joined)}")
+    logger.info(
+        "channels.probe.summary: user_id=%s, ch_id=%s, title=%s, joined=%s",
+        user_id,
+        ch_id,
+        "yes" if title else "no",
+        int(any_joined),
+    )
     return title, any_joined
 
-def list_channels(db:Session, user_id:int)->list[dict]:
-    rows=(db.query(Channel).filter(Channel.user_id==user_id).order_by(Channel.id.desc()).all())
-    return [{"id":r.id,"channel_id":int(r.channel_id),"title":r.title or "","price_min":r.price_min,"price_max":r.price_max,"supply_min":r.supply_min,"supply_max":r.supply_max} for r in rows]
 
-def create_channel(db:Session, user_id:int, channel_id, price_min, price_max, supply_min, supply_max, title_input:str|None)->dict:
-    try: 
-        ch_id=norm_ch_id(channel_id)
-    except ValueError as e: 
-        return {"error":"bad_channel_id","detail":str(e)}
+def list_channels(db: Session, user_id: int) -> list[dict]:
+    rows = db.query(Channel).filter(Channel.user_id == user_id).order_by(Channel.id.desc()).all()
+    return [
+        {
+            "id": r.id,
+            "channel_id": int(r.channel_id),
+            "title": r.title or "",
+            "price_min": r.price_min,
+            "price_max": r.price_max,
+            "supply_min": r.supply_min,
+            "supply_max": r.supply_max,
+        }
+        for r in rows
+    ]
+
+
+def create_channel(
+    db: Session,
+    user_id: int,
+    channel_id,
+    price_min,
+    price_max,
+    supply_min,
+    supply_max,
+    title_input: str | None,
+) -> dict:
     try:
-        price_min, price_max=_coerce_range("price_min","price_max",price_min,price_max)
-        supply_min, supply_max=_coerce_range("supply_min","supply_max",supply_min,supply_max)
-    except ValueError as e: 
-        return {"error":"bad_range","detail":str(e)}
-    exists=(db.query(Channel.id).filter(Channel.user_id==user_id, Channel.channel_id==ch_id).first())
-    if exists: 
-        return {"error":"duplicate_channel"}
-    probed_title, joined=_probe_any_account(db, user_id, ch_id)
-    if not joined: 
-        return {"error":"not_joined","detail":"в канал не войдено ни на каком аккаунте"}
-    title=(title_input or "").strip() or (probed_title or "")
-    ch=Channel(user_id=user_id, channel_id=ch_id, title=title, price_min=price_min, price_max=price_max, supply_min=supply_min, supply_max=supply_max)
-    db.add(ch) 
+        ch_id = norm_ch_id(channel_id)
+    except ValueError as e:
+        return {"error": "bad_channel_id", "detail": str(e)}
+    try:
+        price_min, price_max = _coerce_range("price_min", "price_max", price_min, price_max)
+        supply_min, supply_max = _coerce_range("supply_min", "supply_max", supply_min, supply_max)
+    except ValueError as e:
+        return {"error": "bad_range", "detail": str(e)}
+    exists = (
+        db.query(Channel.id).filter(Channel.user_id == user_id, Channel.channel_id == ch_id).first()
+    )
+    if exists:
+        return {"error": "duplicate_channel"}
+    probed_title, joined = _probe_any_account(db, user_id, ch_id)
+    if not joined:
+        return {"error": "not_joined", "detail": "в канал не войдено ни на каком аккаунте"}
+    title = (title_input or "").strip() or (probed_title or "")
+    ch = Channel(
+        user_id=user_id,
+        channel_id=ch_id,
+        title=title,
+        price_min=price_min,
+        price_max=price_max,
+        supply_min=supply_min,
+        supply_max=supply_max,
+    )
+    db.add(ch)
     db.commit()
     return {"channel_id": ch.id}
 
-def update_channel(db:Session, user_id:int, ch_id:int, **f)->dict:
-    ch=db.query(Channel).filter(Channel.id==ch_id, Channel.user_id==user_id).first()
-    if not ch: 
-        return {"error":"not_found"}
-    if "title" in f: 
-        f["title"]=(f["title"] or "").strip()
+
+def update_channel(db: Session, user_id: int, ch_id: int, **f) -> dict:
+    ch = db.query(Channel).filter(Channel.id == ch_id, Channel.user_id == user_id).first()
+    if not ch:
+        return {"error": "not_found"}
+    if "title" in f:
+        f["title"] = (f["title"] or "").strip()
     if "price_min" in f or "price_max" in f:
-        try: 
-            lo,hi=_coerce_range("price_min","price_max", f.get("price_min", ch.price_min), f.get("price_max", ch.price_max))
-        except ValueError as e: 
-            return {"error":"bad_range","detail":str(e)}
-        f["price_min"], f["price_max"]=lo,hi
+        try:
+            lo, hi = _coerce_range(
+                "price_min",
+                "price_max",
+                f.get("price_min", ch.price_min),
+                f.get("price_max", ch.price_max),
+            )
+        except ValueError as e:
+            return {"error": "bad_range", "detail": str(e)}
+        f["price_min"], f["price_max"] = lo, hi
     if "supply_min" in f or "supply_max" in f:
-        try: 
-            lo,hi=_coerce_range("supply_min","supply_max", f.get("supply_min", ch.supply_min), f.get("supply_max", ch.supply_max))
-        except ValueError as e: 
-            return {"error":"bad_range","detail":str(e)}
-        f["supply_min"], f["supply_max"]=lo,hi
-    for k in ("title","price_min","price_max","supply_min","supply_max"):
-        if k in f: 
+        try:
+            lo, hi = _coerce_range(
+                "supply_min",
+                "supply_max",
+                f.get("supply_min", ch.supply_min),
+                f.get("supply_max", ch.supply_max),
+            )
+        except ValueError as e:
+            return {"error": "bad_range", "detail": str(e)}
+        f["supply_min"], f["supply_max"] = lo, hi
+    for k in ("title", "price_min", "price_max", "supply_min", "supply_max"):
+        if k in f:
             setattr(ch, k, f[k])
     db.commit()
     return {"ok": True}
 
-def delete_channel(db:Session, user_id:int, ch_id:int)->dict:
-    ch=db.query(Channel).filter(Channel.id==ch_id, Channel.user_id==user_id).first()
-    if not ch: 
-        return {"error":"not_found"}
+
+def delete_channel(db: Session, user_id: int, ch_id: int) -> dict:
+    ch = db.query(Channel).filter(Channel.id == ch_id, Channel.user_id == user_id).first()
+    if not ch:
+        return {"error": "not_found"}
     db.delete(ch)
     db.commit()
     return {"ok": True}

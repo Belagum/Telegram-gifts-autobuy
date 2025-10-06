@@ -2,11 +2,12 @@
 # Copyright 2025 Vova orig
 
 import asyncio
+import concurrent.futures
 import os
 import sqlite3
 import threading
-from collections.abc import Awaitable, Callable
-from typing import Any
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any, TypeVar
 
 from pyrogram import Client
 
@@ -16,11 +17,22 @@ _START_ATTEMPTS = 4
 _START_TIMEOUT = 20.0
 _DBLOCK_MAX_BACKOFF = 2.0
 
+
 class _Box:
-    __slots__ = ("path","api_id","api_hash","client","loop","init_lock","call_lock","last_call")
-    def __init__(self, path:str, api_id:int, api_hash:str):
+    __slots__ = (
+        "path",
+        "api_id",
+        "api_hash",
+        "client",
+        "loop",
+        "init_lock",
+        "call_lock",
+        "last_call",
+    )
+
+    def __init__(self, path: str, api_id: int, api_hash: str):
         self.path = os.path.abspath(path)
-        self.api_id = api_id 
+        self.api_id = api_id
         self.api_hash = api_hash
         self.client: Client | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
@@ -28,12 +40,14 @@ class _Box:
         self.call_lock: asyncio.Lock | None = None
         self.last_call = 0.0
 
+
 _CLIENTS: dict[str, _Box] = {}
 _CLIENTS_GUARD = threading.Lock()
 
 _IO_LOOP: asyncio.AbstractEventLoop | None = None
 _IO_THREAD: threading.Thread | None = None
 _IO_LOCK = threading.Lock()
+
 
 def _ensure_io_loop() -> asyncio.AbstractEventLoop:
     global _IO_LOOP, _IO_THREAD
@@ -50,19 +64,27 @@ def _ensure_io_loop() -> asyncio.AbstractEventLoop:
         _IO_LOOP, _IO_THREAD = loop, t
         return loop
 
+
 def _loop_alive(loop: asyncio.AbstractEventLoop | None) -> bool:
     return bool(loop and not loop.is_closed())
 
-def _run_in_loop(loop: asyncio.AbstractEventLoop, coro: Awaitable[Any]) -> Awaitable[Any]:
-    fut = asyncio.run_coroutine_threadsafe(coro, loop)
+
+T = TypeVar("T")
+
+
+def _run_in_loop(  # noqa: UP047
+    loop: asyncio.AbstractEventLoop, coro: Coroutine[Any, Any, T]
+) -> Awaitable[T]:
+    fut: concurrent.futures.Future[T] = asyncio.run_coroutine_threadsafe(coro, loop)
     return asyncio.wrap_future(fut)
 
-async def _ensure_started(path:str, api_id:int, api_hash:str) -> _Box:
+
+async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
     key = os.path.abspath(path)
     with _CLIENTS_GUARD:
         box = _CLIENTS.get(key)
         if not box:
-            box = _Box(key, api_id, api_hash) 
+            box = _Box(key, api_id, api_hash)
             _CLIENTS[key] = box
     if box.client and getattr(box.client, "is_connected", False) and _loop_alive(box.loop):
         return box
@@ -90,19 +112,19 @@ async def _ensure_started(path:str, api_id:int, api_hash:str) -> _Box:
             last_err: BaseException | None = None
             for _ in range(_START_ATTEMPTS):
                 try:
-                    await _start_once() 
+                    await _start_once()
                     return
                 except sqlite3.OperationalError as e:
                     last_err = e
                     if "database is locked" in str(e).lower():
                         await asyncio.sleep(backoff)
-                        backoff = min(backoff*2, _DBLOCK_MAX_BACKOFF)
+                        backoff = min(backoff * 2, _DBLOCK_MAX_BACKOFF)
                         continue
                     break
                 except Exception as e:
                     last_err = e
-                    await asyncio.sleep(backoff) 
-                    backoff = min(backoff*2, _DBLOCK_MAX_BACKOFF)
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, _DBLOCK_MAX_BACKOFF)
             raise last_err or RuntimeError("pyrogram.start failed")
 
         # берём файловый лок в текущем потоке, а не внутри ид треда
@@ -110,19 +132,33 @@ async def _ensure_started(path:str, api_id:int, api_hash:str) -> _Box:
             await _run_in_loop(io, _start_with_retries())
         return box
 
-async def tg_call(path:str, api_id:int, api_hash:str, op:Callable[[Client], Awaitable[Any]], min_interval:float=0.0, op_timeout: float | None=None):
+
+async def tg_call(
+    path: str,
+    api_id: int,
+    api_hash: str,
+    op: Callable[[Client], Awaitable[Any]],
+    min_interval: float = 0.0,
+    op_timeout: float | None = None,
+):
     box = await _ensure_started(path, api_id, api_hash)
-    if not _loop_alive(box.loop) or not box.client or not getattr(box.client, "is_connected", False):
+    if (
+        not _loop_alive(box.loop)
+        or not box.client
+        or not getattr(box.client, "is_connected", False)
+    ):
         box = await _ensure_started(path, api_id, api_hash)
 
-    async def inner():
-        async with box.call_lock:  # type: ignore[arg-type]
-            if min_interval>0:
+    async def inner() -> Any:
+        if box.call_lock is None or box.client is None:
+            raise RuntimeError("telegram client is not initialized")
+        async with box.call_lock:
+            if min_interval > 0:
                 now = asyncio.get_running_loop().time()
                 delay = max(0.0, box.last_call + min_interval - now)
                 if delay > 0:
                     await asyncio.sleep(delay)
-            coro = op(box.client)  # type: ignore[arg-type]
+            coro = op(box.client)
             res = await (asyncio.wait_for(coro, timeout=op_timeout) if op_timeout else coro)
             box.last_call = asyncio.get_running_loop().time()
             return res
@@ -136,7 +172,10 @@ async def tg_call(path:str, api_id:int, api_hash:str, op:Callable[[Client], Awai
         return await inner()
     if not _loop_alive(box.loop):
         box = await _ensure_started(path, api_id, api_hash)
-    return await _run_in_loop(box.loop, inner())  # type: ignore[arg-type]
+    if box.loop is None:
+        raise RuntimeError("telegram client loop is not initialized")
+    return await _run_in_loop(box.loop, inner())
+
 
 async def tg_stop(path: str) -> None:
     key = os.path.abspath(path)
@@ -149,22 +188,26 @@ async def tg_stop(path: str) -> None:
         with _CLIENTS_GUARD:
             _CLIENTS.pop(key, None)
         return
+    if loop is None:
+        return
 
     async def stopper():
-        async with box.call_lock:  # type: ignore[arg-type]
+        if box.call_lock is None or box.client is None:
+            return
+        async with box.call_lock:
             try:
-                await asyncio.wait_for(box.client.stop(), timeout=5.0)  # type: ignore[union-attr]
+                await asyncio.wait_for(box.client.stop(), timeout=5.0)
             except Exception:
                 pass
 
     try:
-        await _run_in_loop(loop, stopper())  # type: ignore[arg-type]
+        await _run_in_loop(loop, stopper())
     finally:
         with _CLIENTS_GUARD:
             _CLIENTS.pop(key, None)
 
 
-async def tg_shutdown(paths:set[str]) -> None:
+async def tg_shutdown(paths: set[str]) -> None:
     for p in set(paths):
         try:
             await tg_stop(p)

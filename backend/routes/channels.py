@@ -6,7 +6,7 @@ from time import perf_counter
 from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
-from ..auth import auth_required
+from ..auth import auth_required, authed_request
 from ..logger import logger
 from ..services.channels_service import (
     create_channel,
@@ -22,7 +22,7 @@ bp_channels = Blueprint("channels", __name__, url_prefix="/api")
 @auth_required
 def channels_list(db: Session):
     t0 = perf_counter()
-    uid = request.user_id
+    uid = authed_request().user_id
     try:
         items = list_channels(db, uid)
         dt = (perf_counter() - t0) * 1000
@@ -37,7 +37,7 @@ def channels_list(db: Session):
 @auth_required
 def channel_create(db: Session):
     t0 = perf_counter()
-    uid = request.user_id
+    uid = authed_request().user_id
     d = request.get_json(silent=True) or {}
     try:
         r = create_channel(
@@ -53,7 +53,10 @@ def channel_create(db: Session):
         if "error" in r:
             code = 409 if r["error"] == "duplicate_channel" else 400
             logger.info(
-                f"channel.create: fail (user_id={uid}, err={r.get('error')}, detail={r.get('detail','')})"
+                "channel.create: fail (user_id=%s, err=%s, detail=%s)",
+                uid,
+                r.get("error"),
+                r.get("detail", ""),
             )
             return jsonify(r), code
 
@@ -74,7 +77,7 @@ def channel_create(db: Session):
 @auth_required
 def channel_update(ch_id: int, db: Session):
     t0 = perf_counter()
-    uid = request.user_id
+    uid = authed_request().user_id
     d = request.get_json(silent=True) or {}
     try:
         r = update_channel(db, uid, ch_id, **d)
@@ -94,7 +97,7 @@ def channel_update(ch_id: int, db: Session):
 @auth_required
 def channel_delete(ch_id: int, db: Session):
     t0 = perf_counter()
-    uid = request.user_id
+    uid = authed_request().user_id
     try:
         r = delete_channel(db, uid, ch_id)
         if "error" in r:

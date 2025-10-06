@@ -14,6 +14,7 @@ _FMT = (
     "<lvl>{message}</lvl>"
 )
 
+
 def _log_file_path() -> str:
     p = os.getenv("LOG_FILE")
     if p:
@@ -22,13 +23,15 @@ def _log_file_path() -> str:
     os.makedirs(base, exist_ok=True)
     return os.path.join(base, "app.log")
 
+
 class _InterceptHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             level = _logger.level(record.levelname).name
         except ValueError:
-            level = record.levelno
+            level = str(record.levelno)
         _logger.opt(depth=6, exception=record.exc_info).log(level, record.getMessage())
+
 
 def setup_logging(level: str | None = None) -> None:
     level = (level or os.getenv("LOG_LEVEL") or "INFO").upper()
@@ -68,6 +71,7 @@ def setup_logging(level: str | None = None) -> None:
     logging.getLogger("werkzeug").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+
 def bind_flask(app) -> None:
     import time
 
@@ -101,9 +105,7 @@ def bind_flask(app) -> None:
         if isinstance(e, HTTPException):
             return e
         _logger.exception(
-            "Unhandled error on {method} {path}",
-            method=request.method,
-            path=request.path
+            "Unhandled error on {method} {path}", method=request.method, path=request.path
         )
         return jsonify({"error": "internal_error"}), 500
 
@@ -114,10 +116,8 @@ def bind_flask(app) -> None:
             return jsonify({"error": "log_file_not_found"}), 404
         # attachment для скачивания
         return send_file(
-            log_file,
-            mimetype="text/plain",
-            as_attachment=True,
-            download_name="giftbuyer.log"
+            log_file, mimetype="text/plain", as_attachment=True, download_name="giftbuyer.log"
         )
+
 
 logger = _logger

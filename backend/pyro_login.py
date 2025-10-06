@@ -22,7 +22,12 @@ os.makedirs(SESS_ROOT, exist_ok=True)
 
 
 def _rpc(e: RPCError) -> dict:
-    return {"error": "telegram_rpc", "error_code": e.__class__.__name__, "detail": str(e), "http": 400}
+    return {
+        "error": "telegram_rpc",
+        "error_code": e.__class__.__name__,
+        "detail": str(e),
+        "http": 400,
+    }
 
 
 class _LoopThread:
@@ -73,20 +78,30 @@ class PyroLoginManager:
         return secrets.token_urlsafe(16)
 
     def _purge(self, session_path: str) -> None:
-        for p in (session_path, session_path + "-journal", session_path + "-shm", session_path + "-wal"):
-            try: os.remove(p)
-            except FileNotFoundError: pass
-            except Exception: pass
+        for p in (
+            session_path,
+            session_path + "-journal",
+            session_path + "-shm",
+            session_path + "-wal",
+        ):
+            try:
+                os.remove(p)
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
         try:
             base, _ = os.path.splitext(session_path)
             for p in glob.glob(base + "*.session*"):
-                try: os.remove(p)
-                except Exception: pass
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
         except Exception:
             pass
 
     def start_login(self, db: Session, user_id: int, api_profile_id: int, phone: str) -> dict:
-        ap: ApiProfile = db.get(ApiProfile, api_profile_id)
+        ap = db.get(ApiProfile, api_profile_id)
         if not ap or ap.user_id != user_id:
             return {"error": "api_profile_not_found", "http": 400}
 
@@ -102,9 +117,13 @@ class PyroLoginManager:
         try:
             client, code_hash = lt.run(go())
         except RPCError as e:
-            lt.stop(); self._purge(sess); return _rpc(e)
+            lt.stop()
+            self._purge(sess)
+            return _rpc(e)
         except Exception as e:
-            lt.stop(); self._purge(sess); return {"error": "unexpected", "detail": str(e), "http": 500}
+            lt.stop()
+            self._purge(sess)
+            return {"error": "unexpected", "detail": str(e), "http": 500}
 
         lid = self._lid()
         self._p[lid] = PendingLogin(
@@ -127,7 +146,9 @@ class PyroLoginManager:
 
         async def go():
             try:
-                await p.client.sign_in(phone_number=p.phone, phone_code_hash=p.phone_code_hash or "", phone_code=code)
+                await p.client.sign_in(
+                    phone_number=p.phone, phone_code_hash=p.phone_code_hash or "", phone_code=code
+                )
             except SessionPasswordNeeded:
                 return {"need_2fa": True}
             return await fetch_profile_and_stars(p.session_path, p.api_id, p.api_hash)
@@ -189,17 +210,28 @@ class PyroLoginManager:
         except Exception:
             pass
         if purge:
-            try: self._purge(p.session_path)
-            except Exception: pass
+            try:
+                self._purge(p.session_path)
+            except Exception:
+                pass
 
-    def _finalize(self, db: Session, p: PendingLogin, me, stars: int, premium: bool, until: str | None) -> None:
+    def _finalize(
+        self, db: Session, p: PendingLogin, me, stars: int, premium: bool, until: str | None
+    ) -> None:
         tg_id = int(getattr(me, "id", 0)) or None
-        acc = db.query(Account).filter(Account.user_id == p.user_id, Account.phone == p.phone).first()
+        acc = (
+            db.query(Account).filter(Account.user_id == p.user_id, Account.phone == p.phone).first()
+        )
         if not acc and tg_id:
             acc = db.get(Account, tg_id)
             if not acc:
-                acc = Account(id=tg_id, user_id=p.user_id, api_profile_id=p.api_profile_id, phone=p.phone,
-                              session_path=p.session_path)
+                acc = Account(
+                    id=tg_id,
+                    user_id=p.user_id,
+                    api_profile_id=p.api_profile_id,
+                    phone=p.phone,
+                    session_path=p.session_path,
+                )
                 db.add(acc)
             else:
                 acc.user_id = p.user_id
@@ -207,8 +239,12 @@ class PyroLoginManager:
                 acc.phone = p.phone
                 acc.session_path = p.session_path
         if not acc:
-            acc = Account(user_id=p.user_id, api_profile_id=p.api_profile_id, phone=p.phone,
-                          session_path=p.session_path)
+            acc = Account(
+                user_id=p.user_id,
+                api_profile_id=p.api_profile_id,
+                phone=p.phone,
+                session_path=p.session_path,
+            )
             db.add(acc)
 
         acc.username = getattr(me, "username", None)

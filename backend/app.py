@@ -21,26 +21,32 @@ from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop
 
 _BOOTSTRAPPED = threading.Event()
 
-def _bootstrap_gifts_workers()->int:
+
+def _bootstrap_gifts_workers() -> int:
     db = SessionLocal()
     try:
-        ids = [uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh == True).all()]
-        for uid in ids: start_user_gifts(uid)
+        ids = [uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh.is_(True)).all()]
+        for uid in ids:
+            start_user_gifts(uid)
         logger.info(f"gifts.bootstrap: started {len(ids)} workers")
         return len(ids)
     finally:
         db.close()
 
-def _stop_all_gifts()->None:
-    for uid in list(GIFTS_THREADS.keys()): stop_user_gifts(uid)
+
+def _stop_all_gifts() -> None:
+    for uid in list(GIFTS_THREADS.keys()):
+        stop_user_gifts(uid)
     logger.info("gifts.bootstrap: stopped all workers")
 
-def _should_boot()->bool:
-    if os.environ.get("GIFTBUYER_BOOT_WORKERS") == "1": return True
+
+def _should_boot() -> bool:
+    if os.environ.get("GIFTBUYER_BOOT_WORKERS") == "1":
+        return True
     return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
 
-def create_app()->Flask:
+def create_app() -> Flask:
     init_db()
     setup_logging()
     app = Flask(__name__)
@@ -61,6 +67,7 @@ def create_app()->Flask:
 
     logger.info("Flask app initialized")
     return app
+
 
 app = create_app()
 app.config.update(

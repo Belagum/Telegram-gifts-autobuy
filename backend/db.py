@@ -14,6 +14,7 @@ ENGINE = create_engine(
     pool_pre_ping=True,
 )
 
+
 @event.listens_for(ENGINE, "connect")
 def _set_sqlite_pragmas(dbapi_conn, _):
     cur = dbapi_conn.cursor()
@@ -27,12 +28,15 @@ def _set_sqlite_pragmas(dbapi_conn, _):
     finally:
         cur.close()
 
+
 class Base(DeclarativeBase):
     pass
+
 
 SessionLocal = scoped_session(
     sessionmaker(bind=ENGINE, autoflush=False, autocommit=False, expire_on_commit=False)
 )
+
 
 def get_db():
     db = SessionLocal()
@@ -49,6 +53,7 @@ def get_db():
             logger.debug("DB session closed")
         finally:
             SessionLocal.remove()
+
 
 def init_db():
     Base.metadata.create_all(bind=ENGINE)

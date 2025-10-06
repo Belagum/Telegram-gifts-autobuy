@@ -251,9 +251,16 @@ def send_code(db: Session):
                 exist.id,
                 exist.phone,
             )
-            return jsonify(
-                {"error": "phone_already_added", "account_id": int(exist.id), "phone": exist.phone}
-            ), 409
+            return (
+                jsonify(
+                    {
+                        "error": "phone_already_added",
+                        "account_id": int(exist.id),
+                        "phone": exist.phone,
+                    }
+                ),
+                409,
+            )
 
         res = _logins.start_login(db, user_id=uid, api_profile_id=int(api_profile_id), phone=norm)
         if "error" in res:

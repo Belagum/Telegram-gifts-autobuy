@@ -2,8 +2,6 @@
 # Copyright 2025 Vova orig
 
 import asyncio
-import hashlib
-import json
 import os
 import threading
 import time
@@ -16,6 +14,8 @@ from sqlalchemy.orm import Session, joinedload
 from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account
+from ..utils.gifts_utils import hash_items as hash_items, merge_new
+from ..utils.jsonio import write_json_list, read_json_list_of_dicts
 from .autobuy_service import autobuy_new_gifts
 from .notify_gifts_service import broadcast_new_gifts
 from .tg_clients_service import tg_call, tg_shutdown
@@ -45,54 +45,6 @@ def _ensure_dir() -> None:
         os.makedirs(_GIFTS_DIR, exist_ok=True)
     except Exception:
         pass
-
-
-def _merge_new(prev: list[dict], cur: list[dict]) -> list[dict]:
-    by_id = {x["id"]: x for x in prev}
-    for x in cur:
-        by_id[x["id"]] = x
-    return sorted(by_id.values(), key=lambda x: (x.get("price", 0), x["id"]))
-
-
-def _read_json(path: str) -> list[dict[str, Any]]:
-    try:
-        with open(path, encoding="utf-8") as f:
-            loaded = json.load(f)
-            if isinstance(loaded, list):
-                return [x for x in loaded if isinstance(x, dict)]
-            return []
-    except Exception:
-        return []
-
-
-def _write_json(path: str, data: list[dict]) -> None:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=0)
-    os.replace(tmp, path)
-
-
-def _hash_items(items: list[dict]) -> str:
-    m = hashlib.md5()
-    for it in items:
-        m.update(
-            str(
-                (
-                    it.get("id"),
-                    it.get("price"),
-                    it.get("is_limited"),
-                    it.get("available_amount"),
-                    it.get("limited_per_user"),
-                    it.get("per_user_remains"),
-                    it.get("per_user_available"),
-                    it.get("require_premium"),
-                    it.get("sticker_file_id"),
-                    it.get("sticker_mime"),
-                )
-            ).encode("utf-8")
-        )
-    return m.hexdigest()
 
 
 class _GiftsEventBus:
@@ -194,8 +146,8 @@ async def _worker_async(uid: int) -> None:
     accs: list[Account] = []
     accs_loaded_at = 0.0
     i = 0
-    merged_all = _read_json(_gifts_path(uid))
-    last_hash = _hash_items(merged_all)
+    merged_all = read_json_list_of_dicts(_gifts_path(uid))
+    last_hash = hash_items(merged_all)
     try:
         while not stop_evt.is_set():
             now = time.perf_counter()
@@ -222,12 +174,12 @@ async def _worker_async(uid: int) -> None:
             step = max(3.0 / float(n), 0.2)
             a = accs[i]
             try:
-                disk_items = _read_json(_gifts_path(uid))
+                disk_items = read_json_list_of_dicts(_gifts_path(uid))
                 prev_ids = {int(x.get("id", 0)) for x in disk_items if isinstance(x.get("id"), int)}
                 gifts = await _list_gifts_for_account_persist(
                     a.session_path, a.api_profile.api_id, a.api_profile.api_hash
                 )
-                merged_all = _merge_new(disk_items or [], gifts)
+                merged_all = merge_new(disk_items or [], gifts)
                 added = [
                     g
                     for g in merged_all
@@ -248,10 +200,10 @@ async def _worker_async(uid: int) -> None:
                 )
             except Exception:
                 pass
-            new_hash = _hash_items(merged_all)
+            new_hash = hash_items(merged_all)
             if new_hash != last_hash:
                 last_hash = new_hash
-                _write_json(_gifts_path(uid), merged_all)
+                write_json_list(_gifts_path(uid), merged_all)
                 gifts_event_bus.publish(
                     uid, {"items": merged_all, "count": len(merged_all), "hash": new_hash}
                 )
@@ -376,7 +328,7 @@ def stop_user_gifts(uid: int) -> None:
 
 def read_user_gifts(uid: int) -> list[dict[str, Any]]:
     _ensure_dir()
-    return _read_json(_gifts_path(uid))
+    return read_json_list_of_dicts(_gifts_path(uid))
 
 
 def refresh_once(uid: int) -> list[dict[str, Any]]:
@@ -392,11 +344,11 @@ def refresh_once(uid: int) -> list[dict[str, Any]]:
             )
         )
         path = _gifts_path(uid)
-        prev = _read_json(path)
-        merged = _merge_new(prev, gifts)
-        _write_json(path, merged)
+        prev = read_json_list_of_dicts(path)
+        merged = merge_new(prev, gifts)
+        write_json_list(path, merged)
         gifts_event_bus.publish(
-            uid, {"items": merged, "count": len(merged), "hash": _hash_items(merged)}
+            uid, {"items": merged, "count": len(merged), "hash": hash_items(merged)}
         )
         return merged
     finally:

@@ -14,16 +14,11 @@ from sqlalchemy.orm import Session
 from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account, User, UserSettings
+from ..utils.fs import ensure_dir
+from ..utils.stickers import sticker_ext
 from .tg_clients_service import tg_call
 
 _STICKERS_DIR = os.path.join(os.getenv("GIFTS_DIR", "gifts_data"), "stickers")
-
-
-def _ensure_dir(p: str) -> None:
-    try:
-        os.makedirs(p, exist_ok=True)
-    except Exception:
-        pass
 
 
 def _collect_targets() -> list[tuple[int, str, int]]:
@@ -47,31 +42,20 @@ def _collect_targets() -> list[tuple[int, str, int]]:
         db.close()
 
 
-def _sticker_ext(mime: str | None) -> str:
-    m = (mime or "").lower()
-    if "tgsticker" in m:
-        return ".tgs"
-    if "webm" in m:
-        return ".webm"
-    if "webp" in m:
-        return ".webp"
-    return ".bin"
-
-
 def _sticker_cache_path(g: dict) -> str | None:
     fid = str(g.get("sticker_file_id") or "").strip()
     if not fid:
         return None
     uniq = (g.get("sticker_unique_id") or "").strip()
     name = uniq if uniq else hashlib.md5(fid.encode("utf-8")).hexdigest()
-    return os.path.join(_STICKERS_DIR, name + _sticker_ext(g.get("sticker_mime")))
+    return os.path.join(_STICKERS_DIR, name + sticker_ext(g.get("sticker_mime")))
 
 
 async def _ensure_cached(http: httpx.AsyncClient, token: str, g: dict) -> str | None:
     path = _sticker_cache_path(g)
     if not path:
         return None
-    _ensure_dir(_STICKERS_DIR)
+    ensure_dir(_STICKERS_DIR)
     if os.path.isfile(path):
         return path
     base = f"https://api.telegram.org/bot{token}"
@@ -130,11 +114,11 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
     mime = (
         "application/x-tgsticker"
         if path.endswith(".tgs")
-        else "video/webm"
-        if path.endswith(".webm")
-        else "image/webp"
-        if path.endswith(".webp")
-        else "application/octet-stream"
+        else (
+            "video/webm"
+            if path.endswith(".webm")
+            else "image/webp" if path.endswith(".webp") else "application/octet-stream"
+        )
     )
     try:
         with open(path, "rb") as f:

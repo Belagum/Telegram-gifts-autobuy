@@ -1,16 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova orig
 
-import asyncio
 import gzip
 import hashlib
 import json
-import os
-import shutil
 import threading
 import time
 from collections import defaultdict
-from collections.abc import Callable, Coroutine, Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from queue import Queue
 from typing import Any, cast
@@ -30,6 +27,10 @@ from ..services.gifts_service import (
     start_user_gifts,
     stop_user_gifts,
 )
+from ..utils.asyncio_utils import run_async as _run_async
+from ..utils.fs import link_or_copy
+from ..utils.fs import save_atomic
+from ..utils.http import etag_for_path
 
 bp_gifts = Blueprint("gifts", __name__, url_prefix="/api")
 
@@ -55,16 +56,6 @@ def _find_cached_tgs(key: str) -> Path | None:
     return p if p.exists() and p.stat().st_size > 0 else None
 
 
-def _save_atomic(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp, "wb") as f:
-        f.write(data)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
-
-
 async def _botapi_download(file_id: str, token: str) -> bytes:
     if not token:
         raise RuntimeError("no_bot_token")
@@ -82,48 +73,8 @@ async def _botapi_download(file_id: str, token: str) -> bytes:
         return r2.content
 
 
-def _run_async(coro: Coroutine[Any, Any, bytes]) -> bytes:
-    try:
-        loop = asyncio.get_running_loop()
-        if loop.is_running():
-            out: bytes | None = None
-            err: Exception | None = None
-
-            def _runner():
-                nonlocal out, err
-                try:
-                    out = asyncio.run(coro)
-                except Exception as e:
-                    err = e
-
-            t = threading.Thread(target=_runner, daemon=True)
-            t.start()
-            t.join()
-            if err:
-                raise err
-            if out is None:
-                raise RuntimeError("async operation returned no data")
-            return out
-    except RuntimeError:
-        pass
-    return asyncio.run(coro)
-
-
-def _link_or_copy(src: Path, dst: Path) -> None:
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        os.link(src, dst)
-    except Exception:
-        shutil.copy2(src, dst)
-
-
-def _etag_for_path(p: Path) -> str:
-    st = p.stat()
-    return f'W/"{int(st.st_mtime)}-{st.st_size}"'
-
-
 def _send_lottie_json_from_tgs(path: Path) -> Response | tuple[Response, int]:
-    etag = _etag_for_path(path)
+    etag = etag_for_path(path)
     inm = (request.headers.get("If-None-Match") or "").strip()
     if inm == etag:
         resp = Response(status=304)
@@ -155,7 +106,7 @@ def _promote_cached(src_key: str, dst_key: str) -> Path | None:
             return None
         dst_path = _cached_path_for(dst_key)
         try:
-            _link_or_copy(src, dst_path)
+            link_or_copy(src, dst_path)
         except Exception:
             logger.exception("promote cache failed")
             return None
@@ -226,7 +177,7 @@ def gifts_sticker_lottie(db: Session):
                     if not (len(data) >= 2 and data[:2] == b"\x1f\x8b"):
                         return jsonify({"error": "bad_tgs"}), 415
                     target = _cached_path_for(cache_key)
-                    _save_atomic(target, data)
+                    save_atomic(target, data)
                     path = target
                 except Exception:
                     logger.exception("bot download failed")

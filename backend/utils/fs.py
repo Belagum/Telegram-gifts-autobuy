@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from pathlib import Path
 from typing import Any
-import json
 
 
 def ensure_dir(path: str | Path) -> None:

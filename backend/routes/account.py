@@ -63,7 +63,7 @@ def accounts(db: Session):
         resp.headers["Cache-Control"] = "no-store"
         dt = (perf_counter() - t0) * 1000
         status = "ready" if code == 200 else "refreshing"
-        logger.info("accounts.list: %s (user_id=%s, dt_ms=%.0f)", status, uid, dt)
+        logger.info(f"accounts.list: {status} (user_id={uid}, dt_ms={dt:.0f})")
         return resp, code
     except Exception:
         logger.exception(f"accounts.list: error (user_id={uid})")
@@ -79,7 +79,7 @@ def me(db: Session):
     try:
         u = db.get(User, uid)
         if not u:
-            logger.warning("me: user_not_found (user_id=%s)", uid)
+            logger.warning(f"me: user_not_found (user_id={uid})")
             return jsonify({"error": "not_found"}), 404
         dt = (perf_counter() - t0) * 1000
         logger.info(f"me: ok (user_id={uid}, username='{u.username}', dt_ms={dt:.0f})")

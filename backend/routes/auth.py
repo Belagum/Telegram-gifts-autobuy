@@ -114,11 +114,10 @@ def logout(db: Session):
         auth = request.headers.get("Authorization", "")
         token = auth[7:] if auth.startswith("Bearer ") else request.cookies.get("auth_token", "")
         token_hint = (token[:6] + "...") if token else ""
+        user_id_hint = getattr(request, "user_id", None)
         logger.info(
-            "auth.logout: start (req_id=%s, user_id=%s, token='%s')",
-            req_id,
-            getattr(request, "user_id", None),
-            token_hint,
+            f"auth.logout: start (req_id={req_id}, user_id={user_id_hint}, "
+            f"token='{token_hint}')"
         )
         if token:
             db.query(SessionToken).filter(SessionToken.token == token).delete()

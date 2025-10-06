@@ -28,8 +28,7 @@ from ..services.gifts_service import (
     stop_user_gifts,
 )
 from ..utils.asyncio_utils import run_async as _run_async
-from ..utils.fs import link_or_copy
-from ..utils.fs import save_atomic
+from ..utils.fs import link_or_copy, save_atomic
 from ..utils.http import etag_for_path
 
 bp_gifts = Blueprint("gifts", __name__, url_prefix="/api")

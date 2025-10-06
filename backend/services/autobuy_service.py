@@ -611,7 +611,7 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
     try:
         u = db.get(User, user_id)
         if not u or not bool(getattr(u, "gifts_autorefresh", False)):
-            logger.info("autobuy:skip user_id=%s reason=autorefresh_off", user_id)
+            logger.info(f"autobuy:skip user_id={user_id} reason=autorefresh_off")
             return {
                 "purchased": [],
                 "skipped": len(gifts or []),
@@ -637,7 +637,7 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
         db.close()
 
     if not accs:
-        logger.info("autobuy:skip user_id=%s reason=no_accounts", user_id)
+        logger.info(f"autobuy:skip user_id={user_id} reason=no_accounts")
         return {
             "purchased": [],
             "skipped": len(gifts or []),
@@ -645,7 +645,7 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
         }
 
     if forced_cid is None and not chans:
-        logger.info("autobuy:skip user_id=%s reason=no_channels", user_id)
+        logger.info(f"autobuy:skip user_id={user_id} reason=no_channels")
         return {
             "purchased": [],
             "skipped": len(gifts or []),

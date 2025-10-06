@@ -115,7 +115,7 @@ def _delete_account_and_session(db: Session, acc: Account) -> None:
         db.delete(acc)
         db.commit()
     except Exception:
-        logger.exception("accounts: failed to delete account (acc_id=%s)", acc.id)
+        logger.exception(f"accounts: failed to delete account (acc_id={acc.id})")
         db.rollback()
 
 
@@ -241,7 +241,7 @@ def _refresh_user_accounts_worker(user_id: int):
                 if _should_refresh(now, r.last_checked_at):
                     refresh_account(db2, r)
             except Exception:
-                logger.exception("accounts.bg_refresh: failed (acc_id=%s)", r.id)
+                logger.exception(f"accounts.bg_refresh: failed (acc_id={r.id})")
     finally:
         try:
             db2.close()
@@ -288,7 +288,7 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
             )
             return
         except Exception as e:
-            logger.exception("accounts.stream: unexpected error (acc_id=%s)", acc.id)
+            logger.exception(f"accounts.stream: unexpected error (acc_id={acc.id})")
             yield {"error": "internal_error", "detail": str(e)}
             return
 

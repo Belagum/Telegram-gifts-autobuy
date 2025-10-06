@@ -34,9 +34,9 @@ def _collect_targets() -> list[tuple[int, str, int]]:
                 out.append((uid, token, int(chat)))
             else:
                 if not token:
-                    logger.warning("notify: uid=%s has no bot_token", uid)
+                    logger.warning(f"notify: uid={uid} has no bot_token")
                 if chat is None:
-                    logger.warning("notify: uid=%s has no notify_chat_id", uid)
+                    logger.warning(f"notify: uid={uid} has no notify_chat_id")
         return out
     finally:
         db.close()
@@ -64,41 +64,23 @@ async def _ensure_cached(http: httpx.AsyncClient, token: str, g: dict) -> str | 
         get_file_url = f"{base}/getFile"
         payload = {"file_id": fid}
         r = await http.post(get_file_url, json=payload)
-        logger.info(
-            "notify:req getFile url=%s json=%s -> code=%s",
-            get_file_url,
-            payload,
-            r.status_code,
-        )
+        logger.info(f"notify:req getFile url={get_file_url} json={payload} -> code={r.status_code}")
         if r.status_code != 200 or not r.json().get("ok", False):
-            logger.warning(
-                "notify:getFile fail code=%s body=%s",
-                r.status_code,
-                r.text[:200],
-            )
+            logger.warning(f"notify:getFile fail code={r.status_code} body={r.text[:200]}")
             return None
         file_path = r.json()["result"]["file_path"]
         url = f"https://api.telegram.org/file/bot{token}/{file_path}"
         got = await http.get(url)
         size = len(got.content) if got.content else 0
-        logger.info(
-            "notify:req file GET url=%s -> code=%s size=%s",
-            url,
-            got.status_code,
-            size,
-        )
+        logger.info(f"notify:req file GET url={url} -> code={got.status_code} size={size}")
         if got.status_code != 200 or not got.content:
-            logger.warning(
-                "notify:file dl fail code=%s size=%s",
-                got.status_code,
-                size,
-            )
+            logger.warning(f"notify:file dl fail code={got.status_code} size={size}")
             return None
         tmp = f"{path}.tmp"
         with open(tmp, "wb") as f:
             f.write(got.content)
         os.replace(tmp, path)
-        logger.info("notify:cached %s", os.path.basename(path))
+        logger.info(f"notify:cached {os.path.basename(path)}")
         return path
     except Exception:
         logger.exception("notify:cache error", exc_info=True)
@@ -138,13 +120,9 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
         r = await http.post(send_url, data=data, files=files)
         ok = r.status_code == 200 and r.json().get("ok", False)
         if not ok:
-            logger.warning(
-                "notify:sendSticker fail code=%s body=%s",
-                r.status_code,
-                r.text[:200],
-            )
+            logger.warning(f"notify:sendSticker fail code={r.status_code} body={r.text[:200]}")
         else:
-            logger.info("notify:sticker ok chat=%s gift_id=%s", chat, g.get("id"))
+            logger.info(f"notify:sticker ok chat={chat} gift_id={g.get('id')}")
         return ok
     except Exception:
         logger.exception("notify:sendSticker error", exc_info=True)
@@ -192,9 +170,9 @@ async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, 
     try:
         chat = int(chat)
     except Exception:
-        logger.warning("notify:bad chat uid=%s chat=%r", uid, chat)
+        logger.warning(f"notify:bad chat uid={uid} chat={chat!r}")
         return
-    logger.info("notify:start uid=%s chat=%s gift_id=%s", uid, chat, g.get("id"))
+    logger.info(f"notify:start uid={uid} chat={chat} gift_id={g.get('id')}")
     try:
         await _send_sticker(http, token, chat, g)
     except Exception:
@@ -202,20 +180,12 @@ async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, 
     try:
         payload = {"chat_id": chat, "text": _gift_text(g, chat), "disable_notification": True}
         send_msg_url = f"{base}/sendMessage"
-        logger.info(
-            "notify:req sendMessage url=%s json=%s",
-            send_msg_url,
-            payload,
-        )
+        logger.info(f"notify:req sendMessage url={send_msg_url} json={payload}")
         r = await http.post(send_msg_url, json=payload)
         if r.status_code != 200 or not r.json().get("ok", False):
-            logger.warning(
-                "notify:sendMessage fail code=%s body=%s",
-                r.status_code,
-                r.text[:200],
-            )
+            logger.warning(f"notify:sendMessage fail code={r.status_code} body={r.text[:200]}")
         else:
-            logger.info("notify:text ok chat=%s gift_id=%s", chat, g.get("id"))
+            logger.info(f"notify:text ok chat={chat} gift_id={g.get('id')}")
     except Exception:
         logger.exception("notify:text error", exc_info=True)
     await asyncio.sleep(0.04)
@@ -240,14 +210,10 @@ async def _collect_dm_ids(uids: list[int]) -> dict[int, list[int]]:
                     if tid > 0:
                         ids.add(tid)
                 except Exception:
-                    logger.debug("notify:get_me fail acc_id=%s", a.id, exc_info=True)
+                    logger.debug(f"notify:get_me fail acc_id={a.id}", exc_info=True)
                 await asyncio.sleep(0.05)
             dm_ids_by_uid[uid] = sorted(ids)
-            logger.info(
-                "notify:dm_ids uid=%s count=%s",
-                uid,
-                len(dm_ids_by_uid[uid]),
-            )
+            logger.info(f"notify:dm_ids uid={uid} count={len(dm_ids_by_uid[uid])}")
     return dm_ids_by_uid
 
 
@@ -274,12 +240,7 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
         logger.exception("notify:failed to fetch tokens from DB")
 
     uids = sorted({u for u, _, _ in targets} | set(token_by_uid.keys()))
-    logger.info(
-        "notify:gifts=%s targets=%s uids_for_dm=%s",
-        len(gifts),
-        len(targets),
-        len(uids),
-    )
+    logger.info(f"notify:gifts={len(gifts)} targets={len(targets)} uids_for_dm={len(uids)}")
 
     dm_ids_by_uid: dict[int, list[int]] = {}
     if uids:
@@ -294,30 +255,22 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
         for uid, token, chat in targets:
             token = (token or token_by_uid.get(uid) or "").strip()
             if not token:
-                logger.warning("notify:no token for uid=%s (channel stage)", uid)
+                logger.warning(f"notify:no token for uid={uid} (channel stage)")
                 continue
             try:
                 chat = int(chat)
             except Exception:
-                logger.warning("notify:bad notify_chat_id uid=%s chat=%r", uid, chat)
+                logger.warning(f"notify:bad notify_chat_id uid={uid} chat={chat!r}")
                 continue
 
             for g in gifts:
                 try:
-                    logger.info(
-                        "notify:try (channel) uid=%s chat=%s gift_id=%s",
-                        uid,
-                        chat,
-                        g.get("id"),
-                    )
+                    logger.info(f"notify:try (channel) uid={uid} chat={chat} gift_id={g.get('id')}")
                     await _notify_one(http, uid, token, chat, g)
                     sent += 1
                 except Exception:
                     logger.exception(
-                        "notify:channel send failed uid=%s chat=%s gift_id=%s",
-                        uid,
-                        chat,
-                        g.get("id"),
+                        f"notify:channel send failed uid={uid} chat={chat} gift_id={g.get('id')}"
                     )
                 await asyncio.sleep(0.12)
 
@@ -326,35 +279,30 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
                 token_by_uid.get(uid) or next((t for (u, t, _) in targets if u == uid and t), "")
             ).strip()
             if not token:
-                logger.warning("notify:no token for uid=%s (dm stage)", uid)
+                logger.warning(f"notify:no token for uid={uid} (dm stage)")
                 continue
 
             dm_ids = dm_ids_by_uid.get(uid) or []
             if not dm_ids:
-                logger.warning("notify:no DM ids for uid=%s", uid)
+                logger.warning(f"notify:no DM ids for uid={uid}")
                 continue
 
             for user_chat_id in dm_ids:
                 for g in gifts:
                     try:
                         logger.info(
-                            "notify:try (dm) uid=%s chat=%s gift_id=%s",
-                            uid,
-                            user_chat_id,
-                            g.get("id"),
+                            f"notify:try (dm) uid={uid} chat={user_chat_id} gift_id={g.get('id')}"
                         )
                         await _notify_one(http, uid, token, user_chat_id, g)
                         sent += 1
                     except Exception:
+                        gid = g.get("id")
                         logger.exception(
-                            "notify:dm send failed uid=%s chat=%s gift_id=%s",
-                            uid,
-                            user_chat_id,
-                            g.get("id"),
+                            f"notify:dm send failed uid={uid} chat={user_chat_id} gift_id={gid}"
                         )
                     await asyncio.sleep(0.12)
 
-    logger.info("notify:done sent=%s", sent)
+    logger.info(f"notify:done sent={sent}")
     return sent
 
 

@@ -70,12 +70,9 @@ async def _safe_tg_call(acc: Account, fn, timeout: float):
             op_timeout=timeout,
         )
     except Exception as e:
-        logger.debug(
-            "channels.probe.call: err (acc_id=%s, fn=%s, %s)",
-            acc.id,
-            getattr(fn, "__name__", "lambda"),
-            type(e).__name__,
-        )
+        fn_name = getattr(fn, "__name__", "lambda")
+        err_name = type(e).__name__
+        logger.debug(f"channels.probe.call: err (acc_id={acc.id}, fn={fn_name}, {err_name})")
         return None
 
 

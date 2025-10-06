@@ -3,31 +3,37 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import Coroutine
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
 
 
-def run_async[T](coro: Coroutine[Any, Any, T]) -> T:
+class _Runner(Generic[T]):  # noqa: UP046
+    def __init__(self, coro: Coroutine[Any, Any, T]):
+        self.coro = coro
+        self.out: T | None = None
+        self.err: BaseException | None = None
+
+    def run(self) -> None:
+        try:
+            self.out = asyncio.run(self.coro)
+        except BaseException as e:  # noqa: BLE001
+            self.err = e
+
+
+def run_async(coro: Coroutine[Any, Any, T]) -> T:  # noqa: UP047
     try:
         loop = asyncio.get_running_loop()
         if loop.is_running():
-            out: T | None = None
-            err: BaseException | None = None
-
-            def _runner() -> None:
-                nonlocal out, err
-                try:
-                    out = asyncio.run(coro)
-                except BaseException as e:  # noqa: BLE001
-                    err = e
-
-            t = threading.Thread(target=_runner, daemon=True)
+            r: _Runner[T] = _Runner(coro)
+            t = threading.Thread(target=r.run, daemon=True)
             t.start()
             t.join()
-            if err:
-                raise err
-            if out is None:
+            if r.err:
+                raise r.err
+            if r.out is None:
                 raise RuntimeError("async operation returned no data")
-            return out
+            return r.out
     except RuntimeError:
         # No running loop
         pass

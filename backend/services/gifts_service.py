@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session, joinedload
 from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account
-from ..utils.gifts_utils import hash_items as hash_items, merge_new
-from ..utils.jsonio import write_json_list, read_json_list_of_dicts
+from ..utils.gifts_utils import hash_items
+from ..utils.gifts_utils import merge_new
+from ..utils.jsonio import read_json_list_of_dicts, write_json_list
 from .autobuy_service import autobuy_new_gifts
 from .notify_gifts_service import broadcast_new_gifts
 from .tg_clients_service import tg_call, tg_shutdown
@@ -186,17 +187,13 @@ async def _worker_async(uid: int) -> None:
                     if isinstance(g.get("id"), int) and g["id"] not in prev_ids
                 ]
             except Exception:
-                logger.exception("gifts.worker: fetch failed (acc_id=%s)", a.id)
+                logger.exception(f"gifts.worker: fetch failed (acc_id={a.id})")
                 gifts = []
                 added = []
             try:
                 logger.info(
-                    "gifts.worker: iter user_id=%s acc_id=%s gifts_now=%s total_cached=%s new=%s",
-                    uid,
-                    a.id,
-                    len(gifts),
-                    len(merged_all),
-                    len(added),
+                    f"gifts.worker: iter user_id={uid} acc_id={a.id} "
+                    f"gifts_now={len(gifts)} total_cached={len(merged_all)} new={len(added)}"
                 )
             except Exception:
                 pass
@@ -246,10 +243,8 @@ async def _worker_async(uid: int) -> None:
 
                     try:
                         logger.info(
-                            "gifts.worker: FINAL purchased=%s skipped=%s notified=%s",
-                            len(res.get("purchased", [])),
-                            res.get("skipped"),
-                            sent,
+                            f"gifts.worker: FINAL purchased={len(res.get('purchased', []))} "
+                            f"skipped={res.get('skipped')} notified={sent}"
                         )
                         for cid, st in (stats.get("channels") or {}).items():
                             ok = len(st.get("purchased", []))
@@ -288,9 +283,7 @@ async def _worker_async(uid: int) -> None:
                         gsk = stats.get("global_skips") or []
                         if gsk:
                             logger.info(
-                                "gifts.worker: FINAL global_skips n=%s details=%s",
-                                len(gsk),
-                                gsk,
+                                f"gifts.worker: FINAL global_skips n={len(gsk)} details={gsk}"
                             )
                     except Exception:
                         logger.exception("gifts.worker: final summary log failed")
@@ -301,7 +294,7 @@ async def _worker_async(uid: int) -> None:
         try:
             await tg_shutdown(known_paths)
         finally:
-            logger.info("gifts.worker: stop (user_id=%s)", uid)
+            logger.info(f"gifts.worker: stop (user_id={uid})")
 
 
 def _run_worker(uid: int) -> None:

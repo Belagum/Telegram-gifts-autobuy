@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2025 Vova orig
+// Copyright 2025 Vova Orig
 
 export default function openCentered(url, name="_blank", w=520, h=700){
   const bx = window.screenX ?? window.screenLeft ?? 0;

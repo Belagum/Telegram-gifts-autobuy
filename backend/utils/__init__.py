@@ -1,8 +1,5 @@
-"""Shared utilities for the backend package.
-
-This module groups small, reusable helpers to keep services and routes
-focused on business logic while minimizing duplication.
-"""
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
 
 __all__ = [
     "asyncio_utils",

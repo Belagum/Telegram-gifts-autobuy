@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2025 Vova orig
+// Copyright 2025 Vova Orig
 
 import React,{createContext,useContext,useEffect,useMemo,useRef,useState,useCallback} from "react";
 

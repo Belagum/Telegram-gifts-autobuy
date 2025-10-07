@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Vova orig
+# Copyright 2025 Vova Orig
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker

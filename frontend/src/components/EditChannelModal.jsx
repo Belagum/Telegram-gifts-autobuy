@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: Apache-2.0
-   Copyright 2025 Vova */
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova Orig
+
 import React,{useState,useMemo} from "react";
 import { createChannel, updateChannel } from "../api";
 import { showError, showPromise } from "../notify";

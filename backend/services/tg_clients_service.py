@@ -69,7 +69,6 @@ def _ensure_io_loop() -> asyncio.AbstractEventLoop:
                 )
 
         t = threading.Thread(target=_runner, name="tg-io", daemon=True)
-        t.start()
         _IO_LOOP, _IO_THREAD = loop, t
         t.start()
         logger.info(f"tg_clients: started io loop thread={t.name}")

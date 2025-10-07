@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account, Channel, User, UserSettings
-from .tg_clients_service import tg_call
+from .tg_clients_service import tg_call, get_stars_balance
 
 INF_SUPPLY = 10**12  # псевдо-бесконечность для сравнений/сортировок
 
@@ -85,11 +85,10 @@ def _sort_key(g: dict) -> tuple[int, int, float]:
 
 async def _stars_for(acc: Account) -> int:
     try:
-        bal = await tg_call(
+        bal = await get_stars_balance(
             acc.session_path,
             acc.api_profile.api_id,
             acc.api_profile.api_hash,
-            lambda c: c.get_stars_balance(),
             min_interval=0.5,
         )
         return int(bal or 0)

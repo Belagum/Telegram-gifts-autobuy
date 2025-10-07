@@ -17,7 +17,7 @@ from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account
 from .session_locks_service import session_lock_for
-from .tg_clients_service import tg_call
+from .tg_clients_service import tg_call, get_stars_balance
 
 STALE_MINUTES = 60
 
@@ -132,7 +132,7 @@ def _delete_account_and_session(db: Session, acc: Account, *, reason: str | None
 
 async def fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str):
     me = await tg_call(session_path, api_id, api_hash, lambda c: c.get_me())
-    stars = await tg_call(session_path, api_id, api_hash, lambda c: c.get_stars_balance())
+    stars = await get_stars_balance(session_path, api_id, api_hash)
     premium = bool(getattr(me, "is_premium", False))
     status_text = None
     if premium:

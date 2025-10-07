@@ -61,6 +61,7 @@ def _ensure_io_loop() -> asyncio.AbstractEventLoop:
             loop.run_forever()
 
         t = threading.Thread(target=_runner, name="tg-io", daemon=True)
+        t.start()
         _IO_LOOP, _IO_THREAD = loop, t
         return loop
 

@@ -104,18 +104,29 @@ def _purge_session_files(session_path: str) -> None:
         pass
 
 
-def _delete_account_and_session(db: Session, acc: Account) -> None:
-    logger.warning(
-        "accounts: deleting invalid session & account (acc_id=%s, session=%s)",
-        acc.id,
-        _sess_name(acc.session_path),
+def _delete_account_and_session(db: Session, acc: Account, *, reason: str | None = None) -> None:
+    user_id = getattr(acc, "user_id", None)
+    api_profile_id = getattr(acc, "api_profile_id", None)
+    phone = getattr(acc, "phone", None)
+    last_checked = getattr(acc, "last_checked_at", None)
+    if last_checked and getattr(last_checked, "tzinfo", None) is None:
+        last_checked = last_checked.replace(tzinfo=UTC)
+    last_checked_str = last_checked.isoformat(timespec="seconds") if last_checked else None
+    session_name = _sess_name(acc.session_path)
+    reason_str = reason or "unspecified"
+    warning_msg = (
+        "accounts: deleting account "
+        f"(acc_id={acc.id}, user_id={user_id}, phone={phone}, "
+        f"session={session_name}, api_profile_id={api_profile_id}, "
+        f"last_checked_at={last_checked_str}, reason={reason_str})"
     )
+    logger.warning(warning_msg)
     _purge_session_files(acc.session_path)
     try:
         db.delete(acc)
         db.commit()
     except Exception:
-        logger.exception(f"accounts: failed to delete account (acc_id={acc.id})")
+        logger.exception(f"accounts: failed to delete account (acc_id={acc.id}, user_id={user_id})")
         db.rollback()
 
 
@@ -176,50 +187,98 @@ def any_stale(db: Session, user_id: int) -> bool:
 def refresh_account(db: Session, acc: Account) -> Account | None:
     lk = session_lock_for(acc.session_path)
     t0 = time.perf_counter()
-    logger.info(
-        "accounts.refresh: start (acc_id=%s, session=%s)",
-        acc.id,
-        _sess_name(acc.session_path),
+    api_profile_id = getattr(acc, "api_profile_id", None)
+    api_profile = getattr(acc, "api_profile", None)
+    api_id = getattr(api_profile, "api_id", None)
+    user_id = getattr(acc, "user_id", None)
+    phone = getattr(acc, "phone", None)
+    session_name = _sess_name(acc.session_path)
+    start_msg = (
+        "accounts.refresh: start "
+        f"(acc_id={acc.id}, user_id={user_id}, phone={phone}, "
+        f"session={session_name}, api_profile_id={api_profile_id}, api_id={api_id})"
     )
+    logger.info(start_msg)
     with lk:
 
         async def work():
+            fetch_begin_msg = (
+                "accounts.refresh: fetch begin "
+                f"(acc_id={acc.id}, user_id={user_id}, "
+                f"session_path={acc.session_path}, api_id={api_id})"
+            )
+            logger.debug(fetch_begin_msg)
             me, stars, premium, until = await fetch_profile_and_stars(
                 acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
             )
+            fetch_done_msg = (
+                "accounts.refresh: fetch done "
+                f"(acc_id={acc.id}, user_id={user_id}, tg_id={getattr(me, 'id', None)}, "
+                f"username={getattr(me, 'username', None)}, stars={stars}, "
+                f"premium={premium}, premium_until={until})"
+            )
+            logger.debug(fetch_done_msg)
+            prev_first = acc.first_name
+            prev_username = acc.username
+            prev_premium = acc.is_premium
+            prev_until = acc.premium_until
+            prev_stars = acc.stars_amount
+            prev_checked = acc.last_checked_at
+            if prev_checked and getattr(prev_checked, "tzinfo", None) is None:
+                prev_checked = prev_checked.replace(tzinfo=UTC)
+            prev_checked_iso = prev_checked.isoformat(timespec="seconds") if prev_checked else None
             acc.first_name = getattr(me, "first_name", None)
             acc.username = getattr(me, "username", None)
             acc.is_premium = premium
             acc.premium_until = until
             acc.stars_amount = int(stars)
             acc.last_checked_at = datetime.now(UTC)
+            new_checked_iso = acc.last_checked_at.isoformat(timespec="seconds")
+            apply_msg = (
+                "accounts.refresh: applying updates "
+                f"(acc_id={acc.id}, user_id={user_id}, "
+                f"first_name={prev_first!r}->{acc.first_name!r}, "
+                f"username={prev_username!r}->{acc.username!r}, "
+                f"stars={prev_stars}->{acc.stars_amount}, "
+                f"premium={prev_premium}->{acc.is_premium}, "
+                f"premium_until={prev_until}->{acc.premium_until}, "
+                f"last_checked_at={prev_checked_iso}->{new_checked_iso})"
+            )
+            logger.debug(apply_msg)
             db.commit()
+            commit_msg = (
+                "accounts.refresh: commit succeeded "
+                f"(acc_id={acc.id}, user_id={user_id}, last_checked_at={new_checked_iso})"
+            )
+            logger.debug(commit_msg)
             return acc
 
         try:
+            logger.debug(
+                f"accounts.refresh: entering asyncio run (acc_id={acc.id}, user_id={user_id})"
+            )
             res: Account = asyncio.run(work())
             dt = (time.perf_counter() - t0) * 1000
-            logger.info(
-                "accounts.refresh: done (acc_id=%s, stars=%s, dt_ms=%.0f)",
-                acc.id,
-                res.stars_amount,
-                dt,
+            done_msg = (
+                "accounts.refresh: done "
+                f"(acc_id={acc.id}, user_id={user_id}, stars={res.stars_amount}, dt_ms={dt:.0f})"
             )
+            logger.info(done_msg)
             return res
         except AuthKeyUnregistered:
-            logger.warning(
-                "accounts.refresh: AUTH_KEY_UNREGISTERED -> remove (acc_id=%s, session=%s)",
-                acc.id,
-                _sess_name(acc.session_path),
+            auth_warning_msg = (
+                "accounts.refresh: AUTH_KEY_UNREGISTERED -> remove "
+                f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
             )
-            _delete_account_and_session(db, acc)
+            logger.warning(auth_warning_msg)
+            _delete_account_and_session(db, acc, reason="AUTH_KEY_UNREGISTERED(refresh)")
             return None
         except Exception:
-            logger.exception(
-                "accounts.refresh: failed (acc_id=%s, session=%s)",
-                acc.id,
-                _sess_name(acc.session_path),
+            refresh_error_msg = (
+                "accounts.refresh: failed "
+                f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
             )
+            logger.exception(refresh_error_msg)
             raise
 
 
@@ -246,10 +305,7 @@ def _refresh_user_accounts_worker(user_id: int):
         try:
             db2.close()
         except Exception:
-            logger.exception(
-                "accounts.bg_refresh: failed to close session (user_id=%s)",
-                user_id,
-            )
+            logger.exception(f"accounts.bg_refresh: failed to close session (user_id={user_id})")
         finally:
             with st.cv:
                 st.refreshing = False
@@ -263,32 +319,58 @@ def schedule_user_refresh(user_id: int) -> None:
 
 def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash: str):
     lk = session_lock_for(acc.session_path)
-    logger.info(
-        "accounts.stream: start (acc_id=%s, session=%s)",
-        acc.id,
-        _sess_name(acc.session_path),
+    api_profile_id = getattr(acc, "api_profile_id", None)
+    api_profile = getattr(acc, "api_profile", None)
+    api_profile_api_id = getattr(api_profile, "api_id", None)
+    user_id = getattr(acc, "user_id", None)
+    phone = getattr(acc, "phone", None)
+    session_name = _sess_name(acc.session_path)
+    stream_start_msg = (
+        "accounts.stream: start "
+        f"(acc_id={acc.id}, user_id={user_id}, phone={phone}, "
+        f"session={session_name}, api_profile_id={api_profile_id}, "
+        f"api_id={api_id}, api_profile_api_id={api_profile_api_id})"
     )
+    logger.info(stream_start_msg)
     with lk:
         yield {"stage": "connect", "message": "Соединяюсь…"}
         time.sleep(0.5)
         try:
+            stream_fetch_begin_msg = (
+                "accounts.stream: fetch begin "
+                f"(acc_id={acc.id}, user_id={user_id}, "
+                f"session_path={acc.session_path}, api_id={api_id})"
+            )
+            logger.debug(stream_fetch_begin_msg)
             me, stars, premium, until = asyncio.run(
                 fetch_profile_and_stars(acc.session_path, api_id, api_hash)
             )
+            stream_fetch_done_msg = (
+                "accounts.stream: fetch done "
+                f"(acc_id={acc.id}, user_id={user_id}, tg_id={getattr(me, 'id', None)}, "
+                f"username={getattr(me, 'username', None)}, stars={stars}, "
+                f"premium={premium}, premium_until={until})"
+            )
+            logger.debug(stream_fetch_done_msg)
         except AuthKeyUnregistered:
-            _delete_account_and_session(db, acc)
+            stream_auth_warning_msg = (
+                "accounts.stream: AUTH_KEY_UNREGISTERED -> removing account "
+                f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
+            )
+            logger.warning(stream_auth_warning_msg)
+            _delete_account_and_session(db, acc, reason="AUTH_KEY_UNREGISTERED(stream)")
             yield {
                 "error": "session_invalid",
                 "error_code": "AUTH_KEY_UNREGISTERED",
                 "detail": "Сессия невалидна. Авторизуйтесь заново.",
             }
-            logger.warning(
-                "accounts.stream: AUTH_KEY_UNREGISTERED -> removed (acc_id=%s)",
-                acc.id,
-            )
             return
         except Exception as e:
-            logger.exception(f"accounts.stream: unexpected error (acc_id={acc.id})")
+            stream_error_msg = (
+                "accounts.stream: unexpected error "
+                f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
+            )
+            logger.exception(stream_error_msg)
             yield {"error": "internal_error", "detail": str(e)}
             return
 
@@ -299,21 +381,43 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
         yield {"stage": "premium", "message": "Проверяю премиум…"}
         time.sleep(0.5)
 
+        prev_first = acc.first_name
+        prev_username = acc.username
+        prev_premium = acc.is_premium
+        prev_until = acc.premium_until
+        prev_stars = acc.stars_amount
+        prev_checked = acc.last_checked_at
+        if prev_checked and getattr(prev_checked, "tzinfo", None) is None:
+            prev_checked = prev_checked.replace(tzinfo=UTC)
+        prev_checked_iso = prev_checked.isoformat(timespec="seconds") if prev_checked else None
+
         acc.first_name = getattr(me, "first_name", None)
         acc.username = getattr(me, "username", None)
         acc.is_premium = premium
         acc.premium_until = until
         acc.stars_amount = int(stars)
         acc.last_checked_at = datetime.now(UTC)
-        db.commit()
+        new_checked_iso = acc.last_checked_at.isoformat(timespec="seconds")
 
-        logger.debug(
-            "accounts.stream: saved (acc_id=%s, stars=%s, premium=%s, until=%s)",
-            acc.id,
-            acc.stars_amount,
-            acc.is_premium,
-            acc.premium_until,
+        stream_apply_msg = (
+            "accounts.stream: applying updates "
+            f"(acc_id={acc.id}, user_id={user_id}, "
+            f"first_name={prev_first!r}->{acc.first_name!r}, "
+            f"username={prev_username!r}->{acc.username!r}, "
+            f"stars={prev_stars}->{acc.stars_amount}, "
+            f"premium={prev_premium}->{acc.is_premium}, "
+            f"premium_until={prev_until}->{acc.premium_until}, "
+            f"last_checked_at={prev_checked_iso}->{new_checked_iso})"
         )
+        logger.debug(stream_apply_msg)
+
+        db.commit()
+        stream_commit_msg = (
+            "accounts.stream: commit succeeded "
+            f"(acc_id={acc.id}, user_id={user_id}, last_checked_at={new_checked_iso})"
+        )
+        logger.debug(stream_commit_msg)
+
         yield {"stage": "save", "message": "Сохраняю…"}
         time.sleep(0.5)
 
@@ -331,8 +435,10 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
                 "last_checked_at": acc.last_checked_at.isoformat(timespec="seconds"),
             },
         }
-        logger.info(
-            "accounts.stream: done (acc_id=%s, session=%s)",
-            acc.id,
-            _sess_name(acc.session_path),
+        stream_done_msg = (
+            "accounts.stream: done "
+            f"(acc_id={acc.id}, user_id={user_id}, session={session_name}, "
+            f"stars={acc.stars_amount}, premium={acc.is_premium}, "
+            f"premium_until={acc.premium_until})"
         )
+        logger.info(stream_done_msg)

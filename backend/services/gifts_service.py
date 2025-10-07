@@ -14,8 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account
-from ..utils.gifts_utils import hash_items
-from ..utils.gifts_utils import merge_new
+from ..utils.gifts_utils import hash_items, merge_new
 from ..utils.jsonio import read_json_list_of_dicts, write_json_list
 from .autobuy_service import autobuy_new_gifts
 from .notify_gifts_service import broadcast_new_gifts

@@ -52,6 +52,7 @@ _IO_LOOP: asyncio.AbstractEventLoop | None = None
 _IO_THREAD: threading.Thread | None = None
 _IO_LOCK = threading.Lock()
 
+
 def _warn_stars_unsupported(path: str) -> None:
     key = os.path.abspath(path)
     with _STAR_WARN_GUARD:
@@ -81,6 +82,7 @@ def _normalize_stars(value: Any) -> int:
     except Exception:
         return 0
 
+
 def _ensure_io_loop() -> asyncio.AbstractEventLoop:
     global _IO_LOOP, _IO_THREAD
     with _IO_LOCK:
@@ -104,6 +106,7 @@ def _ensure_io_loop() -> asyncio.AbstractEventLoop:
         t.start()
         logger.info(f"tg_clients: started io loop thread={t.name}")
         return loop
+
 
 async def get_stars_balance(
     path: str,
@@ -146,6 +149,7 @@ async def get_stars_balance(
         return 0
 
     return _normalize_stars(raw)
+
 
 def _loop_alive(loop: asyncio.AbstractEventLoop | None) -> bool:
     return bool(loop and not loop.is_closed())

@@ -17,7 +17,7 @@ from ..db import SessionLocal
 from ..logger import logger
 from ..models import Account
 from .session_locks_service import session_lock_for
-from .tg_clients_service import tg_call, get_stars_balance
+from .tg_clients_service import get_stars_balance, tg_call
 
 STALE_MINUTES = 60
 

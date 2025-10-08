@@ -1,0 +1,103 @@
+"""Telegram-facing adapters implementing application ports."""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Iterable, Sequence
+
+import httpx
+from backend.application import NotificationPort, TelegramPort
+from backend.domain import AccountSnapshot, PurchaseOperation
+from backend.logger import logger
+from backend.services.tg_clients_service import get_stars_balance, tg_call
+
+
+class TelegramRpcPort(TelegramPort):
+    """Adapter that proxies domain calls to Pyrogram clients."""
+
+    def __init__(self, *, balance_interval: float = 0.5, send_interval: float = 0.7):
+        self._balance_interval = balance_interval
+        self._send_interval = send_interval
+
+    async def fetch_balance(self, account: AccountSnapshot) -> int:
+        balance = await get_stars_balance(
+            account.session_path,
+            account.api_id,
+            account.api_hash,
+            min_interval=self._balance_interval,
+        )
+        return int(balance or 0)
+
+    async def send_gift(self, operation: PurchaseOperation, account: AccountSnapshot) -> None:
+        async def _call(client):
+            return await client.send_gift(
+                chat_id=int(operation.channel_id), gift_id=int(operation.gift_id)
+            )
+
+        await tg_call(
+            account.session_path,
+            account.api_id,
+            account.api_hash,
+            _call,
+            min_interval=self._send_interval,
+        )
+        logger.info(
+            "autobuy:buy ok acc_id=%s chat_id=%s gift_id=%s",
+            account.id,
+            operation.channel_id,
+            operation.gift_id,
+        )
+
+    async def resolve_self_ids(self, accounts: Iterable[AccountSnapshot]) -> list[int]:
+        resolved: set[int] = set()
+        for account in accounts:
+            try:
+                me = await tg_call(
+                    account.session_path,
+                    account.api_id,
+                    account.api_hash,
+                    lambda client: client.get_me(),
+                    min_interval=self._balance_interval,
+                )
+                value = int(getattr(me, "id", 0) or 0)
+                if value > 0:
+                    resolved.add(value)
+            except Exception:
+                logger.debug("autobuy:dm get_me fail acc_id=%s", account.id, exc_info=True)
+            await asyncio.sleep(0.05)
+        return sorted(resolved)
+
+
+class TelegramNotificationAdapter(NotificationPort):
+    """Sends structured reports to Telegram chats using Bot API."""
+
+    def __init__(self, *, timeout: float = 30.0, send_interval: float = 0.05):
+        self._timeout = timeout
+        self._interval = send_interval
+
+    async def send_reports(
+        self, token: str, chat_ids: Sequence[int], messages: Sequence[str]
+    ) -> None:
+        if not token or not chat_ids or not messages:
+            return
+        base = f"https://api.telegram.org/bot{token}"
+        async with httpx.AsyncClient(timeout=self._timeout) as http:
+            for chat_id in chat_ids:
+                for message in messages:
+                    payload = {
+                        "chat_id": int(chat_id),
+                        "text": message,
+                        "parse_mode": "HTML",
+                    }
+                    try:
+                        response = await http.post(f"{base}/sendMessage", json=payload)
+                        if response.status_code != 200 or not response.json().get("ok"):
+                            logger.warning(
+                                "autobuy:report send fail chat=%s code=%s body=%s",
+                                chat_id,
+                                response.status_code,
+                                response.text[:200],
+                            )
+                    except Exception:
+                        logger.exception("autobuy:report http fail chat=%s", chat_id, exc_info=True)
+                    await asyncio.sleep(self._interval)

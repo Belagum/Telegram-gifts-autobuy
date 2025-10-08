@@ -1,0 +1,44 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2025 Vova Orig */
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding-bottom: var(--spacing-xl);
+}
+
+.settings-header h1 {
+  margin: 0;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.chat-input {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.chat-input__prefix {
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface);
+}
+
+.settings-footer {
+  position: sticky;
+  bottom: 0;
+  padding: var(--spacing-md) 0;
+  background: linear-gradient(180deg, transparent, rgba(15, 20, 27, 0.85));
+  display: flex;
+  justify-content: flex-end;
+}

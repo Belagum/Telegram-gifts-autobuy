@@ -1,0 +1,24 @@
+{
+  "// SPDX-License-Identifier": "Apache-2.0",
+  "// Copyright": "2025 Vova Orig",
+  "compilerOptions": {
+    "target": "ES2021",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ES2021"],
+    "skipLibCheck": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client", "vitest/globals"]
+  },
+  "include": ["src"],
+  "references": [{ "path": "tsconfig.node.json" }]
+}

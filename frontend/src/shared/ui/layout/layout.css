@@ -1,0 +1,72 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2025 Vova Orig */
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.layout__sidebar {
+  background: var(--color-surface);
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.layout__logo {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.layout__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.layout__nav a {
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  transition: background 0.2s ease;
+}
+
+.layout__nav a.is-active,
+.layout__nav a:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.layout__sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.layout__content {
+  padding: var(--spacing-xl);
+  background: var(--color-bg);
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .layout__sidebar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  }
+  .layout__nav {
+    flex-direction: row;
+    gap: var(--spacing-md);
+  }
+  .layout__sidebar-footer {
+    flex-direction: row;
+  }
+}

@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2025 Vova Orig
+
+import { toast } from "react-toastify";
+import type { ApiErrorDto } from "../../api/dto";
+
+export const showSuccess = (message: string) => toast.success(message);
+
+export const showInfo = (message: string) => toast.info(message);
+
+export const showError = (error: unknown, fallback = "Произошла ошибка") => {
+  const payload = error as ApiErrorDto & { detail?: string };
+  const message = payload?.detail || payload?.error || fallback;
+  toast.error(message);
+};
+
+export const showPromise = <T,>(promise: Promise<T>, pending: string, success: string, error: string) =>
+  toast.promise(promise, {
+    pending,
+    success,
+    error,
+  });

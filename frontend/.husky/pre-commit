@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+. "$(dirname "$0")/_/husky.sh"
+
+npm run lint-staged

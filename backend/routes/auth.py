@@ -123,12 +123,8 @@ def logout(db: Session):
             db.query(SessionToken).filter(SessionToken.token == token).delete()
             db.commit()
         dt = (perf_counter() - t0) * 1000
-        logger.info(
-            "auth.logout: ok (req_id=%s, user_id=%s, dt_ms=%.0f)",
-            req_id,
-            getattr(request, "user_id", None),
-            dt,
-        )
+        user_id_value = getattr(request, "user_id", None)
+        logger.info(f"auth.logout: ok (req_id={req_id}, user_id={user_id_value}, dt_ms={dt:.0f})")
         resp = make_response(jsonify({"ok": True}))
         resp.delete_cookie("auth_token")
         return resp

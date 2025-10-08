@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+
 """Compatibility layer exposing legacy autobuy API."""
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
     try:
         user = session.get(User, user_id)
         if not user or not bool(getattr(user, "gifts_autorefresh", False)):
-            logger.info("autobuy:skip user_id=%s reason=autorefresh_off", user_id)
+            logger.info(f"autobuy:skip user_id={user_id} reason=autorefresh_off")
             return _legacy_skip("autorefresh_off", gifts)
         settings = session.get(UserSettings, user_id)
         forced_channel_id = (

@@ -53,10 +53,8 @@ def channel_create(db: Session):
         if "error" in r:
             code = 409 if r["error"] == "duplicate_channel" else 400
             logger.info(
-                "channel.create: fail (user_id=%s, err=%s, detail=%s)",
-                uid,
-                r.get("error"),
-                r.get("detail", ""),
+                f"channel.create: fail (user_id={uid}, err={r.get('error')}, "
+                f"detail={r.get('detail', '')})"
             )
             return jsonify(r), code
 

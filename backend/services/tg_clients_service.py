@@ -59,7 +59,7 @@ def _warn_stars_unsupported(path: str) -> None:
         if key in _STAR_WARNED_PATHS:
             return
         _STAR_WARNED_PATHS.add(key)
-    logger.warning("tg_clients: get_stars_balance unsupported, defaulting to zero path=%s", key)
+    logger.warning(f"tg_clients: get_stars_balance unsupported, defaulting to zero path={key}")
 
 
 def _normalize_stars(value: Any) -> int:
@@ -67,7 +67,7 @@ def _normalize_stars(value: Any) -> int:
         return 0
     if isinstance(value, bool):
         return int(value)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return int(value)
     if isinstance(value, dict):
         for key in ("balance", "amount", "stars", "value"):

@@ -1,9 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+
 """SQLAlchemy-backed repository adapters."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Callable, Sequence
 
 from backend.application import (
     AccountRepository,
@@ -11,17 +13,9 @@ from backend.application import (
     UserSettingsRepository,
 )
 from backend.domain import AccountSnapshot, ChannelFilter
+from backend.infrastructure.unit_of_work import unit_of_work_scope
 from backend.models import Account, Channel, UserSettings
 from sqlalchemy.orm import Session, joinedload
-
-
-@contextmanager
-def _session_scope(factory: Callable[[], Session]) -> Iterator[Session]:
-    session = factory()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 class SqlAlchemyAccountRepository(AccountRepository):
@@ -31,7 +25,7 @@ class SqlAlchemyAccountRepository(AccountRepository):
         self._session_factory = session_factory
 
     def list_for_user(self, user_id: int) -> Sequence[AccountSnapshot]:
-        with _session_scope(self._session_factory) as session:
+        with unit_of_work_scope(self._session_factory) as session:
             rows = (
                 session.query(Account)
                 .options(joinedload(Account.api_profile))
@@ -60,7 +54,7 @@ class SqlAlchemyChannelRepository(ChannelRepository):
         self._session_factory = session_factory
 
     def list_for_user(self, user_id: int) -> Sequence[ChannelFilter]:
-        with _session_scope(self._session_factory) as session:
+        with unit_of_work_scope(self._session_factory) as session:
             rows = (
                 session.query(Channel)
                 .filter(Channel.user_id == user_id)
@@ -88,7 +82,7 @@ class SqlAlchemyUserSettingsRepository(UserSettingsRepository):
         self._session_factory = session_factory
 
     def get_bot_token(self, user_id: int) -> str | None:
-        with _session_scope(self._session_factory) as session:
+        with unit_of_work_scope(self._session_factory) as session:
             settings = session.get(UserSettings, user_id)
             if not settings:
                 return None

@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright 2025 Vova Orig */
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.account-card {
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.account-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-card__header h3 {
+  margin: 0;
+}
+
+.account-card__username {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.account-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.account-card__updated {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.account-empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-lg);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+}

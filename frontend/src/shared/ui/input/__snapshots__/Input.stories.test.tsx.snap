@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Input stories > renders default input 1`] = `
+<div
+  class="ui-input"
+>
+  <input
+    class="ui-input__field"
+  />
+</div>
+`;
+
+exports[`Input stories > renders error state 1`] = `
+<div
+  class="ui-input ui-input--error"
+>
+  <input
+    class="ui-input__field"
+  />
+  <div
+    class="ui-input__error"
+  >
+    Ошибка валидации
+  </div>
+</div>
+`;

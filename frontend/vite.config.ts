@@ -4,7 +4,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// В конфигурации Vite мы включаем проверку CSP и ограничения для dev-сервера.
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -13,7 +12,13 @@ export default defineConfig({
     strictPort: true,
     headers: {
       "Content-Security-Policy":
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:5000 https://localhost:5000; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:5000 https://localhost:5000; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'",
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
     },
   },
   preview: {

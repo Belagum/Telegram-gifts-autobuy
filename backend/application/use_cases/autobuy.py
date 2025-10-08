@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+
 """Autobuy use-case implemented in object oriented style."""
 
 from __future__ import annotations
@@ -526,17 +529,17 @@ class AutobuyUseCase:
         self._report = ReportBuilder()
 
     async def execute(self, data: AutobuyInput) -> AutobuyOutput:
-        logger.bind(user_id=data.user_id).info("autobuy:start gifts=%s", len(data.gifts))
+        logger.bind(user_id=data.user_id).info(f"autobuy:start gifts={len(data.gifts)}")
         gifts, skipped_rows = self._validator.validate_many(data.gifts)
         accounts = list(self._accounts.list_for_user(data.user_id))
         if not accounts:
-            logger.info("autobuy:no_accounts user_id=%s", data.user_id)
+            logger.info(f"autobuy:no_accounts user_id={data.user_id}")
             early_stats = self._empty_stats(skipped_rows)
             early_stats["global_skips"].append({"reason": "no_accounts"})
             return AutobuyOutput(purchased=[], skipped=len(data.gifts), stats=early_stats)
         channels = list(self._channels.list_for_user(data.user_id))
         if data.forced_channel_id is None and not channels:
-            logger.info("autobuy:no_channels user_id=%s", data.user_id)
+            logger.info(f"autobuy:no_channels user_id={data.user_id}")
             early_stats = self._empty_stats(skipped_rows)
             early_stats["global_skips"].append({"reason": "no_channels"})
             return AutobuyOutput(purchased=[], skipped=len(data.gifts), stats=early_stats)
@@ -551,10 +554,9 @@ class AutobuyUseCase:
             )
         stars = {acc.id: acc.balance for acc in enriched_accounts}
         total_stars = sum(stars.values())
+        balances = ", ".join(f"{aid}:{bal}" for aid, bal in stars.items())
         logger.bind(user_id=data.user_id).info(
-            "autobuy:balances total=%s details=%s",
-            total_stars,
-            ", ".join(f"{aid}:{bal}" for aid, bal in stars.items()),
+            f"autobuy:balances total={total_stars} details={balances}"
         )
         planner = PurchasePlanner(selector, stats)
         plan = planner.plan(
@@ -581,10 +583,7 @@ class AutobuyUseCase:
         skipped = len(data.gifts) - len(purchased)
         await self._send_reports(data.user_id, stats_dict, list(data.gifts))
         logger.bind(user_id=data.user_id).info(
-            "autobuy:summary purchased=%s skipped=%s plan=%s",
-            len(purchased),
-            skipped,
-            len(plan),
+            f"autobuy:summary purchased={len(purchased)} skipped={skipped} plan={len(plan)}"
         )
         return AutobuyOutput(purchased=purchased, skipped=skipped, stats=stats_dict)
 
@@ -603,8 +602,10 @@ class AutobuyUseCase:
         for account in accounts:
             try:
                 balance = await self._telegram.fetch_balance(account)
-            except Exception:  # pragma: no cover - network failure branch
-                logger.debug("autobuy:balance_fail account_id=%s", account.id, exc_info=True)
+            except Exception as exc:  # pragma: no cover - network failure branch
+                logger.opt(exception=exc).debug(
+                    f"autobuy:balance_fail account_id={account.id}"
+                )
                 balance = 0
             enriched.append(account.with_balance(balance))
         return enriched
@@ -633,28 +634,24 @@ class AutobuyUseCase:
             except Exception as exc:  # pragma: no cover - network failure branch
                 reason = {"code": type(exc).__name__, "message": str(exc)[:400]}
                 stats.record_failure(op, reason="send_gift_failed", rpc=reason)
-                logger.warning(
-                    "autobuy:send_fail account_id=%s channel=%s gift=%s reason=%s",
-                    op.account_id,
-                    op.channel_id,
-                    op.gift_id,
-                    reason,
-                    exc_info=True,
+                logger.opt(exception=exc).warning(
+                    f"autobuy:send_fail account_id={op.account_id} channel={op.channel_id} "
+                    f"gift={op.gift_id} reason={reason}"
                 )
             await asyncio.sleep(0)
 
     async def _send_reports(self, user_id: int, stats: dict, considered: Sequence[dict]) -> None:
         token = (self._settings.get_bot_token(user_id) or "").strip()
         if not token:
-            logger.info("autobuy:report_skipped user_id=%s reason=no_token", user_id)
+            logger.info(f"autobuy:report_skipped user_id={user_id} reason=no_token")
             return
         accounts = list(self._accounts.list_for_user(user_id))
         if not accounts:
-            logger.info("autobuy:report_skipped user_id=%s reason=no_accounts", user_id)
+            logger.info(f"autobuy:report_skipped user_id={user_id} reason=no_accounts")
             return
         chat_ids = await self._telegram.resolve_self_ids(accounts)
         if not chat_ids:
-            logger.info("autobuy:report_skipped user_id=%s reason=no_dm_targets", user_id)
+            logger.info(f"autobuy:report_skipped user_id={user_id} reason=no_dm_targets")
             return
         lines = self._report.build(stats, considered)
         messages = self._split_messages(lines)

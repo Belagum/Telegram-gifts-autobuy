@@ -103,21 +103,15 @@ def _probe_one_account(acc: Account, ch_id: int) -> tuple[str | None, bool]:
         title, joined = asyncio.run(work(PROBE_CALL_TIMEOUT))
         dt = (perf_counter() - t0) * 1000
         logger.info(
-            "channels.probe: acc=%s, ch_id=%s, title=%s, joined=%s, dt_ms=%.0f",
-            acc.id,
-            ch_id,
-            "yes" if title else "no",
-            int(joined),
-            dt,
+            "channels.probe: acc="
+            f"{acc.id}, ch_id={ch_id}, title={'yes' if title else 'no'}, joined={int(joined)}, "
+            f"dt_ms={dt:.0f}"
         )
         return title, joined
     except Exception:
         dt = (perf_counter() - t0) * 1000
         logger.warning(
-            "channels.probe: fail (acc_id=%s, ch_id=%s, dt_ms=%.0f, err=Exception)",
-            acc.id,
-            ch_id,
-            dt,
+            f"channels.probe: fail (acc_id={acc.id}, ch_id={ch_id}, dt_ms={dt:.0f}, err=Exception)"
         )
         return None, False
 
@@ -137,11 +131,8 @@ def _probe_any_account(db: Session, user_id: int, ch_id: int) -> tuple[str | Non
             any_joined = True
         break
     logger.info(
-        "channels.probe.summary: user_id=%s, ch_id=%s, title=%s, joined=%s",
-        user_id,
-        ch_id,
-        "yes" if title else "no",
-        int(any_joined),
+        f"channels.probe.summary: user_id={user_id}, ch_id={ch_id}, "
+        f"title={'yes' if title else 'no'}, joined={int(any_joined)}"
     )
     return title, any_joined
 

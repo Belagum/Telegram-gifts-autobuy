@@ -83,7 +83,7 @@ async def _ensure_cached(http: httpx.AsyncClient, token: str, g: dict) -> str | 
         logger.info(f"notify:cached {os.path.basename(path)}")
         return path
     except Exception:
-        logger.exception("notify:cache error", exc_info=True)
+        logger.exception("notify:cache error")
         return None
 
 
@@ -110,12 +110,8 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
         files = {"sticker": (sticker_name, blob, mime)}
         send_url = f"{base}/sendSticker"
         logger.info(
-            "notify:req sendSticker url=%s data=%s file=(%s, %s, %sB)",
-            send_url,
-            data,
-            sticker_name,
-            mime,
-            len(blob),
+            f"notify:req sendSticker url={send_url} data={data} "
+            f"file=({sticker_name}, {mime}, {len(blob)}B)"
         )
         r = await http.post(send_url, data=data, files=files)
         ok = r.status_code == 200 and r.json().get("ok", False)
@@ -125,7 +121,7 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
             logger.info(f"notify:sticker ok chat={chat} gift_id={g.get('id')}")
         return ok
     except Exception:
-        logger.exception("notify:sendSticker error", exc_info=True)
+        logger.exception("notify:sendSticker error")
         return False
 
 
@@ -176,7 +172,7 @@ async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, 
     try:
         await _send_sticker(http, token, chat, g)
     except Exception:
-        logger.exception("notify:sticker pipeline", exc_info=True)
+        logger.exception("notify:sticker pipeline")
     try:
         payload = {"chat_id": chat, "text": _gift_text(g, chat), "disable_notification": True}
         send_msg_url = f"{base}/sendMessage"
@@ -187,7 +183,7 @@ async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, 
         else:
             logger.info(f"notify:text ok chat={chat} gift_id={g.get('id')}")
     except Exception:
-        logger.exception("notify:text error", exc_info=True)
+        logger.exception("notify:text error")
     await asyncio.sleep(0.04)
 
 
@@ -209,8 +205,10 @@ async def _collect_dm_ids(uids: list[int]) -> dict[int, list[int]]:
                     tid = int(getattr(me, "id", 0) or 0)
                     if tid > 0:
                         ids.add(tid)
-                except Exception:
-                    logger.debug(f"notify:get_me fail acc_id={a.id}", exc_info=True)
+                except Exception as exc:
+                    logger.opt(exception=exc).debug(
+                        f"notify:get_me fail acc_id={a.id}"
+                    )
                 await asyncio.sleep(0.05)
             dm_ids_by_uid[uid] = sorted(ids)
             logger.info(f"notify:dm_ids uid={uid} count={len(dm_ids_by_uid[uid])}")

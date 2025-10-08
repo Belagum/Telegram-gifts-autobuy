@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+
 Flask
 Flask-Cors
 SQLAlchemy
@@ -6,3 +9,7 @@ kurigram
 TgCrypto
 httpx
 loguru
+pydantic
+prometheus-client
+tenacity
+pydantic-settings

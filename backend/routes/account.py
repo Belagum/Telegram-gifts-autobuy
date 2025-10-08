@@ -142,11 +142,11 @@ def create_apiprofile(db: Session):
             .first()
         )
         if exist_hash:
-            logger.warning(
-                "apiprofile.create: duplicate api_hash (user_id=%s, existing_id=%s)",
-                uid,
-                exist_hash.id,
+            message = (
+                "apiprofile.create: duplicate api_hash "
+                f"(user_id={uid}, existing_id={exist_hash.id})"
             )
+            logger.warning(message)
             return jsonify({"error": "duplicate_api_hash", "existing_id": exist_hash.id}), 409
 
         ap = ApiProfile(user_id=uid, api_id=int(api_id), api_hash=str(api_hash), name=name)
@@ -245,12 +245,11 @@ def send_code(db: Session):
             .first()
         )
         if exist:
-            logger.warning(
-                "auth.send_code: phone_exists (user_id=%s, acc_id=%s, phone_db='%s')",
-                uid,
-                exist.id,
-                exist.phone,
+            phone_msg = (
+                "auth.send_code: phone_exists "
+                f"(user_id={uid}, acc_id={exist.id}, phone_db='{exist.phone}')"
             )
+            logger.warning(phone_msg)
             return (
                 jsonify(
                     {
@@ -384,20 +383,18 @@ def account_refresh(acc_id: int, db: Session):
                 db2, acc=acc2, api_id=ap.api_id, api_hash=ap.api_hash
             ):
                 if ev.get("stage"):
-                    logger.debug(
-                        "account.refresh.stream: stage=%s (user_id=%s, acc_id=%s)",
-                        ev["stage"],
-                        uid,
-                        acc_id,
+                    stage_msg = (
+                        "account.refresh.stream: "
+                        f"stage={ev['stage']} (user_id={uid}, acc_id={acc_id})"
                     )
+                    logger.debug(stage_msg)
                 if ev.get("error"):
-                    logger.warning(
-                        "account.refresh.stream: error='%s' detail='%s' (user_id=%s, acc_id=%s)",
-                        ev.get("error"),
-                        ev.get("detail"),
-                        uid,
-                        acc_id,
+                    error_msg = (
+                        "account.refresh.stream: "
+                        f"error='{ev.get('error')}' detail='{ev.get('detail')}' "
+                        f"(user_id={uid}, acc_id={acc_id})"
                     )
+                    logger.warning(error_msg)
                 yield json.dumps(ev, ensure_ascii=False) + "\n"
             logger.debug(f"account.refresh.stream: end (user_id={uid}, acc_id={acc_id})")
         except Exception:

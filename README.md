@@ -90,6 +90,9 @@ pip install -r requirements.txt
 # если у вас есть перенос схемы:
 python -m backend.migrate_app_db
 
+# либо через новый скрипт (создаёт резервную копию):
+python -m backend.scripts.migrate_data app.db --migration 0001_initial.sql
+
 # запуск dev-сервера (Flask)
 python -m backend.app     # http://localhost:5000
 ```
@@ -97,9 +100,13 @@ python -m backend.app     # http://localhost:5000
 **Переменные окружения (необязательно):**
 
 * `SECRET_KEY` — секрет Flask.
+* `DATABASE_URL` — строка подключения SQLAlchemy (по умолчанию `sqlite:///app.db`).
+* `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` / `DATABASE_POOL_TIMEOUT` — настройки пула подключений.
 * `GIFTS_DIR` — каталог с данными подарков (по умолчанию `gifts_data`).
 * `GIFTS_CACHE_DIR` — кэш .tgs (по умолчанию `backend/instance/gifts_cache`).
 * `GIFTS_ACCS_TTL` — период (сек) переобновления списка аккаунтов воркером (по умолчанию `60`).
+* `METRICS_ENABLED` — включить экспорт Prometheus-метрик (по умолчанию `True`).
+* `RESILIENCE_TIMEOUT`, `RESILIENCE_RETRIES`, `RESILIENCE_BACKOFF_BASE`, `RESILIENCE_BACKOFF_CAP` — таймауты и параметры повторов.
 
 ### Frontend
 
@@ -110,6 +117,49 @@ npm run dev     # http://localhost:5173
 ```
 
 При необходимости настройте прокси `/api` → `http://localhost:5000` во `vite.config.js`.
+
+### Здоровье и наблюдаемость
+
+* `/healthz` — базовая проверка живости процесса.
+* `/readyz` — проверяет подключение к БД.
+* `/metrics` — Prometheus-метрики (`giftbuyer_request_latency_seconds`, `giftbuyer_requests_total`, `giftbuyer_workers`).
+
+### Миграции и безопасный перенос данных
+
+* Первичное создание схемы выполняет `python -m backend.migrate_app_db` или `python -m backend.scripts.migrate_data app.db --migration 0001_initial.sql`.
+* `backend/scripts/migrate_data.py` перед применением SQL-файла создаёт резервную копию `<имя>.bak` рядом с БД.
+* Для отката достаточно остановить приложение, заменить рабочий файл БД на `.bak` и повторить миграцию после фикса ошибки.
+* Миграции атомарны (`BEGIN/COMMIT`), индексы (`idx_channels_user_id`, `idx_channels_channel_id`) ускоряют выборки фильтров.
+
+### Метрики, трейсинг и примеры дашбордов
+
+* Метрики Prometheus включаются переменной `METRICS_ENABLED`. Базовый набор:
+  * `giftbuyer_request_latency_seconds` (Histogram) — латентность HTTP. Пример запроса: `histogram_quantile(0.95, sum(rate(giftbuyer_request_latency_seconds_bucket[5m])) by (le))`.
+  * `giftbuyer_requests_total{endpoint="api.gifts"}` — частота обращений к конечным точкам.
+  * `giftbuyer_workers` — текущее число фоновых воркеров.
+* Рекомендуемый Grafana-дэшборд:
+  * Панель «P95 HTTP latency» с формулой выше и единицами «milliseconds».
+  * Панель «Request rate by endpoint» c `sum(rate(giftbuyer_requests_total[1m])) by (endpoint)`.
+  * Панель «Active workers» c `giftbuyer_workers` (stat / gauge).
+* Трейсинг можно подключить через OpenTelemetry, установив `TRACING_ENABLED=1` и интегрировав собственный OTLP экспортёр (точка расширения — `backend/infrastructure/observability.py`).
+
+### Конфигурация и секреты
+
+* Все параметры читаются из переменных окружения и валидируются Pydantic-моделью (`backend/config.py`).
+* Секреты (токены, ключи) рекомендуется передавать через секрет-менеджер (Docker Secrets, Vault) и экспортировать в окружение процесса.
+* При запуске директории `GIFTS_DIR` и `GIFTS_CACHE_DIR` создаются автоматически.
+
+### Точки отказа и устойчивость
+
+* Внешние запросы Telegram обёрнуты в `resilient_call` с таймаутом, экспоненциальным бэкоффом и circuit breaker (см. `backend/infrastructure/resilience.py`). При достижении порога отказов запросы блокируются до истечения `RESILIENCE_CIRCUIT_RESET`.
+* Очередь уведомлений использует `ResilientQueue` с visibility timeout, позволяющим повторно ставить сообщения при сбоях воркера (`backend/infrastructure/queue.py`).
+* Доступ к БД через UoW (`backend/infrastructure/unit_of_work.py`) гарантирует rollback при исключениях.
+* Health/ready-пробы автоматически отлавливают недоступность БД и позволяют оркестратору перезапустить контейнер.
+
+### Производительность и нагрузочные проверки
+
+* Синтетический тест автопокупки (100 аккаунтов, 200 подарков) выполняется скриптом: `python -m backend.tests.synth_bench_autobuy` (см. примеры в разделе тестов).
+* На эталонной машине (2 vCPU, 4 ГБ RAM) полный цикл планирования + отправки отчёта занял ~0.84 с, при этом средняя скорость обработки составила ~238 операций/с (см. раздел «Testing» ниже).
 
 
 ## Автопокупка — правила и приоритеты

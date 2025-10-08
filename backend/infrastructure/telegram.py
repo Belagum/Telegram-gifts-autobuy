@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+
 """Telegram-facing adapters implementing application ports."""
 
 from __future__ import annotations
@@ -7,9 +10,13 @@ from collections.abc import Iterable, Sequence
 
 import httpx
 from backend.application import NotificationPort, TelegramPort
+from backend.config import load_config
 from backend.domain import AccountSnapshot, PurchaseOperation
+from backend.infrastructure.resilience import CircuitBreaker, resilient_call
 from backend.logger import logger
 from backend.services.tg_clients_service import get_stars_balance, tg_call
+
+_config = load_config()
 
 
 class TelegramRpcPort(TelegramPort):
@@ -42,10 +49,8 @@ class TelegramRpcPort(TelegramPort):
             min_interval=self._send_interval,
         )
         logger.info(
-            "autobuy:buy ok acc_id=%s chat_id=%s gift_id=%s",
-            account.id,
-            operation.channel_id,
-            operation.gift_id,
+            f"autobuy:buy ok acc_id={account.id} chat_id={operation.channel_id} "
+            f"gift_id={operation.gift_id}"
         )
 
     async def resolve_self_ids(self, accounts: Iterable[AccountSnapshot]) -> list[int]:
@@ -62,8 +67,10 @@ class TelegramRpcPort(TelegramPort):
                 value = int(getattr(me, "id", 0) or 0)
                 if value > 0:
                     resolved.add(value)
-            except Exception:
-                logger.debug("autobuy:dm get_me fail acc_id=%s", account.id, exc_info=True)
+            except Exception as exc:
+                logger.opt(exception=exc).debug(
+                    f"autobuy:dm get_me fail acc_id={account.id}"
+                )
             await asyncio.sleep(0.05)
         return sorted(resolved)
 
@@ -74,6 +81,10 @@ class TelegramNotificationAdapter(NotificationPort):
     def __init__(self, *, timeout: float = 30.0, send_interval: float = 0.05):
         self._timeout = timeout
         self._interval = send_interval
+        self._breaker = CircuitBreaker(
+            failure_threshold=_config.resilience.circuit_fail_threshold,
+            reset_timeout=_config.resilience.circuit_reset_timeout,
+        )
 
     async def send_reports(
         self, token: str, chat_ids: Sequence[int], messages: Sequence[str]
@@ -90,14 +101,20 @@ class TelegramNotificationAdapter(NotificationPort):
                         "parse_mode": "HTML",
                     }
                     try:
-                        response = await http.post(f"{base}/sendMessage", json=payload)
+                        response = await resilient_call(
+                            http.post,
+                            f"{base}/sendMessage",
+                            json=payload,
+                            breaker=self._breaker,
+                            timeout=self._timeout,
+                        )
                         if response.status_code != 200 or not response.json().get("ok"):
                             logger.warning(
-                                "autobuy:report send fail chat=%s code=%s body=%s",
-                                chat_id,
-                                response.status_code,
-                                response.text[:200],
+                                f"autobuy:report send fail chat={chat_id} "
+                                f"code={response.status_code} body={response.text[:200]}"
                             )
                     except Exception:
-                        logger.exception("autobuy:report http fail chat=%s", chat_id, exc_info=True)
+                        logger.exception(
+                            f"autobuy:report http fail chat={chat_id}"
+                        )
                     await asyncio.sleep(self._interval)

@@ -120,12 +120,8 @@ def bind_flask(app) -> None:
             dt = (time.perf_counter() - getattr(g, "_t0", time.perf_counter())) * 1000.0
             ip = request.headers.get("X-Forwarded-For", request.remote_addr)
             logger.info(
-                "{method} {path} -> {status} in {ms:.1f} ms from {ip}",
-                method=request.method,
-                path=request.path,
-                status=resp.status_code,
-                ms=dt,
-                ip=ip,
+                f"{request.method} {request.path} -> {resp.status_code} "
+                f"in {dt:.1f} ms from {ip}"
             )
         except Exception:
             pass
@@ -141,18 +137,9 @@ def bind_flask(app) -> None:
         if isinstance(e, HTTPException):
             return e
         if isinstance(e, ApplicationError):
-            logger.warning(
-                "Handled application error %s on %s %s",
-                e.code,
-                request.method,
-                request.path,
-            )
+            logger.warning(f"Handled application error {e.code} on {request.method} {request.path}")
             return jsonify({"error": e.code, "message": e.message}), e.status_code
-        logger.exception(
-            "Unhandled error on {method} {path}",
-            method=request.method,
-            path=request.path,
-        )
+        logger.exception(f"Unhandled error on {request.method} {request.path}")
         return jsonify({"error": "internal_error"}), 500
 
     @app.get("/api/logs/download")

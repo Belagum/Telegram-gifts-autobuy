@@ -25,9 +25,9 @@ def settings_set(db: Session):
     target = d.get("buy_target_id")
     if token is not None and not isinstance(token, str):
         return jsonify({"error": "bot_token_type"}), 400
-    if chat is not None and not isinstance(chat, (str, int)):
+    if chat is not None and not isinstance(chat, str | int):
         return jsonify({"error": "notify_chat_id_type"}), 400
-    if target is not None and not isinstance(target, (str, int)):
+    if target is not None and not isinstance(target, str | int):
         return jsonify({"error": "buy_target_id_type"}), 400
     try:
         uid = authed_request().user_id

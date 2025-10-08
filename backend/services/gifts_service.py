@@ -205,10 +205,7 @@ async def _worker_async(uid: int) -> None:
                 )
 
                 if added:
-                    logger.info(
-                        "gifts.worker: parallel start buy&notify items=%s",
-                        len(added),
-                    )
+                    logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
 
                     buy_task = asyncio.create_task(autobuy_new_gifts(uid, added))
                     notify_future = asyncio.to_thread(_notify_run_blocking, added)
@@ -222,21 +219,17 @@ async def _worker_async(uid: int) -> None:
                     )
 
                     if isinstance(buy_res, Exception):
-                        logger.error(
-                            "gifts.autobuy failed: %s: %s",
-                            type(buy_res).__name__,
-                            buy_res,
-                        )
+                        logger.error(f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}")
                     else:
                         res = cast(dict[str, Any], buy_res or res)
                         stats = cast(dict[str, Any], res.get("stats") or {})
 
                     if isinstance(notify_res, Exception):
-                        logger.error(
-                            "gifts.notify failed (thread): %s: %s",
-                            type(notify_res).__name__,
-                            notify_res,
+                        notify_error = (
+                            "gifts.notify failed (thread): "
+                            f"{type(notify_res).__name__}: {notify_res}"
                         )
+                        logger.error(notify_error)
                     else:
                         sent = int(notify_res or 0)
 
@@ -249,35 +242,32 @@ async def _worker_async(uid: int) -> None:
                             ok = len(st.get("purchased", []))
                             fail = len(st.get("failed", []))
                             rsn = len(st.get("reasons", []))
-                            logger.info(
-                                "gifts.worker: FINAL channel=%s ok=%s fail=%s reasons=%s",
-                                cid,
-                                ok,
-                                fail,
-                                rsn,
+                            chan_summary = (
+                                "gifts.worker: FINAL channel="
+                                f"{cid} ok={ok} fail={fail} reasons={rsn}"
                             )
+                            logger.info(chan_summary)
                             if fail:
-                                logger.info(
-                                    "gifts.worker: FINAL channel=%s failed_details=%s",
-                                    cid,
-                                    st.get("failed"),
+                                failed_details = (
+                                    "gifts.worker: FINAL channel="
+                                    f"{cid} failed_details={st.get('failed')}"
                                 )
+                                logger.info(failed_details)
                             if rsn:
-                                logger.info(
-                                    "gifts.worker: FINAL channel=%s reasons_details=%s",
-                                    cid,
-                                    st.get("reasons"),
+                                reasons_details = (
+                                    "gifts.worker: FINAL channel="
+                                    f"{cid} reasons_details={st.get('reasons')}"
                                 )
+                                logger.info(reasons_details)
 
                         for aid, st in (stats.get("accounts") or {}).items():
-                            logger.info(
-                                "gifts.worker: FINAL account=%s spent=%s start=%s end=%s buys=%s",
-                                aid,
-                                st.get("spent", 0),
-                                st.get("balance_start", 0),
-                                st.get("balance_end", 0),
-                                st.get("purchases", 0),
+                            account_summary = (
+                                "gifts.worker: FINAL account="
+                                f"{aid} spent={st.get('spent', 0)} "
+                                f"start={st.get('balance_start', 0)} "
+                                f"end={st.get('balance_end', 0)} buys={st.get('purchases', 0)}"
                             )
+                            logger.info(account_summary)
 
                         gsk = stats.get("global_skips") or []
                         if gsk:

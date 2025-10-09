@@ -30,6 +30,7 @@ def read_user_settings(user_id: int) -> dict[str, str | int | bool | None]:
             "bot_token": s.bot_token if s else None,
             "notify_chat_id": s.notify_chat_id if s else None,
             "buy_target_id": s.buy_target_id if s else None,
+            "buy_target_on_fail_only": bool(s.buy_target_on_fail_only) if s else False,
         }
     finally:
         db.close()
@@ -40,6 +41,7 @@ def set_user_settings(
     bot_token: str | None,
     notify_chat_id: str | int | None,
     buy_target_id: str | int | None,
+    buy_target_on_fail_only: bool | None,
 ) -> dict[str, str | int | bool | None]:
     db: Session = SessionLocal()
     try:
@@ -60,11 +62,15 @@ def set_user_settings(
         else:
             s.buy_target_id = _norm_peer_id(buy_target_id)
 
+        if buy_target_on_fail_only is not None:
+            s.buy_target_on_fail_only = bool(buy_target_on_fail_only)
+
         db.commit()
         return {
             "bot_token": s.bot_token,
             "notify_chat_id": s.notify_chat_id,
             "buy_target_id": s.buy_target_id,
+            "buy_target_on_fail_only": bool(s.buy_target_on_fail_only),
         }
     finally:
         db.close()

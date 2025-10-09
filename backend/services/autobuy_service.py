@@ -41,6 +41,11 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
         forced_channel_id = (
             int(settings.buy_target_id) if settings and settings.buy_target_id is not None else None
         )
+        forced_channel_fallback = (
+            bool(getattr(settings, "buy_target_on_fail_only", False)) if settings else False
+        )
+        if forced_channel_id is None:
+            forced_channel_fallback = False
     finally:
         session.close()
 
@@ -50,6 +55,7 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
             user_id=user_id,
             gifts=list(gifts or []),
             forced_channel_id=forced_channel_id,
+            forced_channel_fallback=forced_channel_fallback,
         )
     )
     return {

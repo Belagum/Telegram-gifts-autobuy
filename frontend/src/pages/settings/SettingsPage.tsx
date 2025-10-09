@@ -25,6 +25,7 @@ const schema = z.object({
     .string()
     .optional()
     .refine((value) => !value || /^-?\d+$/.test(value), "ID должен содержать только цифры"),
+  buyTargetOnFailOnly: z.boolean().optional(),
 });
 
 export type SettingsFormValues = z.infer<typeof schema>;
@@ -36,6 +37,7 @@ const transformSettingsToForm = (settings: Settings): SettingsFormValues => {
     botToken: settings.botToken ?? "",
     notifyChatTail: chatId.startsWith("-100") ? chatId.slice(4) : chatId.replace(/\D+/g, ""),
     buyTargetId: settings.buyTargetId ? String(settings.buyTargetId) : "",
+    buyTargetOnFailOnly: Boolean(settings.buyTargetOnFailOnly),
   };
 };
 
@@ -52,11 +54,20 @@ export const SettingsPage: React.FC = () => {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { botToken: "", notifyChatTail: "", buyTargetId: "" },
+    defaultValues: {
+      botToken: "",
+      notifyChatTail: "",
+      buyTargetId: "",
+      buyTargetOnFailOnly: false,
+    },
   });
+
+  const buyTargetIdValue = watch("buyTargetId");
 
   React.useEffect(() => {
     (async () => {
@@ -69,11 +80,22 @@ export const SettingsPage: React.FC = () => {
     })();
   }, [reset]);
 
+  React.useEffect(() => {
+    if (!buyTargetIdValue?.trim()) {
+      setValue("buyTargetOnFailOnly", false);
+    }
+  }, [buyTargetIdValue, setValue]);
+
+  const fallbackDisabled = !buyTargetIdValue?.trim();
+
   const onSubmit = handleSubmit(async (values) => {
     const payload: Settings = {
       botToken: values.botToken?.trim() || null,
       notifyChatId: values.notifyChatTail ? `-100${values.notifyChatTail}` : null,
       buyTargetId: values.buyTargetId?.trim() ? values.buyTargetId.trim() : null,
+      buyTargetOnFailOnly: values.buyTargetId?.trim()
+        ? Boolean(values.buyTargetOnFailOnly)
+        : false,
     };
     try {
       await setSettings(payload);
@@ -109,6 +131,14 @@ export const SettingsPage: React.FC = () => {
           error={errors.buyTargetId?.message}
         >
           <Input {...register("buyTargetId")} inputMode="numeric" placeholder="Например, -1001234567890" />
+          <label className={clsx("settings-toggle", { "is-disabled": fallbackDisabled })}>
+            <input
+              type="checkbox"
+              {...register("buyTargetOnFailOnly")}
+              disabled={fallbackDisabled}
+            />
+            <span>Покупать на ID, только если не получилось через каналы</span>
+          </label>
         </FormField>
         <div className="settings-footer">
           <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>

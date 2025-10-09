@@ -5,6 +5,7 @@ export interface Settings {
   botToken: string | null;
   notifyChatId: string | null;
   buyTargetId: string | null;
+  buyTargetOnFailOnly: boolean;
 }
 
 export interface GiftsSettings {

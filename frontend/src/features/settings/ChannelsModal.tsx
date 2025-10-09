@@ -91,9 +91,6 @@ export const ChannelsModal: React.FC<ChannelsModalProps> = ({ open, onClose }) =
                 {describeChannel(channel)}
               </button>
               <div className="channel-actions">
-                <Button size="sm" variant="ghost" onClick={() => setEditor(channel)}>
-                  Редактировать
-                </Button>
                 <Button size="sm" variant="danger" onClick={() => setConfirm(channel)}>
                   Удалить
                 </Button>

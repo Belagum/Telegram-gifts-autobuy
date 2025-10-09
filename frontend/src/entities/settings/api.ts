@@ -26,13 +26,21 @@ export const setSettings = async (settings: Settings): Promise<Settings> => {
 };
 
 export const listChannels = async (): Promise<Channel[]> => {
-  const dto = await httpClient<ChannelDto[] | null | string>("/channels");
-  if (!Array.isArray(dto)) return [];
-  return dto.map(mapChannel);
+  const data = await httpClient<
+    ChannelDto[] | { items?: ChannelDto[]; channels?: ChannelDto[] } | null | string
+  >("/channels");
+  const items = Array.isArray(data)
+    ? data
+    : (data && typeof data === "object" && Array.isArray((data as any).items))
+    ? (data as any).items
+    : (data && typeof data === "object" && Array.isArray((data as any).channels))
+    ? (data as any).channels
+    : [];
+  return items.map(mapChannel);
 };
 
-export const createChannel = async (payload: Partial<Channel>): Promise<Channel> => {
-  const dto = await httpClient<ChannelDto>("/channel", {
+export const createChannel = async (payload: Partial<Channel>): Promise<void> => {
+  await httpClient("/channel", {
     method: "POST",
     body: {
       channel_id: payload.channelId,
@@ -42,12 +50,12 @@ export const createChannel = async (payload: Partial<Channel>): Promise<Channel>
       supply_min: payload.supplyMin ?? null,
       supply_max: payload.supplyMax ?? null,
     },
+    parseJson: false,
   });
-  return mapChannel(dto);
 };
 
-export const updateChannel = async (id: number, payload: Partial<Channel>): Promise<Channel> => {
-  const dto = await httpClient<ChannelDto>(`/channel/${id}`, {
+export const updateChannel = async (id: number, payload: Partial<Channel>): Promise<void> => {
+  await httpClient(`/channel/${id}`, {
     method: "PATCH",
     body: {
       channel_id: payload.channelId,
@@ -57,8 +65,8 @@ export const updateChannel = async (id: number, payload: Partial<Channel>): Prom
       supply_min: payload.supplyMin ?? null,
       supply_max: payload.supplyMax ?? null,
     },
+    parseJson: false,
   });
-  return mapChannel(dto);
 };
 
 export const deleteChannel = async (id: number): Promise<void> => {

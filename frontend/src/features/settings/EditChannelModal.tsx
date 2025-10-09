@@ -13,7 +13,6 @@ import { createChannel, updateChannel } from "../../entities/settings/api";
 import type { Channel } from "../../entities/settings/channel";
 import { showError, showPromise } from "../../shared/ui/feedback/toast";
 
-// Универсальный препроцессор: пустые значения -> null, строки -> number, числа проходят как есть
 const numericNullable = z.preprocess(
   (value) => {
     if (value === "" || value == null) return null;
@@ -44,6 +43,7 @@ export interface EditChannelModalProps {
 
 export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initial, onClose, onSaved }) => {
   const isEdit = Boolean(initial?.id);
+  const formRef = React.useRef<HTMLFormElement | null>(null);
   const defaultValues: EditChannelFormValues = React.useMemo(
     () => ({
       channelId: initial?.channelId ?? "",
@@ -73,15 +73,15 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
   const onSubmit = handleSubmit(async (values) => {
     const { channelId, title, priceMin, priceMax, supplyMin, supplyMax } = values;
     if (!isEdit && !channelId) {
-      showError({ error: "Укажи ID канала" });
+      showError({ error: "Введите ID канала" });
       return;
     }
     if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
-      showError({ error: "price_min ≤ price_max" });
+      showError({ error: "Минимальная цена больше максимальной" });
       return;
     }
     if (supplyMin !== null && supplyMax !== null && supplyMin > supplyMax) {
-      showError({ error: "supply_min ≤ supply_max" });
+      showError({ error: "Минимальный supply больше максимального" });
       return;
     }
     const payload: Partial<Pick<Channel, "title" | "priceMin" | "priceMax" | "supplyMin" | "supplyMax">> = {
@@ -96,9 +96,12 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
         const promise = updateChannel(initial.id, payload);
         await showPromise(
           promise,
-          "Сохраняю…",
+          "Сохраняю изменения…",
           "Сохранено",
-          (err) => (err as any)?.payload?.detail || (err as any)?.payload?.error || "Ошибка сохранения",
+          (err) =>
+            (err as any)?.payload?.detail ||
+            (err as any)?.payload?.error ||
+            "Не удалось сохранить изменения",
         );
       } else {
         const promise = createChannel({
@@ -111,15 +114,17 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
         });
         await showPromise(
           promise,
-          "Соединяюсь…",
+          "Добавляю канал…",
           "Канал добавлен",
-          (err) => (err as any)?.payload?.detail || (err as any)?.payload?.error || "Не удалось добавить канал",
+          (err) =>
+            (err as any)?.payload?.detail ||
+            (err as any)?.payload?.error ||
+            "Не удалось добавить канал",
         );
       }
       onSaved();
       onClose();
     } catch {
-      // Ошибка уже показана через showPromise
     }
   });
 
@@ -127,35 +132,35 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Канал" : "Добавить канал"}
+      title={isEdit ? "Редактирование канала" : "Добавление канала"}
       footer={
-        <Button type="submit" form="edit-channel-form" loading={isSubmitting} disabled={isSubmitting}>
+        <Button type="submit" form="edit-channel-form" onClick={() => onSubmit()} loading={isSubmitting} disabled={isSubmitting}>
           Сохранить
         </Button>
       }
     >
-      <form id="edit-channel-form" onSubmit={onSubmit} className="modal-form" noValidate>
+      <form id="edit-channel-form" ref={formRef} onSubmit={onSubmit} className="modal-form" noValidate>
         {!isEdit && (
           <FormField label="ID канала" error={errors.channelId?.message ?? undefined} required>
             <Input placeholder="-1001234567890" {...register("channelId", { required: !isEdit })} />
           </FormField>
         )}
-        <FormField label="Название" description="Опционально">
-          <Input placeholder="Название" {...register("title")} />
+        <FormField label="Название" description="Необязательно">
+          <Input placeholder="Название (опционально)" {...register("title")} />
         </FormField>
         <div className="two-column-grid">
-          <FormField label="Цена мин" error={errors.priceMin?.message ?? undefined}>
+          <FormField label="Цена от" error={errors.priceMin?.message ?? undefined}>
             <Input type="number" min={0} {...register("priceMin")} />
           </FormField>
-          <FormField label="Цена макс" error={errors.priceMax?.message ?? undefined}>
+          <FormField label="Цена до" error={errors.priceMax?.message ?? undefined}>
             <Input type="number" min={0} {...register("priceMax")} />
           </FormField>
         </div>
         <div className="two-column-grid">
-          <FormField label="Supply мин" error={errors.supplyMin?.message ?? undefined}>
+          <FormField label="Supply от" error={errors.supplyMin?.message ?? undefined}>
             <Input type="number" min={0} {...register("supplyMin")} />
           </FormField>
-          <FormField label="Supply макс" error={errors.supplyMax?.message ?? undefined}>
+          <FormField label="Supply до" error={errors.supplyMax?.message ?? undefined}>
             <Input type="number" min={0} {...register("supplyMax")} />
           </FormField>
         </div>

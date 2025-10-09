@@ -120,8 +120,7 @@ def bind_flask(app) -> None:
             dt = (time.perf_counter() - getattr(g, "_t0", time.perf_counter())) * 1000.0
             ip = request.headers.get("X-Forwarded-For", request.remote_addr)
             logger.info(
-                f"{request.method} {request.path} -> {resp.status_code} "
-                f"in {dt:.1f} ms from {ip}"
+                f"{request.method} {request.path} -> {resp.status_code} in {dt:.1f} ms from {ip}"
             )
         except Exception:
             pass

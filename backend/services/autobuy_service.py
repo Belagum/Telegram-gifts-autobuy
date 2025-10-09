@@ -5,12 +5,13 @@
 
 from __future__ import annotations
 
+from sqlalchemy.orm import Session
+
 from backend.application.use_cases.autobuy import AutobuyInput
 from backend.container import container
 from backend.db import SessionLocal
 from backend.logger import logger
 from backend.models import User, UserSettings
-from sqlalchemy.orm import Session
 
 
 def _legacy_skip(reason: str, gifts: list[dict]) -> dict:
@@ -55,4 +56,5 @@ async def autobuy_new_gifts(user_id: int, gifts: list[dict]) -> dict:
         "purchased": output.purchased,
         "skipped": output.skipped,
         "stats": output.stats,
+        "deferred": output.deferred,
     }

@@ -1,6 +1,10 @@
-from collections.abc import Iterable, Sequence
+from __future__ import annotations
 
-import pytest
+import asyncio
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 from backend.application.use_cases.autobuy import AutobuyInput, AutobuyUseCase
 from backend.domain import AccountSnapshot, ChannelFilter
 
@@ -54,8 +58,7 @@ class FakeNotificationPort:
         self.sent_payloads.append((token, list(chat_ids), list(messages)))
 
 
-@pytest.mark.asyncio
-async def test_autobuy_use_case_executes_plan() -> None:
+def test_autobuy_use_case_executes_plan() -> None:
     accounts = [
         AccountSnapshot(
             id=1,
@@ -103,15 +106,14 @@ async def test_autobuy_use_case_executes_plan() -> None:
         }
     ]
 
-    output = await use_case.execute(AutobuyInput(user_id=1, gifts=gifts))
+    output = asyncio.run(use_case.execute(AutobuyInput(user_id=1, gifts=gifts)))
 
     assert len(output.purchased) == 2
     assert telegram_port.sent == [(10, 1), (10, 1)]
     assert notify_port.sent_payloads  # report was sent
 
 
-@pytest.mark.asyncio
-async def test_autobuy_use_case_skips_invalid_gifts() -> None:
+def test_autobuy_use_case_skips_invalid_gifts() -> None:
     account_repo = FakeAccountRepository(
         [
             AccountSnapshot(
@@ -167,8 +169,76 @@ async def test_autobuy_use_case_skips_invalid_gifts() -> None:
         },
     ]
 
-    output = await use_case.execute(AutobuyInput(user_id=1, gifts=gifts))
+    output = asyncio.run(use_case.execute(AutobuyInput(user_id=1, gifts=gifts)))
 
     assert output.purchased == []
     assert any(skip.get("reason") == "invalid/price" for skip in output.stats["global_skips"])
     assert any(skip.get("reason") == "unlimited" for skip in output.stats["global_skips"])
+
+
+def test_autobuy_use_case_defers_locked_gifts() -> None:
+    now = datetime.now(UTC)
+    unlock_at = (now + timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    accounts = [
+        AccountSnapshot(
+            id=1,
+            user_id=1,
+            session_path="/tmp/a",
+            api_id=1,
+            api_hash="hash",
+            is_premium=False,
+            balance=0,
+        ),
+    ]
+    channels = [
+        ChannelFilter(
+            id=1,
+            user_id=1,
+            channel_id=-100,
+            price_min=0,
+            price_max=200,
+            supply_min=0,
+            supply_max=10,
+        )
+    ]
+    account_repo = FakeAccountRepository(accounts)
+    channel_repo = FakeChannelRepository(channels)
+    settings_repo = FakeSettingsRepository("token")
+    telegram_port = FakeTelegramPort({1: 150})
+    notify_port = FakeNotificationPort()
+
+    use_case = AutobuyUseCase(
+        accounts=account_repo,
+        channels=channel_repo,
+        telegram=telegram_port,
+        notifications=notify_port,
+        settings=settings_repo,
+    )
+
+    gifts: list[dict[str, Any]] = [
+        {
+            "id": 99,
+            "price": 100,
+            "is_limited": True,
+            "total_amount": 1,
+            "available_amount": 1,
+            "limited_per_user": False,
+            "locks": {"1": unlock_at},
+        }
+    ]
+
+    output = asyncio.run(use_case.execute(AutobuyInput(user_id=1, gifts=gifts)))
+
+    assert output.purchased == []
+    assert output.deferred
+    deferred_entry = output.deferred[0]
+    assert deferred_entry["gift_id"] == 99
+    assert deferred_entry["account_id"] == 1
+    assert deferred_entry["run_at"] == unlock_at
+    assert not telegram_port.sent
+    assert notify_port.sent_payloads
+    assert any(
+        "Отложенные покупки" in message
+        for _, _, payload in notify_port.sent_payloads
+        for message in payload
+    )

@@ -60,8 +60,3 @@
 .ui-button--loading {
   position: relative;
 }
-
-.ui-button--loading .ui-button__label::after {
-  content: "…";
-  margin-left: 4px;
-}

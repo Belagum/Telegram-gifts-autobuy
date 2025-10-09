@@ -159,7 +159,7 @@ async def _run_deferred_autobuy(uid: int, gift_id: int, account_id: int, run_at:
     finally:
         tasks = _DEFERRED_TASKS.get(uid)
         if tasks is not None:
-            tasks.pop(key, None)
+            await tasks.pop(key, None)
 
 
 async def _list_gifts_for_account_persist(
@@ -190,7 +190,6 @@ async def _list_gifts_for_account_persist(
         else:
             per_user_available = avail_total
 
-        # Extract lock/unlock time and normalize to ISO 8601 UTC string if present
         def _to_iso_utc(value: Any) -> str | None:
             try:
                 if value is None:
@@ -198,22 +197,18 @@ async def _list_gifts_for_account_persist(
                 if isinstance(value, int | float):
                     dt = datetime.fromtimestamp(int(value), tz=UTC)
                     return dt.isoformat().replace("+00:00", "Z")
-                # datetime-like
                 if isinstance(value, datetime):
                     dt = value if value.tzinfo else value.replace(tzinfo=UTC)
                     dt = dt.astimezone(UTC)
                     return dt.isoformat().replace("+00:00", "Z")
-                # strings – try to parse a few common formats; otherwise return as-is
                 if isinstance(value, str):
                     s = value.strip()
                     if s:
                         return s
-                # Objects with attribute "timestamp" (telethon/pyrogram types)
                 ts = getattr(value, "timestamp", None)
                 if callable(ts):
                     return _to_iso_utc(ts())
             except Exception:
-                # Be conservative – if conversion fails, omit the field
                 return None
             return None
 

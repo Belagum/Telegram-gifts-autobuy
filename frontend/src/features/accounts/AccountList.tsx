@@ -6,7 +6,7 @@ import { Button } from "../../shared/ui/button/Button";
 import { Skeleton } from "../../shared/ui/skeleton/Skeleton";
 import { Account } from "../../entities/accounts/model";
 import { refreshAccountStream } from "../../entities/accounts/api";
-import { showError, showSuccess } from "../../shared/ui/feedback/toast";
+import { upsertLoadingToast, completeToast, failToast } from "../../shared/ui/feedback/toast";
 import "./account-list.css";
 
 export interface AccountListProps {
@@ -27,18 +27,24 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) 
   const handleRefresh = async (id: number) => {
     if (loadingId === id) return;
     setLoadingId(id);
+    const toastId = `acc-refresh-${id}`;
+    upsertLoadingToast(toastId, "Обновление аккаунта...");
     try {
       await refreshAccountStream(id, (event) => {
+        if (event.message || event.stage) {
+          const msg = event.message || `Этап: ${event.stage}`;
+          upsertLoadingToast(toastId, msg);
+        }
         if (event.error) {
-          showError(event, event.detail ?? "Не удалось обновить аккаунт");
+          failToast(toastId, event.detail || event.error || "Ошибка при обновлении аккаунта.");
         }
         if (event.done && event.account) {
           setItems((prev) => prev.map((item) => (item.id === id ? event.account! : item)));
-          showSuccess("Данные обновлены");
+          completeToast(toastId, "Аккаунт успешно обновлён.");
         }
       });
     } catch (error) {
-      showError(error, "Ошибка обновления");
+      failToast(toastId, "Не удалось обновить аккаунт.");
     } finally {
       setLoadingId(null);
       onReload();
@@ -62,7 +68,7 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) 
   }
 
   if (!items.length) {
-    return <div className="account-empty">Аккаунтов нет</div>;
+    return <div className="account-empty">Нет аккаунтов</div>;
   }
 
   return (
@@ -71,18 +77,22 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) 
         <div key={account.id} className="account-card">
           <div className="account-card__header">
             <h3>{account.displayName}</h3>
-            <span className="account-card__username">@{account.username ?? "—"}</span>
+            <span className="account-card__username">@{account.username ?? "нет имени"}</span>
           </div>
           <div className="account-card__row">
-            <span>Звёзды</span>
+            <span>Звёзды:</span>
             <span>{account.stars}</span>
           </div>
           <div className="account-card__row">
-            <span>Премиум</span>
-            <span>{account.isPremium ? `✅ до ${account.premiumUntil ?? "?"}` : "❌"}</span>
+            <span>Премиум:</span>
+            <span>
+              {account.isPremium
+                ? `до ${account.premiumUntil ?? "?"}`
+                : "Нет"}
+            </span>
           </div>
           <div className="account-card__updated">
-            Обновлено: {account.lastCheckedAt ? new Date(account.lastCheckedAt).toLocaleString() : "—"}
+            Последнее обновление: {account.lastCheckedAt ? new Date(account.lastCheckedAt).toLocaleString() : "нет данных"}
           </div>
           <Button
             variant="secondary"
@@ -90,7 +100,7 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) 
             loading={loadingId === account.id}
             disabled={loadingId === account.id}
           >
-            {loadingId === account.id ? "Обновляю…" : "Обновить"}
+            {loadingId === account.id ? "Обновление..." : "Обновить"}
           </Button>
         </div>
       ))}

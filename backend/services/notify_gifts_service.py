@@ -159,7 +159,6 @@ def _gift_text(g: dict, chat: int) -> str:
         lines.append(f"Лимит на пользователя: остаток={remaining} доступно={available}")
     else:
         lines.append("Лимит на пользователя: безлимитно к пользователям")
-    # Lock status line
     locked_until = g.get("locked_until_date")
     if isinstance(locked_until, str) and locked_until.strip():
         lines.append(f"лок: до {locked_until}")

@@ -28,3 +28,19 @@ export const showPromise = <T,>(promise: Promise<T>, pending: string, success: s
     success,
     error,
   });
+
+export const upsertLoadingToast = (id: string, message: string) => {
+  if (toast.isActive(id)) {
+    toast.update(id, { render: message, isLoading: true });
+  } else {
+    toast.loading(message, { toastId: id });
+  }
+};
+
+export const completeToast = (id: string, message: string) => {
+  toast.update(id, { render: message, type: "success", isLoading: false, autoClose: 2000 });
+};
+
+export const failToast = (id: string, message: string) => {
+  toast.update(id, { render: message, type: "error", isLoading: false, autoClose: 4000 });
+};

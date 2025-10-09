@@ -11,6 +11,7 @@ import { Input } from "../../shared/ui/input/Input";
 import { Button } from "../../shared/ui/button/Button";
 import { createChannel, updateChannel } from "../../entities/settings/api";
 import type { Channel } from "../../entities/settings/channel";
+import { extractApiErrorMessage } from "../../shared/api/errorMessages";
 import { showError, showPromise } from "../../shared/ui/feedback/toast";
 
 const numericNullable = z.preprocess(
@@ -93,40 +94,47 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     };
     try {
       if (isEdit && initial) {
-        const promise = updateChannel(initial.id, payload);
         await showPromise(
-          promise,
+          updateChannel(initial.id, payload),
           "Сохраняю изменения…",
           "Сохранено",
-          (err) =>
-            (err as any)?.payload?.detail ||
-            (err as any)?.payload?.error ||
-            "Не удалось сохранить изменения",
+          (err) => extractApiErrorMessage(err, "Не удалось сохранить изменения"),
         );
       } else {
-        const promise = createChannel({
-          channelId: channelId!,
-          title: payload.title ?? null,
-          priceMin: payload.priceMin,
-          priceMax: payload.priceMax,
-          supplyMin: payload.supplyMin,
-          supplyMax: payload.supplyMax,
-        });
         await showPromise(
-          promise,
+          createChannel({
+            channelId: channelId!,
+            title: payload.title ?? null,
+            priceMin: payload.priceMin,
+            priceMax: payload.priceMax,
+            supplyMin: payload.supplyMin,
+            supplyMax: payload.supplyMax,
+          }),
           "Добавляю канал…",
           "Канал добавлен",
-          (err) =>
-            (err as any)?.payload?.detail ||
-            (err as any)?.payload?.error ||
-            "Не удалось добавить канал",
+          (err) => extractApiErrorMessage(err, "Не удалось добавить канал"),
         );
       }
       onSaved();
       onClose();
-    } catch {
+    } catch (error) {
+      console.error("Failed to save channel", error);
     }
   });
+
+  const handleSaveClick = React.useCallback(() => {
+    const formElement = formRef.current as (HTMLFormElement & {
+      requestSubmit?: () => void;
+    }) | null;
+    if (!formElement) {
+      return;
+    }
+    if (typeof formElement.requestSubmit === "function") {
+      formElement.requestSubmit();
+    } else {
+      formElement.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    }
+  }, []);
 
   return (
     <Modal
@@ -134,12 +142,13 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
       onClose={onClose}
       title={isEdit ? "Редактирование канала" : "Добавление канала"}
       footer={
-        <Button type="submit" form="edit-channel-form" onClick={() => onSubmit()} loading={isSubmitting} disabled={isSubmitting}>
+        <Button type="button" onClick={handleSaveClick} loading={isSubmitting} disabled={isSubmitting}>
           Сохранить
         </Button>
       }
     >
       <form id="edit-channel-form" ref={formRef} onSubmit={onSubmit} className="modal-form" noValidate>
+        <button type="submit" hidden aria-hidden="true" />
         {!isEdit && (
           <FormField label="ID канала" error={errors.channelId?.message ?? undefined} required>
             <Input placeholder="-1001234567890" {...register("channelId", { required: !isEdit })} />

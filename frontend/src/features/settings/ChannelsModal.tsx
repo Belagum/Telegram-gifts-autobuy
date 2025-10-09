@@ -7,7 +7,8 @@ import { Button } from "../../shared/ui/button/Button";
 import { ConfirmDialog } from "../../shared/ui/modal/ConfirmDialog";
 import { listChannels, deleteChannel } from "../../entities/settings/api";
 import type { Channel } from "../../entities/settings/channel";
-import { showError, showSuccess } from "../../shared/ui/feedback/toast";
+import { extractApiErrorMessage } from "../../shared/api/errorMessages";
+import { showError, showPromise } from "../../shared/ui/feedback/toast";
 import { EditChannelModal } from "./EditChannelModal";
 import "./channels-modal.css";
 
@@ -42,12 +43,17 @@ export const ChannelsModal: React.FC<ChannelsModalProps> = ({ open, onClose }) =
 
   const handleDelete = async () => {
     if (!confirm) return;
+    const channel = confirm;
     try {
-      await deleteChannel(confirm.id);
-      setChannels((current) => current.filter((channel) => channel.id !== confirm.id));
-      showSuccess("Канал удалён");
+      await showPromise(
+        deleteChannel(channel.id),
+        "Удаляю канал…",
+        "Канал удалён",
+        (err) => extractApiErrorMessage(err, "Не удалось удалить канал"),
+      );
+      setChannels((current) => current.filter((item) => item.id !== channel.id));
     } catch (error) {
-      showError(error, "Не удалось удалить канал");
+      console.error("Failed to delete channel", error);
     } finally {
       setConfirm(null);
     }

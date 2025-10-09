@@ -19,6 +19,7 @@ export const setSettings = async (settings: Settings): Promise<Settings> => {
       bot_token: settings.botToken,
       notify_chat_id: settings.notifyChatId,
       buy_target_id: settings.buyTargetId,
+      buy_target_on_fail_only: settings.buyTargetOnFailOnly,
     },
   });
   return mapSettings(dto);

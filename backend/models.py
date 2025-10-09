@@ -56,6 +56,9 @@ class UserSettings(Base):
     bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notify_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     buy_target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)  # NEW
+    buy_target_on_fail_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

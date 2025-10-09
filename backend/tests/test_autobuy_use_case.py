@@ -36,13 +36,13 @@ class FakeSettingsRepository:
 class FakeTelegramPort:
     def __init__(self, balances: dict[int, int]):
         self._balances = balances
-        self.sent: list[tuple[int, int]] = []
+        self.sent: list[tuple[int, int, int]] = []
 
     async def fetch_balance(self, account: AccountSnapshot) -> int:
         return self._balances.get(account.id, 0)
 
     async def send_gift(self, operation, account: AccountSnapshot) -> None:
-        self.sent.append((operation.gift_id, operation.account_id))
+        self.sent.append((operation.gift_id, operation.channel_id, operation.account_id))
 
     async def resolve_self_ids(self, accounts: Iterable[AccountSnapshot]) -> list[int]:
         return [42]
@@ -109,8 +109,72 @@ def test_autobuy_use_case_executes_plan() -> None:
     output = asyncio.run(use_case.execute(AutobuyInput(user_id=1, gifts=gifts)))
 
     assert len(output.purchased) == 2
-    assert telegram_port.sent == [(10, 1), (10, 1)]
+    assert telegram_port.sent == [(10, -100, 1), (10, -100, 1)]
     assert notify_port.sent_payloads  # report was sent
+
+
+def test_autobuy_use_case_falls_back_to_forced_channel_when_no_match() -> None:
+    accounts = [
+        AccountSnapshot(
+            id=1,
+            user_id=1,
+            session_path="/tmp/a",
+            api_id=1,
+            api_hash="hash",
+            is_premium=False,
+            balance=0,
+        ),
+    ]
+    channels = [
+        ChannelFilter(
+            id=1,
+            user_id=1,
+            channel_id=-200,
+            price_min=0,
+            price_max=5,
+            supply_min=0,
+            supply_max=10,
+        )
+    ]
+    account_repo = FakeAccountRepository(accounts)
+    channel_repo = FakeChannelRepository(channels)
+    settings_repo = FakeSettingsRepository("token")
+    telegram_port = FakeTelegramPort({1: 100})
+    notify_port = FakeNotificationPort()
+
+    use_case = AutobuyUseCase(
+        accounts=account_repo,
+        channels=channel_repo,
+        telegram=telegram_port,
+        notifications=notify_port,
+        settings=settings_repo,
+    )
+
+    gifts: list[dict[str, object]] = [
+        {
+            "id": 10,
+            "price": 10,
+            "is_limited": True,
+            "total_amount": 1,
+            "available_amount": 1,
+            "limited_per_user": False,
+        }
+    ]
+
+    output = asyncio.run(
+        use_case.execute(
+            AutobuyInput(
+                user_id=1,
+                gifts=gifts,
+                forced_channel_id=-500,
+                forced_channel_fallback=True,
+            )
+        )
+    )
+
+    assert output.purchased
+    assert all(row["channel_id"] == -500 for row in output.purchased)
+    assert telegram_port.sent == [(10, -500, 1)]
 
 
 def test_autobuy_use_case_skips_invalid_gifts() -> None:

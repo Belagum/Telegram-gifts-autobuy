@@ -43,6 +43,34 @@
   background: var(--color-surface);
 }
 
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+  font-size: 14px;
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+.settings-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-toggle span {
+  flex: 1;
+}
+
+.settings-toggle.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-toggle.is-disabled span {
+  cursor: not-allowed;
+}
+
 .settings-footer {
   position: sticky;
   bottom: 0;

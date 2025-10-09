@@ -37,6 +37,7 @@ class AutobuyInput:
     user_id: int
     gifts: Sequence[dict[str, Any]]
     forced_channel_id: int | None = None
+    forced_channel_fallback: bool = False
 
 
 @dataclass(slots=True)
@@ -335,6 +336,7 @@ class PurchasePlanner:
         gifts: Sequence[GiftPayload],
         stars: dict[int, int],
         forced_channel_id: int | None = None,
+        forced_channel_fallback: bool = False,
     ) -> PurchasePlan:
         remain_by_gift: dict[int, int] = {
             p.candidate.gift_id: p.candidate.available_amount for p in gifts
@@ -350,7 +352,8 @@ class PurchasePlanner:
                 price = candidate.price
                 if remain_by_gift.get(gift_id, 0) <= 0:
                     continue
-                channel = self._selector.best_for(candidate, forced_channel_id)
+                selector_forced_id = None if forced_channel_fallback else forced_channel_id
+                channel = self._selector.best_for(candidate, selector_forced_id)
                 if channel is None:
                     if forced_channel_id is None:
                         self._stats.record_plan_skip(
@@ -618,13 +621,17 @@ class AutobuyUseCase:
             logger.info(f"autobuy:no_accounts user_id={data.user_id}")
             early_stats = self._empty_stats(skipped_rows)
             early_stats["global_skips"].append({"reason": "no_accounts"})
-            return AutobuyOutput(purchased=[], skipped=len(data.gifts), stats=early_stats)
+            return AutobuyOutput(
+                purchased=[], skipped=len(data.gifts), stats=early_stats, deferred=[]
+            )
         channels = list(self._channels.list_for_user(data.user_id))
         if data.forced_channel_id is None and not channels:
             logger.info(f"autobuy:no_channels user_id={data.user_id}")
             early_stats = self._empty_stats(skipped_rows)
             early_stats["global_skips"].append({"reason": "no_channels"})
-            return AutobuyOutput(purchased=[], skipped=len(data.gifts), stats=early_stats)
+            return AutobuyOutput(
+                purchased=[], skipped=len(data.gifts), stats=early_stats, deferred=[]
+            )
         selector = ChannelSelector(channels)
         enriched_accounts = await self._load_balances(accounts)
         stats = AutobuyStats(channels, enriched_accounts)
@@ -646,6 +653,7 @@ class AutobuyUseCase:
             gifts=gifts,
             stars=stars,
             forced_channel_id=data.forced_channel_id,
+            forced_channel_fallback=data.forced_channel_fallback,
         )
         await self._execute_plan(plan, enriched_accounts, stats)
         stats_dict = stats.to_dict()

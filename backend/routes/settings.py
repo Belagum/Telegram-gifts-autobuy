@@ -23,15 +23,18 @@ def settings_set(db: Session):
     token = d.get("bot_token")
     chat = d.get("notify_chat_id")
     target = d.get("buy_target_id")
+    fallback = d.get("buy_target_on_fail_only")
     if token is not None and not isinstance(token, str):
         return jsonify({"error": "bot_token_type"}), 400
     if chat is not None and not isinstance(chat, str | int):
         return jsonify({"error": "notify_chat_id_type"}), 400
     if target is not None and not isinstance(target, str | int):
         return jsonify({"error": "buy_target_id_type"}), 400
+    if fallback is not None and not isinstance(fallback, bool):
+        return jsonify({"error": "buy_target_on_fail_only_type"}), 400
     try:
         uid = authed_request().user_id
-        out = set_user_settings(uid, (token or "").strip() or None, chat, target)
+        out = set_user_settings(uid, (token or "").strip() or None, chat, target, fallback)
     except ValueError as e:
         msg = str(e)
         if "channel" in msg or "100" in msg:

@@ -70,6 +70,7 @@ export interface SettingsDto {
   bot_token: string | null;
   notify_chat_id: string | null;
   buy_target_id: string | null;
+  buy_target_on_fail_only: boolean | null;
 }
 
 export interface GiftsStreamEventDto {

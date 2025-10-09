@@ -78,6 +78,7 @@ export const mapSettings = (dto: SettingsDto): Settings => ({
   botToken: dto.bot_token,
   notifyChatId: dto.notify_chat_id,
   buyTargetId: dto.buy_target_id,
+  buyTargetOnFailOnly: Boolean(dto.buy_target_on_fail_only),
 });
 
 export const mapGiftsSettings = (dto: GiftsSettingsDto): GiftsSettings => ({

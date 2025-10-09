@@ -2,6 +2,7 @@
 // Copyright 2025 Vova Orig
 
 import React from "react";
+import clsx from "clsx";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +13,7 @@ import { getSettings, setSettings } from "../../entities/settings/api";
 import type { Settings } from "../../entities/settings/model";
 import { showError, showSuccess } from "../../shared/ui/feedback/toast";
 import "./settings.css";
+import { usePopupAutoSize } from "../../shared/lib/hooks/usePopupAutoSize";
 
 const schema = z.object({
   botToken: z.string().optional(),
@@ -28,7 +30,8 @@ const schema = z.object({
 export type SettingsFormValues = z.infer<typeof schema>;
 
 const transformSettingsToForm = (settings: Settings): SettingsFormValues => {
-  const chatId = settings.notifyChatId ?? "";
+  const chatIdRaw = settings.notifyChatId;
+  const chatId = chatIdRaw == null ? "" : String(chatIdRaw);
   return {
     botToken: settings.botToken ?? "",
     notifyChatTail: chatId.startsWith("-100") ? chatId.slice(4) : chatId.replace(/\D+/g, ""),
@@ -37,6 +40,14 @@ const transformSettingsToForm = (settings: Settings): SettingsFormValues => {
 };
 
 export const SettingsPage: React.FC = () => {
+  const [isPopup, setIsPopup] = React.useState(false);
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get("popup");
+    setIsPopup(Boolean((window as Window).opener || flag));
+  }, []);
+
+  usePopupAutoSize(isPopup);
   const {
     register,
     handleSubmit,
@@ -74,7 +85,7 @@ export const SettingsPage: React.FC = () => {
   });
 
   return (
-    <div className="settings-page">
+    <div className={clsx("settings-page", { "is-popup": isPopup })}>
       <header className="settings-header">
         <h1>Настройки</h1>
       </header>

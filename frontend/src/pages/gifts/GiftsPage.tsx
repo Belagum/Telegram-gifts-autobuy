@@ -11,9 +11,14 @@ import { listAccounts } from "../../entities/accounts/api";
 import type { Gift } from "../../entities/gifts/model";
 import { useOnScreen } from "../../shared/lib/hooks/useOnScreen";
 import { openCentered } from "../../shared/lib/utils/openCentered";
+import { usePopupAutoSize } from "../../shared/lib/hooks/usePopupAutoSize";
 import "./gifts.css";
 
 const TGS_CACHE = new Map<string, unknown>();
+const GIFTS_DEBUG = true;
+const dbg = (...args: unknown[]) => {
+  if (GIFTS_DEBUG) console.log("[Gifts]", ...args);
+};
 
 const priceFormat = (value: number | null | undefined) =>
   typeof value === "number" ? value.toLocaleString("ru-RU") : value ?? "—";
@@ -32,8 +37,10 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
     const fileId = gift.stickerFileId;
     const uniq = gift.stickerUniqueId;
     if (!visible || (!fileId && !uniq) || !containerRef.current) {
+      dbg("thumb.skip", { id: gift.id, visible, fileId: !!fileId, uniq: !!uniq });
       return;
     }
+    dbg("thumb.start", { id: gift.id, visible, fileId, uniq });
     const params = new URLSearchParams();
     if (fileId) params.set("file_id", fileId);
     if (uniq) params.set("uniq", uniq);
@@ -52,6 +59,7 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
             if (response.status === 409) {
               const body = await response.json().catch(() => ({}));
               if ((body as { error?: string }).error === "no_bot_token") {
+                dbg("thumb.no_bot_token", { id: gift.id });
                 onMissingToken();
               }
               throw new Error("no_bot_token");
@@ -71,8 +79,19 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
           return;
         }
         if (animationRef.current) {
-          animationRef.current.destroy();
+          try {
+            animationRef.current.destroy();
+          } catch (err) {
+            console.warn("Lottie destroy failed (re-init)", err);
+            try {
+              if (containerRef.current) containerRef.current.innerHTML = "";
+            } catch {}
+          }
         }
+        try {
+          if (containerRef.current) containerRef.current.innerHTML = "";
+        } catch {}
+        dbg("thumb.loadAnimation", { id: gift.id });
         animationRef.current = lottie.loadAnimation({
           container: containerRef.current,
           renderer: "svg",
@@ -81,12 +100,12 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
           animationData: data,
           rendererSettings: {
             preserveAspectRatio: "xMidYMid meet",
-            progressiveLoad: true,
+            progressiveLoad: false,
             hideOnTransparent: true,
           },
         });
       } catch (error) {
-        console.warn("Lottie load failed", error);
+        console.warn("[Gifts] Lottie load failed", error);
       }
     })();
 
@@ -94,8 +113,17 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
       cancelled = true;
       controller.abort();
       if (animationRef.current) {
-        animationRef.current.destroy();
-        animationRef.current = null;
+        dbg("thumb.cleanup", { id: gift.id });
+        try {
+          animationRef.current.destroy();
+        } catch (err) {
+          console.warn("[Gifts] Lottie destroy failed (cleanup)", err);
+          try {
+            if (containerRef.current) containerRef.current.innerHTML = "";
+          } catch {}
+        } finally {
+          animationRef.current = null;
+        }
       }
     };
   }, [gift.stickerFileId, gift.stickerUniqueId, visible, onMissingToken]);
@@ -119,6 +147,22 @@ const GiftCard: React.FC<{ gift: Gift; onMissingToken: () => void }> = ({ gift, 
 };
 
 export const GiftsPage: React.FC = () => {
+  const [isPopup, setIsPopup] = React.useState(false);
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get("popup");
+    const opener = Boolean((window as Window).opener);
+    const popup = Boolean(opener || flag);
+    setIsPopup(popup);
+    dbg("init.isPopup", {
+      popup,
+      opener,
+      query: Boolean(flag),
+      search: window.location.search,
+      win: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio },
+    });
+  }, []);
+  usePopupAutoSize(isPopup);
   const [gifts, setGifts] = React.useState<Gift[]>([]);
   const [autoRefresh, setAutoRefresh] = React.useState(false);
   const [hasAccounts, setHasAccounts] = React.useState(false);
@@ -128,17 +172,22 @@ export const GiftsPage: React.FC = () => {
   const loadGifts = React.useCallback(async () => {
     try {
       const data = await listGifts();
-      setGifts(data.filter((gift) => gift.stickerFileId));
+      dbg("api.listGifts", { total: data.length });
+      const items = data.filter((gift) => gift.stickerFileId);
+      dbg("state.setGifts", { withSticker: items.length });
+      setGifts(items);
     } catch (error) {
       showError(error, "Не удалось загрузить подарки");
     }
   }, []);
+
 
   React.useEffect(() => {
     void loadGifts();
     (async () => {
       try {
         const settings = await getGiftsSettings();
+        dbg("api.getGiftsSettings", settings);
         setAutoRefresh(settings.autoRefresh);
       } catch (error) {
         console.warn("Failed to load gifts settings", error);
@@ -147,6 +196,7 @@ export const GiftsPage: React.FC = () => {
     (async () => {
       try {
         const accounts = await listAccounts();
+        dbg("api.listAccounts", { count: accounts.length });
         setHasAccounts(accounts.length > 0);
       } catch (error) {
         console.warn("Failed to check accounts", error);
@@ -159,8 +209,11 @@ export const GiftsPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await refreshGifts();
+      dbg("api.refreshGifts", { ok: Array.isArray((data as any).items), count: Array.isArray((data as any).items) ? (data as any).items.length : undefined });
       if (Array.isArray(data.items)) {
-        setGifts(data.items.filter((gift) => gift.stickerFileId));
+        const items = data.items.filter((gift) => gift.stickerFileId);
+        dbg("state.setGifts", { withSticker: items.length });
+        setGifts(items);
       } else {
         await loadGifts();
       }
@@ -174,6 +227,7 @@ export const GiftsPage: React.FC = () => {
   const toggleAuto = React.useCallback(async () => {
     if (!hasAccounts) return;
     const next = !autoRefresh;
+    dbg("ui.toggleAutoRefresh", { next });
     setAutoRefresh(next);
     try {
       await setGiftsSettings(next);
@@ -206,11 +260,11 @@ export const GiftsPage: React.FC = () => {
   }, [autoRefresh, hasAccounts, handleRefresh]);
 
   return (
-    <div className="gifts-page">
+    <div className={`gifts-page${isPopup ? " is-popup" : ""}`}>
       {missingToken && (
         <div className="gift-alert">
           <span>Нет Bot token. Укажите его в настройках, чтобы загрузить превью.</span>
-          <Button variant="secondary" onClick={() => openCentered("/settings", "settings", 520, 420)}>
+          <Button variant="secondary" onClick={() => openCentered("/settings?popup=1", "settings", 520, 420)}>
             Открыть настройки
           </Button>
         </div>

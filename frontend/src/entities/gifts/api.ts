@@ -9,8 +9,13 @@ import type { Gift, GiftsStreamEvent } from "./model";
 import type { GiftsSettings } from "../settings/model";
 
 export const listGifts = async (): Promise<Gift[]> => {
-  const dto = await httpClient<GiftDto[]>("/gifts");
-  return dto.map(mapGift);
+  const dto = await httpClient<{ items?: GiftDto[]; gifts?: GiftDto[] }>("/gifts");
+  const items = Array.isArray(dto.items)
+    ? dto.items
+    : Array.isArray(dto.gifts)
+    ? dto.gifts
+    : [];
+  return items.map(mapGift);
 };
 
 export const refreshGifts = async (): Promise<{ items: Gift[] }> => {

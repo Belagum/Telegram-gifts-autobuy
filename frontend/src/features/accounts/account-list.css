@@ -3,8 +3,7 @@
 
 .account-grid {
   display: grid;
-  /* Fill entire width and adapt to screen size */
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--spacing-lg);
 }
 

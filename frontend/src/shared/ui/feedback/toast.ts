@@ -8,10 +8,18 @@ export const showSuccess = (message: string) => toast.success(message);
 
 export const showInfo = (message: string) => toast.info(message);
 
-export const showError = (error: unknown, fallback = "Произошла ошибка") => {
+const activeToastIds = new Set<string>();
+
+export const showError = (error: unknown, fallback = "Что-то пошло не так, попробуйте ещё раз") => {
   const payload = error as ApiErrorDto & { detail?: string };
   const message = payload?.detail || payload?.error || fallback;
-  toast.error(message);
+  const id = `err-${message}`;
+  if (activeToastIds.has(id)) return;
+  activeToastIds.add(id);
+  toast.error(message, {
+    toastId: id,
+    onClose: () => activeToastIds.delete(id),
+  });
 };
 
 export const showPromise = <T,>(promise: Promise<T>, pending: string, success: string, error: string) =>
@@ -20,3 +28,4 @@ export const showPromise = <T,>(promise: Promise<T>, pending: string, success: s
     success,
     error,
   });
+

@@ -8,6 +8,15 @@
   padding-bottom: var(--spacing-xl);
 }
 
+/* Popup-specific appearance (no layout wrapper) */
+.settings-page.is-popup {
+  padding: var(--spacing-xl);
+}
+
+.settings-page.is-popup .settings-header {
+  display: none;
+}
+
 .settings-header h1 {
   margin: 0;
 }

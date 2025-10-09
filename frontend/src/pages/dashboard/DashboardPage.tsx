@@ -69,8 +69,8 @@ export const DashboardPage: React.FC = () => {
     void loadAccounts();
   };
 
-  const openGifts = () => openCentered("/gifts", "gifts", 520, 700);
-  const openSettings = () => openCentered("/settings", "settings", 520, 600);
+  const openGifts = () => openCentered("/gifts?popup=1", "gifts", 520, 700);
+  const openSettings = () => openCentered("/settings?popup=1", "settings", 520, 600);
 
   return (
     <div className="dashboard">

@@ -8,12 +8,15 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 from backend.logger import logger
 
+T = TypeVar("T")
+
 
 @dataclass(slots=True)
-class QueueMessage[T]:
+class QueueMessage(Generic[T]):  # noqa: UP046
     """Message wrapper with idempotency token."""
 
     payload: T
@@ -21,7 +24,7 @@ class QueueMessage[T]:
     inserted_at: float
 
 
-class ResilientQueue[T]:
+class ResilientQueue(Generic[T]):  # noqa: UP046
     """Queue with visibility timeout to emulate external brokers."""
 
     def __init__(self, max_size: int, visibility_timeout: float) -> None:

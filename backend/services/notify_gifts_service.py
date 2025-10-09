@@ -157,6 +157,13 @@ def _gift_text(g: dict, chat: int) -> str:
         lines.append(f"Лимит на пользователя: остаток={remaining} доступно={available}")
     else:
         lines.append("Лимит на пользователя: безлимитно к пользователям")
+    # Lock status line
+    locked_until = g.get("locked_until_date")
+    if isinstance(locked_until, str) and locked_until.strip():
+        lines.append(f"лок: до {locked_until}")
+    else:
+        lines.append("лок: без блокировки")
+
     lines.append(f"Chat: {chat}")
     return "\n".join(lines)
 
@@ -206,9 +213,7 @@ async def _collect_dm_ids(uids: list[int]) -> dict[int, list[int]]:
                     if tid > 0:
                         ids.add(tid)
                 except Exception as exc:
-                    logger.opt(exception=exc).debug(
-                        f"notify:get_me fail acc_id={a.id}"
-                    )
+                    logger.opt(exception=exc).debug(f"notify:get_me fail acc_id={a.id}")
                 await asyncio.sleep(0.05)
             dm_ids_by_uid[uid] = sorted(ids)
             logger.info(f"notify:dm_ids uid={uid} count={len(dm_ids_by_uid[uid])}")

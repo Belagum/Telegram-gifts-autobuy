@@ -9,7 +9,7 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 from backend.config import load_config
 from backend.logger import logger
@@ -22,6 +22,7 @@ from tenacity import (
 )
 
 _config = load_config()
+T = TypeVar("T")
 
 
 @dataclass
@@ -57,7 +58,7 @@ class CircuitBreaker:
             logger.error("breaker: opening circuit after failures")
 
 
-async def resilient_call[T](
+async def resilient_call(  # noqa: UP047
     func: Callable[..., Awaitable[T]],
     *args: Any,
     breaker: CircuitBreaker | None = None,
@@ -101,7 +102,7 @@ async def resilient_call[T](
         last_exc = exc.last_attempt.exception()
         if last_exc is None:
             raise RuntimeError("resilience: retry failed without exception") from exc
-        raise last_exc
+        raise last_exc from exc
     except Exception:
         breaker.on_failure()
         raise

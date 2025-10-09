@@ -9,12 +9,16 @@ import time
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from threading import Lock
+from typing import Generic, TypeVar
 
 from backend.logger import logger
 
+K = TypeVar("K", bound=Hashable)
+V = TypeVar("V")
+
 
 @dataclass(slots=True)
-class CacheEntry[V]:
+class CacheEntry(Generic[V]):  # noqa: UP046
     """Single cache entry."""
 
     value: V
@@ -24,7 +28,7 @@ class CacheEntry[V]:
         return time.monotonic() >= self.expires_at
 
 
-class InMemoryTTLCache[K: Hashable, V]:
+class InMemoryTTLCache(Generic[K, V]):  # noqa: UP046
     """Thread-safe cache with TTL and lazy refresh support."""
 
     def __init__(self, ttl_seconds: int) -> None:

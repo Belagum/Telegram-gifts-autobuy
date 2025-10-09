@@ -3,9 +3,8 @@
 
 """Miscellaneous health endpoints."""
 
-from flask import Blueprint, jsonify
-
 from backend.infrastructure.health import check_database
+from flask import Blueprint, jsonify
 
 bp_misc = Blueprint("misc", __name__)
 

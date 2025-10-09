@@ -603,9 +603,7 @@ class AutobuyUseCase:
             try:
                 balance = await self._telegram.fetch_balance(account)
             except Exception as exc:  # pragma: no cover - network failure branch
-                logger.opt(exception=exc).debug(
-                    f"autobuy:balance_fail account_id={account.id}"
-                )
+                logger.opt(exception=exc).debug(f"autobuy:balance_fail account_id={account.id}")
                 balance = 0
             enriched.append(account.with_balance(balance))
         return enriched

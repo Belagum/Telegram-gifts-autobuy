@@ -9,8 +9,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseConfig(BaseModel):
@@ -21,8 +21,7 @@ class DatabaseConfig(BaseModel):
     max_overflow: int = Field(5, ge=0, alias="DATABASE_MAX_OVERFLOW")
     pool_timeout: float = Field(30.0, ge=0.1, alias="DATABASE_POOL_TIMEOUT")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class CacheConfig(BaseModel):
@@ -31,8 +30,7 @@ class CacheConfig(BaseModel):
     directory: Path = Field(Path("backend/instance/gifts_cache"), alias="GIFTS_CACHE_DIR")
     ttl_seconds: int = Field(3600, ge=1, alias="CACHE_TTL")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class QueueConfig(BaseModel):
@@ -41,8 +39,7 @@ class QueueConfig(BaseModel):
     max_size: int = Field(1000, ge=1, alias="QUEUE_MAX_SIZE")
     visibility_timeout: float = Field(30.0, ge=0.1, alias="QUEUE_VISIBILITY_TIMEOUT")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class ResilienceConfig(BaseModel):
@@ -55,8 +52,7 @@ class ResilienceConfig(BaseModel):
     circuit_fail_threshold: int = Field(5, ge=1, alias="RESILIENCE_CIRCUIT_THRESHOLD")
     circuit_reset_timeout: float = Field(60.0, ge=1.0, alias="RESILIENCE_CIRCUIT_RESET")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class ObservabilityConfig(BaseModel):
@@ -66,8 +62,7 @@ class ObservabilityConfig(BaseModel):
     tracing_enabled: bool = Field(False, alias="TRACING_ENABLED")
     service_name: str = Field("giftbuyer-backend", alias="SERVICE_NAME")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(validate_by_name=True)
 
 
 class AppConfig(BaseSettings):
@@ -83,11 +78,12 @@ class AppConfig(BaseSettings):
     resilience: ResilienceConfig = Field(default_factory=lambda: ResilienceConfig())
     observability: ObservabilityConfig = Field(default_factory=lambda: ObservabilityConfig())
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        validate_assignment = True
-        arbitrary_types_allowed = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+    )
 
     @field_validator("gifts_dir", "cache", mode="after")
     def _ensure_paths(cls, value: Any) -> Any:  # noqa: N805

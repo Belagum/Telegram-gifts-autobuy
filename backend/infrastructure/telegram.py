@@ -68,9 +68,7 @@ class TelegramRpcPort(TelegramPort):
                 if value > 0:
                     resolved.add(value)
             except Exception as exc:
-                logger.opt(exception=exc).debug(
-                    f"autobuy:dm get_me fail acc_id={account.id}"
-                )
+                logger.opt(exception=exc).debug(f"autobuy:dm get_me fail acc_id={account.id}")
             await asyncio.sleep(0.05)
         return sorted(resolved)
 
@@ -114,7 +112,5 @@ class TelegramNotificationAdapter(NotificationPort):
                                 f"code={response.status_code} body={response.text[:200]}"
                             )
                     except Exception:
-                        logger.exception(
-                            f"autobuy:report http fail chat={chat_id}"
-                        )
+                        logger.exception(f"autobuy:report http fail chat={chat_id}")
                     await asyncio.sleep(self._interval)

@@ -28,6 +28,7 @@ def hash_items(items: list[dict[str, Any]]) -> str:
                     it.get("per_user_remains"),
                     it.get("per_user_available"),
                     it.get("require_premium"),
+                    it.get("locked_until_date"),
                     it.get("sticker_file_id"),
                     it.get("sticker_mime"),
                 )

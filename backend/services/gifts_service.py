@@ -6,6 +6,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from queue import Queue
 from typing import Any, cast
 
@@ -107,23 +108,67 @@ async def _list_gifts_for_account_persist(
         else:
             per_user_available = avail_total
 
-        out.append(
-            {
-                "id": int(getattr(g, "id", 0)),
-                "price": int(getattr(g, "price", 0)),
-                "is_limited": is_limited,
-                "available_amount": avail_total,
-                "total_amount": getattr(g, "total_amount", None)
-                or getattr(raw, "total_amount", None),
-                "require_premium": bool(getattr(raw, "require_premium", False)),
-                "limited_per_user": limited_per_user,
-                "per_user_remains": per_user_remains,
-                "per_user_available": per_user_available,
-                "sticker_file_id": getattr(getattr(g, "sticker", None), "file_id", None),
-                "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
-                "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
-            }
+        # Extract lock/unlock time and normalize to ISO 8601 UTC string if present
+        def _to_iso_utc(value: Any) -> str | None:
+            try:
+                if value is None:
+                    return None
+                if isinstance(value, (int, float)):
+                    dt = datetime.fromtimestamp(int(value), tz=UTC)
+                    return dt.isoformat().replace("+00:00", "Z")
+                # datetime-like
+                if isinstance(value, datetime):
+                    dt = value if value.tzinfo else value.replace(tzinfo=UTC)
+                    dt = dt.astimezone(UTC)
+                    return dt.isoformat().replace("+00:00", "Z")
+                # strings – try to parse a few common formats; otherwise return as-is
+                if isinstance(value, str):
+                    s = value.strip()
+                    if s:
+                        return s
+                # Objects with attribute "timestamp" (telethon/pyrogram types)
+                ts = getattr(value, "timestamp", None)
+                if callable(ts):
+                    return _to_iso_utc(ts())
+            except Exception:
+                # Be conservative – if conversion fails, omit the field
+                return None
+            return None
+
+        locked_raw = (
+            getattr(g, "locked_until_date", None)
+            or getattr(raw, "locked_until_date", None)
+            or getattr(g, "locked_until", None)
+            or getattr(raw, "locked_until", None)
         )
+        locked_until_date = _to_iso_utc(locked_raw)
+
+        item = {
+            "id": int(getattr(g, "id", 0)),
+            "price": int(getattr(g, "price", 0)),
+            "is_limited": is_limited,
+            "available_amount": avail_total,
+            "total_amount": getattr(g, "total_amount", None) or getattr(raw, "total_amount", None),
+            "require_premium": bool(getattr(raw, "require_premium", False)),
+            "limited_per_user": limited_per_user,
+            "per_user_remains": per_user_remains,
+            "per_user_available": per_user_available,
+            "sticker_file_id": getattr(getattr(g, "sticker", None), "file_id", None),
+            "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
+            "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
+        }
+        if locked_until_date:
+            item["locked_until_date"] = locked_until_date
+            try:
+                logger.info(f"gifts.parse: gift_id={item['id']} locked_until={locked_until_date}")
+            except Exception:
+                pass
+        else:
+            try:
+                logger.info(f"gifts.parse: gift_id={item['id']} unlocked")
+            except Exception:
+                pass
+        out.append(item)
     return out
 
 

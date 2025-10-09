@@ -8,10 +8,6 @@ import os
 import threading
 import time
 
-from flask import Flask, Response, g, request
-from flask_cors import CORS
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-
 from backend.config import load_config
 from backend.db import SessionLocal, init_db
 from backend.infrastructure.health import check_database
@@ -24,6 +20,9 @@ from backend.routes.gifts import bp_gifts
 from backend.routes.misc import bp_misc
 from backend.routes.settings import bp_settings
 from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
+from flask import Flask, Response, g, request
+from flask_cors import CORS
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 _config = load_config()
 _BOOTSTRAPPED = threading.Event()

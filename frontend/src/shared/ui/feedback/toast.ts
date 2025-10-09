@@ -28,4 +28,3 @@ export const showPromise = <T,>(promise: Promise<T>, pending: string, success: s
     success,
     error,
   });
-

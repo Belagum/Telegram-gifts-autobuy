@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from backend.domain import (
@@ -43,6 +44,7 @@ class AutobuyOutput:
     purchased: list[dict[str, Any]]
     skipped: int
     stats: dict[str, Any]
+    deferred: list[dict[str, Any]]
 
 
 class AutobuyStats:
@@ -71,6 +73,8 @@ class AutobuyStats:
         }
         self._global_skips: list[dict[str, Any]] = []
         self._plan_skips: list[dict[str, Any]] = []
+        self._deferred: list[dict[str, Any]] = []
+        self._deferred_keys: set[tuple[int, int]] = set()
         self.plan: PurchasePlan = PurchasePlan()
 
     def record_global_skip(
@@ -186,6 +190,31 @@ class AutobuyStats:
             },
         )["reasons"].append(payload)
 
+    def record_deferred(
+        self,
+        *,
+        gift_id: int,
+        account_id: int,
+        channel_id: int,
+        price: int,
+        supply: int,
+        locked_until: datetime,
+    ) -> None:
+        key = (gift_id, account_id)
+        if key in self._deferred_keys:
+            return
+        self._deferred_keys.add(key)
+        payload = {
+            "gift_id": gift_id,
+            "account_id": account_id,
+            "channel_id": channel_id,
+            "price": price,
+            "supply": supply,
+            "run_at": locked_until.isoformat().replace("+00:00", "Z"),
+            "reason": "locked_until",
+        }
+        self._deferred.append(payload)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "channels": self._channels,
@@ -193,6 +222,7 @@ class AutobuyStats:
             "global_skips": self._global_skips,
             "plan_skips": self._plan_skips,
             "plan": [asdict(op) for op in self.plan],
+            "deferred": [dict(row) for row in self._deferred],
         }
 
 
@@ -332,6 +362,17 @@ class PurchasePlanner:
                     target_channel_id = forced_channel_id
                 else:
                     target_channel_id = channel.channel_id
+                locked_until = self._resolve_lock(payload.raw, account.id)
+                if locked_until and locked_until > datetime.now(UTC):
+                    self._stats.record_deferred(
+                        gift_id=gift_id,
+                        account_id=account.id,
+                        channel_id=target_channel_id,
+                        price=price,
+                        supply=candidate.total_supply,
+                        locked_until=locked_until,
+                    )
+                    continue
                 cap_total = candidate.per_user_cap
                 already = already_by_account.get((account.id, gift_id), 0)
                 cap_left = max(0, cap_total - already)
@@ -372,6 +413,31 @@ class PurchasePlanner:
                         break
         return self._stats.plan
 
+    @staticmethod
+    def _resolve_lock(payload: dict[str, Any], account_id: int) -> datetime | None:
+        locks = payload.get("locks") or {}
+        raw = locks.get(str(account_id)) if isinstance(locks, dict) else None
+        if raw is None and isinstance(locks, dict):
+            raw = locks.get(account_id)
+        if raw is None:
+            return None
+        if isinstance(raw, int | float):
+            return datetime.fromtimestamp(float(raw), tz=UTC)
+        if isinstance(raw, str):
+            cleaned = raw.strip()
+            if not cleaned:
+                return None
+            if cleaned.endswith("Z"):
+                cleaned = cleaned[:-1] + "+00:00"
+            try:
+                parsed = datetime.fromisoformat(cleaned)
+            except ValueError:
+                return None
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC)
+        return None
+
 
 class ReportBuilder:
     """Renders human readable reports that mirror legacy behaviour."""
@@ -386,6 +452,7 @@ class ReportBuilder:
     ACCOUNT = "👤"
     COIN = "💰"
     CHART = "📊"
+    DEFERRED = "⏳"
 
     def build(self, stats: dict, considered: Sequence[dict]) -> list[str]:
         lines: list[str] = []
@@ -481,6 +548,21 @@ class ReportBuilder:
             if not printed_header:
                 lines.append(
                     f"• {self.FAIL} {gid} | {price}{self.STAR} | supply={supply_str} (нет данных)"
+                )
+        deferred = stats.get("deferred") or []
+        if deferred:
+            lines.append("")
+            lines.append(f"{self.DEFERRED} Отложенные покупки:")
+            for row in deferred:
+                gift_id = row.get("gift_id")
+                account_id = row.get("account_id")
+                channel_id = row.get("channel_id")
+                price_val = row.get("price")
+                run_at = row.get("run_at")
+                price_txt = price_val if price_val is not None else "?"
+                lines.append(
+                    f"• gift={gift_id} acc={account_id} ch={channel_id} {price_txt}{self.STAR} "
+                    f"→ будет куплен после {run_at}, так как лок действует до этого времени"
                 )
         lines.append("")
         lines.append(f"{self.CHANNEL} По каналам:")
@@ -581,11 +663,15 @@ class AutobuyUseCase:
                     }
                 )
         skipped = len(data.gifts) - len(purchased)
+        deferred = list(stats_dict.get("deferred") or [])
         await self._send_reports(data.user_id, stats_dict, list(data.gifts))
         logger.bind(user_id=data.user_id).info(
-            f"autobuy:summary purchased={len(purchased)} skipped={skipped} plan={len(plan)}"
+            f"autobuy:summary purchased={len(purchased)} skipped={skipped} plan={len(plan)} "
+            f"deferred={len(deferred)}"
         )
-        return AutobuyOutput(purchased=purchased, skipped=skipped, stats=stats_dict)
+        return AutobuyOutput(
+            purchased=purchased, skipped=skipped, stats=stats_dict, deferred=deferred
+        )
 
     @staticmethod
     def _empty_stats(skipped_rows: Sequence[dict[str, Any]]) -> dict[str, Any]:

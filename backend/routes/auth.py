@@ -116,8 +116,7 @@ def logout(db: Session):
         token_hint = (token[:6] + "...") if token else ""
         user_id_hint = getattr(request, "user_id", None)
         logger.info(
-            f"auth.logout: start (req_id={req_id}, user_id={user_id_hint}, "
-            f"token='{token_hint}')"
+            f"auth.logout: start (req_id={req_id}, user_id={user_id_hint}, token='{token_hint}')"
         )
         if token:
             db.query(SessionToken).filter(SessionToken.token == token).delete()

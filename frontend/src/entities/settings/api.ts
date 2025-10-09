@@ -25,18 +25,27 @@ export const setSettings = async (settings: Settings): Promise<Settings> => {
   return mapSettings(dto);
 };
 
+type ChannelsResponse = ChannelDto[] | { items?: ChannelDto[]; channels?: ChannelDto[] } | null | string;
+
+const extractChannelDtos = (payload: ChannelsResponse): ChannelDto[] => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (payload && typeof payload === "object") {
+    const withCollections = payload as { items?: ChannelDto[]; channels?: ChannelDto[] };
+    if (Array.isArray(withCollections.items)) {
+      return withCollections.items;
+    }
+    if (Array.isArray(withCollections.channels)) {
+      return withCollections.channels;
+    }
+  }
+  return [];
+};
+
 export const listChannels = async (): Promise<Channel[]> => {
-  const data = await httpClient<
-    ChannelDto[] | { items?: ChannelDto[]; channels?: ChannelDto[] } | null | string
-  >("/channels");
-  const items = Array.isArray(data)
-    ? data
-    : (data && typeof data === "object" && Array.isArray((data as any).items))
-    ? (data as any).items
-    : (data && typeof data === "object" && Array.isArray((data as any).channels))
-    ? (data as any).channels
-    : [];
-  return items.map(mapChannel);
+  const data = await httpClient<ChannelsResponse>("/channels");
+  return extractChannelDtos(data).map(mapChannel);
 };
 
 export const createChannel = async (payload: Partial<Channel>): Promise<void> => {

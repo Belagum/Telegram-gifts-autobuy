@@ -41,6 +41,10 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
       return;
     }
     dbg("thumb.start", { id: gift.id, visible, fileId, uniq });
+    const containerElement = containerRef.current;
+    if (!containerElement) {
+      return;
+    }
     const params = new URLSearchParams();
     if (fileId) params.set("file_id", fileId);
     if (uniq) params.set("uniq", uniq);
@@ -75,7 +79,7 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
             }
             return json;
           })());
-        if (cancelled || !containerRef.current) {
+        if (cancelled || !containerElement.isConnected) {
           return;
         }
         if (animationRef.current) {
@@ -84,16 +88,20 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
           } catch (err) {
             console.warn("Lottie destroy failed (re-init)", err);
             try {
-              if (containerRef.current) containerRef.current.innerHTML = "";
-            } catch {}
+              containerElement.innerHTML = "";
+            } catch (clearError) {
+              console.warn("[Gifts] Failed to reset container after destroy", clearError);
+            }
           }
         }
         try {
-          if (containerRef.current) containerRef.current.innerHTML = "";
-        } catch {}
+          containerElement.innerHTML = "";
+        } catch (clearError) {
+          console.warn("[Gifts] Failed to reset container", clearError);
+        }
         dbg("thumb.loadAnimation", { id: gift.id });
         animationRef.current = lottie.loadAnimation({
-          container: containerRef.current,
+          container: containerElement,
           renderer: "svg",
           loop: true,
           autoplay: true,
@@ -119,14 +127,16 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
         } catch (err) {
           console.warn("[Gifts] Lottie destroy failed (cleanup)", err);
           try {
-            if (containerRef.current) containerRef.current.innerHTML = "";
-          } catch {}
+            containerElement.innerHTML = "";
+          } catch (clearError) {
+            console.warn("[Gifts] Failed to clear container during cleanup", clearError);
+          }
         } finally {
           animationRef.current = null;
         }
       }
     };
-  }, [gift.stickerFileId, gift.stickerUniqueId, visible, onMissingToken]);
+  }, [gift.id, gift.stickerFileId, gift.stickerUniqueId, visible, onMissingToken]);
 
   return <div ref={containerRef} className="gift-thumb" />;
 };
@@ -209,9 +219,10 @@ export const GiftsPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await refreshGifts();
-      dbg("api.refreshGifts", { ok: Array.isArray((data as any).items), count: Array.isArray((data as any).items) ? (data as any).items.length : undefined });
-      if (Array.isArray(data.items)) {
-        const items = data.items.filter((gift) => gift.stickerFileId);
+      const refreshedItems = Array.isArray(data.items) ? data.items : [];
+      dbg("api.refreshGifts", { ok: refreshedItems.length > 0, count: refreshedItems.length });
+      if (refreshedItems.length > 0) {
+        const items = refreshedItems.filter((gift) => gift.stickerFileId);
         dbg("state.setGifts", { withSticker: items.length });
         setGifts(items);
       } else {

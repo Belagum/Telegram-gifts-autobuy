@@ -6,8 +6,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from backend.domain import (
@@ -72,6 +73,7 @@ class AutobuyStats:
         self._global_skips: list[dict[str, Any]] = []
         self._plan_skips: list[dict[str, Any]] = []
         self.plan: PurchasePlan = PurchasePlan()
+        self._deferred: list[dict[str, Any]] = []
 
     def record_global_skip(
         self, gift_id: int, reason: str, *, details: Sequence[str] | None = None
@@ -111,6 +113,18 @@ class AutobuyStats:
             },
         )
         acc["planned"] += 1
+
+    def record_deferred(self, op: PurchaseOperation, *, available_at: datetime) -> None:
+        payload = {
+            "gift_id": op.gift_id,
+            "price": op.price,
+            "account_id": op.account_id,
+            "channel_id": op.channel_id,
+            "available_at": available_at.astimezone(UTC)
+            .isoformat()
+            .replace("+00:00", "Z"),
+        }
+        self._deferred.append(payload)
 
     def record_purchase(self, op: PurchaseOperation, *, balance_after: int, supply: int) -> None:
         purchased = {
@@ -193,6 +207,7 @@ class AutobuyStats:
             "global_skips": self._global_skips,
             "plan_skips": self._plan_skips,
             "plan": [asdict(op) for op in self.plan],
+            "deferred": list(self._deferred),
         }
 
 
@@ -294,9 +309,15 @@ class ChannelSelector:
 class PurchasePlanner:
     """Generates a purchase plan using available balances and channel constraints."""
 
-    def __init__(self, selector: ChannelSelector, stats: AutobuyStats):
+    def __init__(
+        self,
+        selector: ChannelSelector,
+        stats: AutobuyStats,
+        lock_resolver: LockStatusResolver,
+    ):
         self._selector = selector
         self._stats = stats
+        self._lock_resolver = lock_resolver
 
     def plan(
         self,
@@ -305,11 +326,12 @@ class PurchasePlanner:
         gifts: Sequence[GiftPayload],
         stars: dict[int, int],
         forced_channel_id: int | None = None,
-    ) -> PurchasePlan:
+    ) -> PurchaseSchedule:
         remain_by_gift: dict[int, int] = {
             p.candidate.gift_id: p.candidate.available_amount for p in gifts
         }
         already_by_account: dict[tuple[int, int], int] = {}
+        deferred: list[DeferredPurchase] = []
         for account in sorted(accounts, key=lambda a: stars.get(a.id, 0), reverse=True):
             budget = stars.get(account.id, 0)
             if budget <= 0:
@@ -342,6 +364,20 @@ class PurchasePlanner:
                         details=[f"acc={account.id} cap={cap_total}"],
                     )
                     continue
+                lock_status = self._lock_resolver.for_account(account.id, payload)
+                if lock_status.locked and lock_status.available_at is not None:
+                    op = PurchaseOperation(
+                        account_id=account.id,
+                        channel_id=target_channel_id,
+                        gift_id=gift_id,
+                        price=price,
+                        supply=candidate.total_supply,
+                    )
+                    deferred.append(
+                        DeferredPurchase(operation=op, available_at=lock_status.available_at)
+                    )
+                    self._stats.record_deferred(op, available_at=lock_status.available_at)
+                    continue
                 max_qty = min(remain_by_gift[gift_id], budget // price, cap_left)
                 if max_qty <= 0:
                     if budget < price:
@@ -370,7 +406,73 @@ class PurchasePlanner:
                     already_by_account[(account.id, gift_id)] = already
                     if budget < price or remain_by_gift[gift_id] <= 0 or already >= cap_total:
                         break
-        return self._stats.plan
+        return PurchaseSchedule(plan=self._stats.plan, deferred=deferred)
+
+
+@dataclass(slots=True, frozen=True)
+class LockStatus:
+    locked: bool
+    available_at: datetime | None
+
+
+class LockStatusResolver:
+    """Resolves per-account gift lock information."""
+
+    def __init__(self, now_factory: Callable[[], datetime]):
+        self._now_factory = now_factory
+
+    def for_account(self, account_id: int, payload: GiftPayload) -> LockStatus:
+        locks_raw = payload.raw.get("locked_until_by_account")
+        lock_value: Any | None = None
+        if isinstance(locks_raw, dict):
+            lock_value = locks_raw.get(account_id)
+            if lock_value is None:
+                lock_value = locks_raw.get(str(account_id))
+        if lock_value is None:
+            lock_value = payload.raw.get("locked_until_date")
+        available_at = self._parse(lock_value)
+        if available_at is None:
+            return LockStatus(locked=False, available_at=None)
+        now = self._now_factory()
+        if available_at <= now:
+            return LockStatus(locked=False, available_at=None)
+        return LockStatus(locked=True, available_at=available_at)
+
+    @staticmethod
+    def _parse(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.astimezone(UTC)
+        if isinstance(value, (int | float)):
+            return datetime.fromtimestamp(int(value), tz=UTC)
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return None
+            normalised = f"{text[:-1]}+00:00" if text.endswith("Z") else text
+            try:
+                parsed = datetime.fromisoformat(normalised)
+            except ValueError:
+                return None
+            return (
+                parsed.replace(tzinfo=UTC)
+                if parsed.tzinfo is None
+                else parsed.astimezone(UTC)
+            )
+        return None
+
+
+@dataclass(slots=True)
+class DeferredPurchase:
+    operation: PurchaseOperation
+    available_at: datetime
+
+
+@dataclass(slots=True)
+class PurchaseSchedule:
+    plan: PurchasePlan
+    deferred: list[DeferredPurchase]
 
 
 class ReportBuilder:
@@ -483,6 +585,17 @@ class ReportBuilder:
                     f"• {self.FAIL} {gid} | {price}{self.STAR} | supply={supply_str} (нет данных)"
                 )
         lines.append("")
+        deferred_rows = stats.get("deferred") or []
+        if deferred_rows:
+            lines.append("⏳ Отложенные покупки:")
+            for row in deferred_rows:
+                pending = (
+                    f"• подарок {row.get('gift_id')} → acc={row.get('account_id')} "
+                    f"ch={row.get('channel_id')} будет куплен "
+                    f"{row.get('available_at')} (лок истечёт)"
+                )
+                lines.append(pending)
+            lines.append("")
         lines.append(f"{self.CHANNEL} По каналам:")
         for cid, st in stats.get("channels", {}).items():
             lines.append(
@@ -519,6 +632,7 @@ class AutobuyUseCase:
         telegram: TelegramPort,
         notifications: NotificationPort,
         settings: UserSettingsRepository,
+        now_factory: Callable[[], datetime] | None = None,
     ) -> None:
         self._accounts = accounts
         self._channels = channels
@@ -527,6 +641,8 @@ class AutobuyUseCase:
         self._settings = settings
         self._validator = GiftValidator()
         self._report = ReportBuilder()
+        self._clock = now_factory or (lambda: datetime.now(UTC))
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def execute(self, data: AutobuyInput) -> AutobuyOutput:
         logger.bind(user_id=data.user_id).info(f"autobuy:start gifts={len(data.gifts)}")
@@ -558,14 +674,17 @@ class AutobuyUseCase:
         logger.bind(user_id=data.user_id).info(
             f"autobuy:balances total={total_stars} details={balances}"
         )
-        planner = PurchasePlanner(selector, stats)
-        plan = planner.plan(
+        lock_resolver = LockStatusResolver(self._clock)
+        planner = PurchasePlanner(selector, stats, lock_resolver)
+        schedule = planner.plan(
             accounts=enriched_accounts,
             gifts=gifts,
             stars=stars,
             forced_channel_id=data.forced_channel_id,
         )
-        await self._execute_plan(plan, enriched_accounts, stats)
+        await self._execute_plan(schedule.plan, enriched_accounts, stats)
+        accounts_map = {acc.id: acc for acc in enriched_accounts}
+        self._schedule_deferred(schedule.deferred, accounts_map, stats)
         stats_dict = stats.to_dict()
         purchased: list[dict] = []
         for cid, st in stats_dict["channels"].items():
@@ -582,9 +701,11 @@ class AutobuyUseCase:
                 )
         skipped = len(data.gifts) - len(purchased)
         await self._send_reports(data.user_id, stats_dict, list(data.gifts))
-        logger.bind(user_id=data.user_id).info(
-            f"autobuy:summary purchased={len(purchased)} skipped={skipped} plan={len(plan)}"
+        summary_line = (
+            f"autobuy:summary purchased={len(purchased)} skipped={skipped} "
+            f"plan={len(schedule.plan)} deferred={len(schedule.deferred)}"
         )
+        logger.bind(user_id=data.user_id).info(summary_line)
         return AutobuyOutput(purchased=purchased, skipped=skipped, stats=stats_dict)
 
     @staticmethod
@@ -595,6 +716,7 @@ class AutobuyUseCase:
             "global_skips": [dict(row) for row in skipped_rows],
             "plan_skips": [],
             "plan": [],
+            "deferred": [],
         }
 
     async def _load_balances(self, accounts: Sequence[AccountSnapshot]) -> list[AccountSnapshot]:
@@ -637,6 +759,68 @@ class AutobuyUseCase:
                     f"gift={op.gift_id} reason={reason}"
                 )
             await asyncio.sleep(0)
+
+    def _schedule_deferred(
+        self,
+        deferred: Sequence[DeferredPurchase],
+        accounts_map: dict[int, AccountSnapshot],
+        stats: AutobuyStats,
+    ) -> None:
+        for item in deferred:
+            task = asyncio.create_task(self._wait_and_purchase(item, accounts_map, stats))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+
+    async def _wait_and_purchase(
+        self,
+        item: DeferredPurchase,
+        accounts_map: dict[int, AccountSnapshot],
+        stats: AutobuyStats,
+    ) -> None:
+        operation = item.operation
+        account = accounts_map.get(operation.account_id)
+        if account is None:
+            return
+        now = self._clock()
+        delay = (item.available_at - now).total_seconds()
+        if delay > 0:
+            wait_line = (
+                f"autobuy:deferred_wait account_id={operation.account_id} "
+                f"gift={operation.gift_id} seconds={delay:.2f}"
+            )
+            logger.info(wait_line)
+            await asyncio.sleep(delay)
+        try:
+            balance = await self._telegram.fetch_balance(account)
+        except Exception as exc:  # pragma: no cover - network failure branch
+            logger.opt(exception=exc).debug(
+                f"autobuy:deferred_balance_fail account_id={operation.account_id}"
+            )
+            balance = account.balance
+        account.balance = balance
+        if account.balance < operation.price:
+            stats.record_reason(
+                operation,
+                reason="insufficient_account_balance_deferred",
+                balance=account.balance,
+                need=operation.price,
+            )
+            return
+        try:
+            await self._telegram.send_gift(operation, account)
+            account.balance -= operation.price
+            stats.record_purchase(operation, balance_after=account.balance, supply=operation.supply)
+            logger.info(
+                f"autobuy:deferred_done account_id={operation.account_id} gift={operation.gift_id}"
+            )
+        except Exception as exc:  # pragma: no cover - network failure branch
+            reason = {"code": type(exc).__name__, "message": str(exc)[:400]}
+            stats.record_failure(operation, reason="send_gift_failed", rpc=reason)
+            fail_line = (
+                f"autobuy:deferred_send_fail account_id={operation.account_id} "
+                f"channel={operation.channel_id} gift={operation.gift_id} reason={reason}"
+            )
+            logger.opt(exception=exc).warning(fail_line)
 
     async def _send_reports(self, user_id: int, stats: dict, considered: Sequence[dict]) -> None:
         token = (self._settings.get_bot_token(user_id) or "").strip()

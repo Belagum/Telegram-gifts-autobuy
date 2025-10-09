@@ -81,7 +81,7 @@ gifts_event_bus = _GiftsEventBus()
 
 
 async def _list_gifts_for_account_persist(
-    session_path: str, api_id: int, api_hash: str
+    account_id: int, session_path: str, api_id: int, api_hash: str
 ) -> list[dict[str, Any]]:
     gifts = cast(
         list[Any],
@@ -113,7 +113,7 @@ async def _list_gifts_for_account_persist(
             try:
                 if value is None:
                     return None
-                if isinstance(value, (int, float)):
+                if isinstance(value, (int | float)):
                     dt = datetime.fromtimestamp(int(value), tz=UTC)
                     return dt.isoformat().replace("+00:00", "Z")
                 # datetime-like
@@ -157,6 +157,7 @@ async def _list_gifts_for_account_persist(
             "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
             "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
         }
+        item["locked_until_by_account"] = {str(account_id): locked_until_date}
         if locked_until_date:
             item["locked_until_date"] = locked_until_date
             try:
@@ -222,7 +223,7 @@ async def _worker_async(uid: int) -> None:
                 disk_items = read_json_list_of_dicts(_gifts_path(uid))
                 prev_ids = {int(x.get("id", 0)) for x in disk_items if isinstance(x.get("id"), int)}
                 gifts = await _list_gifts_for_account_persist(
-                    a.session_path, a.api_profile.api_id, a.api_profile.api_hash
+                    a.id, a.session_path, a.api_profile.api_id, a.api_profile.api_hash
                 )
                 merged_all = merge_new(disk_items or [], gifts)
                 added = [
@@ -367,7 +368,7 @@ def refresh_once(uid: int) -> list[dict[str, Any]]:
             raise NoAccountsError("no_accounts")
         gifts = asyncio.run(
             _list_gifts_for_account_persist(
-                acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
+                acc.id, acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
             )
         )
         path = _gifts_path(uid)

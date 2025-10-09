@@ -1,4 +1,6 @@
+import asyncio
 from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from backend.application.use_cases.autobuy import AutobuyInput, AutobuyUseCase
@@ -172,3 +174,71 @@ async def test_autobuy_use_case_skips_invalid_gifts() -> None:
     assert output.purchased == []
     assert any(skip.get("reason") == "invalid/price" for skip in output.stats["global_skips"])
     assert any(skip.get("reason") == "unlimited" for skip in output.stats["global_skips"])
+
+
+@pytest.mark.asyncio
+async def test_autobuy_schedules_locked_gift() -> None:
+    accounts = [
+        AccountSnapshot(
+            id=1,
+            user_id=1,
+            session_path="/tmp/a",
+            api_id=1,
+            api_hash="hash",
+            is_premium=False,
+            balance=0,
+        ),
+    ]
+    channels = [
+        ChannelFilter(
+            id=1,
+            user_id=1,
+            channel_id=-100,
+            price_min=0,
+            price_max=100,
+            supply_min=0,
+            supply_max=10,
+        )
+    ]
+    account_repo = FakeAccountRepository(accounts)
+    channel_repo = FakeChannelRepository(channels)
+    settings_repo = FakeSettingsRepository("token")
+    telegram_port = FakeTelegramPort({1: 40})
+    notify_port = FakeNotificationPort()
+
+    use_case = AutobuyUseCase(
+        accounts=account_repo,
+        channels=channel_repo,
+        telegram=telegram_port,
+        notifications=notify_port,
+        settings=settings_repo,
+    )
+
+    future = datetime.now(UTC) + timedelta(seconds=0.05)
+    future_iso = future.isoformat().replace("+00:00", "Z")
+    gifts: list[dict[str, object]] = [
+        {
+            "id": 99,
+            "price": 20,
+            "is_limited": True,
+            "total_amount": 1,
+            "available_amount": 1,
+            "limited_per_user": True,
+            "per_user_remains": 1,
+            "per_user_available": 1,
+            "locked_until_by_account": {"1": future_iso},
+            "locked_until_date": future_iso,
+        }
+    ]
+
+    output = await use_case.execute(AutobuyInput(user_id=1, gifts=gifts))
+
+    assert output.purchased == []
+    assert output.stats["deferred"]
+    await asyncio.sleep(0.2)
+    assert telegram_port.sent == [(99, 1)]
+    assert any(
+        "будет куплен" in message
+        for _, _, messages in notify_port.sent_payloads
+        for message in messages
+    )

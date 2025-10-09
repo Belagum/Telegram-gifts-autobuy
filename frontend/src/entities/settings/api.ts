@@ -26,7 +26,8 @@ export const setSettings = async (settings: Settings): Promise<Settings> => {
 };
 
 export const listChannels = async (): Promise<Channel[]> => {
-  const dto = await httpClient<ChannelDto[]>("/channels");
+  const dto = await httpClient<ChannelDto[] | null | string>("/channels");
+  if (!Array.isArray(dto)) return [];
   return dto.map(mapChannel);
 };
 

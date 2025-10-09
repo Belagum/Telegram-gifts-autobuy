@@ -56,7 +56,14 @@ export const SelectApiProfileModal: React.FC<SelectApiProfileModalProps> = ({
     }
     try {
       const updated = await renameApiProfile(editingId, next);
-      setList((current) => current.map((item) => (item.id === editingId ? updated : item)));
+      setList((current) =>
+        current.map((item) => {
+          if (item.id !== editingId) return item;
+          const merged = { ...item, ...updated };
+          merged.name = (updated as typeof item).name ?? next;
+          return merged;
+        }),
+      );
       showSuccess("Название обновлено");
     } catch (error) {
       showError(error, "Не удалось обновить");

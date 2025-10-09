@@ -13,29 +13,24 @@ import { createChannel, updateChannel } from "../../entities/settings/api";
 import type { Channel } from "../../entities/settings/channel";
 import { showError, showPromise } from "../../shared/ui/feedback/toast";
 
+// Универсальный препроцессор: пустые значения -> null, строки -> number, числа проходят как есть
+const numericNullable = z.preprocess(
+  (value) => {
+    if (value === "" || value == null) return null;
+    if (typeof value === "string") return Number(value);
+    if (typeof value === "number") return value;
+    return null;
+  },
+  z.number().nonnegative().nullable(),
+);
+
 const schema = z.object({
   channelId: z.string().optional(),
   title: z.string().optional(),
-  priceMin: z
-    .string()
-    .optional()
-    .transform((value) => (value ? Number(value) : null))
-    .refine((value) => value === null || value >= 0, "Цена не может быть отрицательной"),
-  priceMax: z
-    .string()
-    .optional()
-    .transform((value) => (value ? Number(value) : null))
-    .refine((value) => value === null || value >= 0, "Цена не может быть отрицательной"),
-  supplyMin: z
-    .string()
-    .optional()
-    .transform((value) => (value ? Number(value) : null))
-    .refine((value) => value === null || value >= 0, "Supply не может быть отрицательным"),
-  supplyMax: z
-    .string()
-    .optional()
-    .transform((value) => (value ? Number(value) : null))
-    .refine((value) => value === null || value >= 0, "Supply не может быть отрицательным"),
+  priceMin: numericNullable,
+  priceMax: numericNullable,
+  supplyMin: numericNullable,
+  supplyMax: numericNullable,
 });
 
 export type EditChannelFormValues = z.infer<typeof schema>;
@@ -99,7 +94,12 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     try {
       if (isEdit && initial) {
         const promise = updateChannel(initial.id, payload);
-        await showPromise(promise, "Сохраняю…", "Сохранено", "Ошибка сохранения");
+        await showPromise(
+          promise,
+          "Сохраняю…",
+          "Сохранено",
+          (err) => (err as any)?.payload?.detail || (err as any)?.payload?.error || "Ошибка сохранения",
+        );
       } else {
         const promise = createChannel({
           channelId: channelId!,
@@ -109,12 +109,17 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
           supplyMin: payload.supplyMin,
           supplyMax: payload.supplyMax,
         });
-        await showPromise(promise, "Соединяюсь…", "Канал добавлен", "Не удалось добавить канал");
+        await showPromise(
+          promise,
+          "Соединяюсь…",
+          "Канал добавлен",
+          (err) => (err as any)?.payload?.detail || (err as any)?.payload?.error || "Не удалось добавить канал",
+        );
       }
       onSaved();
       onClose();
-    } catch (error) {
-      showError(error, "Не удалось сохранить канал");
+    } catch {
+      // Ошибка уже показана через showPromise
     }
   });
 
@@ -139,35 +144,19 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
           <Input placeholder="Название" {...register("title")} />
         </FormField>
         <div className="two-column-grid">
-          <FormField label="Цена мин">
-            <Input
-              type="number"
-              min={0}
-              {...register("priceMin", { setValueAs: (value) => (value === "" ? null : Number(value)) })}
-            />
+          <FormField label="Цена мин" error={errors.priceMin?.message ?? undefined}>
+            <Input type="number" min={0} {...register("priceMin")} />
           </FormField>
-          <FormField label="Цена макс">
-            <Input
-              type="number"
-              min={0}
-              {...register("priceMax", { setValueAs: (value) => (value === "" ? null : Number(value)) })}
-            />
+          <FormField label="Цена макс" error={errors.priceMax?.message ?? undefined}>
+            <Input type="number" min={0} {...register("priceMax")} />
           </FormField>
         </div>
         <div className="two-column-grid">
-          <FormField label="Supply мин">
-            <Input
-              type="number"
-              min={0}
-              {...register("supplyMin", { setValueAs: (value) => (value === "" ? null : Number(value)) })}
-            />
+          <FormField label="Supply мин" error={errors.supplyMin?.message ?? undefined}>
+            <Input type="number" min={0} {...register("supplyMin")} />
           </FormField>
-          <FormField label="Supply макс">
-            <Input
-              type="number"
-              min={0}
-              {...register("supplyMax", { setValueAs: (value) => (value === "" ? null : Number(value)) })}
-            />
+          <FormField label="Supply макс" error={errors.supplyMax?.message ?? undefined}>
+            <Input type="number" min={0} {...register("supplyMax")} />
           </FormField>
         </div>
       </form>

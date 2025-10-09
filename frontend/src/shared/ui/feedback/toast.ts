@@ -22,12 +22,25 @@ export const showError = (error: unknown, fallback = "Что-то пошло н�
   });
 };
 
-export const showPromise = <T,>(promise: Promise<T>, pending: string, success: string, error: string) =>
-  toast.promise(promise, {
+export const showPromise = <T,>(
+  promise: Promise<T>,
+  pending: string,
+  success: string,
+  error: string | ((err: unknown) => string),
+) => {
+  if (typeof error === "string") {
+    return toast.promise(promise, { pending, success, error });
+  }
+  return toast.promise(promise, {
     pending,
     success,
-    error,
+    error: {
+      render({ data }) {
+        return error(data);
+      },
+    },
   });
+};
 
 export const upsertLoadingToast = (id: string, message: string) => {
   if (toast.isActive(id)) {

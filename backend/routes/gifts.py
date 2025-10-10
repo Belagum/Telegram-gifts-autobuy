@@ -69,7 +69,7 @@ async def _botapi_download(file_id: str, token: str) -> bytes:
         fp = p["result"]["file_path"]
         r2 = await http.get(f"{base}/{fp}", follow_redirects=True)
         r2.raise_for_status()
-        return r2.content
+        return cast(bytes, r2.content)
 
 
 def _send_lottie_json_from_tgs(path: Path) -> Response | tuple[Response, int]:
@@ -132,7 +132,8 @@ def gifts_refresh(db: Session) -> Response | tuple[Response, int]:
 
     def gen() -> Iterator[bytes]:
         def line(o: dict[str, Any]) -> bytes:
-            return (json.dumps(o, ensure_ascii=False) + "\n").encode("utf-8")
+            text: str = json.dumps(o, ensure_ascii=False)
+            return (text + "\n").encode("utf-8")
 
         yield line({"stage": "start"})
         try:

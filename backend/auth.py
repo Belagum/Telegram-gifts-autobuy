@@ -16,11 +16,11 @@ from .models import SessionToken, token_default_exp
 
 
 def hash_password(p: str) -> str:
-    return generate_password_hash(p)
+    return str(generate_password_hash(p))
 
 
 def verify_password(h: str, p: str) -> bool:
-    return check_password_hash(h, p)
+    return bool(check_password_hash(h, p))
 
 
 def issue_token(db: Session, user_id: int) -> str:

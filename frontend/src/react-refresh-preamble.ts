@@ -2,6 +2,7 @@
 // Copyright 2025 Vova Orig
 
 /* eslint-disable import/no-unresolved */
+// @ts-expect-error Vite injects this virtual module at build time
 import RefreshRuntime from '/@react-refresh';
 
 declare global {

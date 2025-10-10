@@ -45,15 +45,18 @@ export const mapApiProfile = (dto: ApiProfileDto): ApiProfile => ({
   apiId: dto.api_id,
 });
 
-export const mapChannel = (dto: ChannelDto): Channel => ({
-  id: dto.id,
-  channelId: dto.channel_id,
-  title: (dto.title ?? null) && dto.title.trim() !== "" ? dto.title : null,
-  priceMin: dto.price_min,
-  priceMax: dto.price_max,
-  supplyMin: dto.supply_min,
-  supplyMax: dto.supply_max,
-});
+export const mapChannel = (dto: ChannelDto): Channel => {
+  const normalizedTitle = typeof dto.title === "string" ? dto.title.trim() : "";
+  return {
+    id: dto.id,
+    channelId: dto.channel_id,
+    title: normalizedTitle !== "" ? normalizedTitle : null,
+    priceMin: dto.price_min,
+    priceMax: dto.price_max,
+    supplyMin: dto.supply_min,
+    supplyMax: dto.supply_max,
+  };
+};
 
 export const mapGift = (dto: GiftDto): Gift => ({
   id: dto.id,
@@ -63,10 +66,16 @@ export const mapGift = (dto: GiftDto): Gift => ({
   isLimited: dto.is_limited,
   animatedUrl: dto.animated_url,
   availableAmount: dto.available_amount ?? null,
+  totalAmount: dto.total_amount ?? null,
+  limitedPerUser: Boolean(dto.limited_per_user ?? false),
+  perUserAvailable: dto.per_user_available ?? null,
+  perUserRemains: dto.per_user_remains ?? null,
   requiresPremium: dto.require_premium ?? false,
   stickerFileId: dto.sticker_file_id ?? null,
   stickerUniqueId: dto.sticker_unique_id ?? null,
   stickerMime: dto.sticker_mime ?? null,
+  locks: dto.locks ?? null,
+  lockedUntilDate: dto.locked_until_date ?? null,
 });
 
 export const mapGiftsStreamEvent = (dto: GiftsStreamEventDto): GiftsStreamEvent => ({

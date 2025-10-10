@@ -147,10 +147,21 @@ def _format_remaining(delta: timedelta) -> str:
     return " ".join(parts)
 
 
+def _convert_gift_ids_to_strings(gifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result = []
+    for gift in gifts:
+        gift_copy = gift.copy()
+        if "id" in gift_copy and isinstance(gift_copy["id"], int):
+            gift_copy["id"] = str(gift_copy["id"])
+        result.append(gift_copy)
+    return result
+
+
 @bp_gifts.get("/gifts", endpoint="gifts_list")
 @auth_required
 def gifts_list(db: Session):
-    return jsonify({"items": read_user_gifts(authed_request().user_id)})
+    items = read_user_gifts(authed_request().user_id)
+    return jsonify({"items": _convert_gift_ids_to_strings(items)})
 
 
 @bp_gifts.post("/gifts/refresh", endpoint="gifts_refresh")
@@ -161,7 +172,8 @@ def gifts_refresh(db: Session) -> Response | tuple[Response, int]:
     )
     if not want_stream:
         try:
-            return jsonify({"items": refresh_once(authed_request().user_id)})
+            items = refresh_once(authed_request().user_id)
+            return jsonify({"items": _convert_gift_ids_to_strings(items)})
         except NoAccountsError:
             return jsonify({"error": "no_accounts"}), 409
 
@@ -173,6 +185,7 @@ def gifts_refresh(db: Session) -> Response | tuple[Response, int]:
         yield line({"stage": "start"})
         try:
             items = refresh_once(authed_request().user_id)
+            items = _convert_gift_ids_to_strings(items)
             yield line({"stage": "fetched", "count": len(items)})
             yield line({"stage": "done", "items": items})
         except NoAccountsError:
@@ -187,12 +200,17 @@ def gifts_refresh(db: Session) -> Response | tuple[Response, int]:
     return resp
 
 
-@bp_gifts.post("/gifts/<int:gift_id>/buy", endpoint="gifts_buy")
+@bp_gifts.post("/gifts/<string:gift_id>/buy", endpoint="gifts_buy")
 @auth_required
-def gifts_buy(gift_id: int, db: Session) -> Response | tuple[Response, int]:
+def gifts_buy(gift_id: str, db: Session) -> Response | tuple[Response, int]:
     payload = request.get_json(silent=True) or {}
     account_raw = payload.get("account_id")
     target_raw = (payload.get("target_id") or "").strip()
+
+    try:
+        gift_id_int = int(gift_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "gift_id_invalid"}), 400
 
     try:
         account_id = int(account_raw)
@@ -226,7 +244,7 @@ def gifts_buy(gift_id: int, db: Session) -> Response | tuple[Response, int]:
         (
             row
             for row in items
-            if isinstance(row.get("id"), int) and int(row.get("id", 0)) == gift_id
+            if isinstance(row.get("id"), int) and int(row.get("id", 0)) == gift_id_int
         ),
         None,
     )
@@ -261,7 +279,7 @@ def gifts_buy(gift_id: int, db: Session) -> Response | tuple[Response, int]:
 
     async def _send_once() -> None:
         async def _call(client):
-            return await client.send_gift(chat_id=int(target_id), gift_id=int(gift_id))
+            return await client.send_gift(chat_id=int(target_id), gift_id=gift_id_int)
 
         await tg_call(
             account.session_path,
@@ -379,13 +397,16 @@ def gifts_stream(db: Session):
     def gen() -> Iterator[bytes]:
         try:
             snap = read_user_gifts(user_id)
+            snap = _convert_gift_ids_to_strings(snap)
             yield sse("gifts", {"items": snap, "count": len(snap)})
             last_ping = time.monotonic()
             while True:
                 try:
                     evt = q.get(timeout=10.0)
                     if evt and evt.get("items") is not None:
-                        yield sse("gifts", evt)
+                        evt_copy = evt.copy()
+                        evt_copy["items"] = _convert_gift_ids_to_strings(evt["items"])
+                        yield sse("gifts", evt_copy)
                 except Exception:
                     pass
                 if time.monotonic() - last_ping > 25:

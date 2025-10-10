@@ -59,7 +59,7 @@ export const mapChannel = (dto: ChannelDto): Channel => {
 };
 
 export const mapGift = (dto: GiftDto): Gift => ({
-  id: dto.id,
+  id: String(dto.id),
   title: dto.title,
   price: dto.price,
   supply: dto.supply,

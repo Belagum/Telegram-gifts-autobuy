@@ -49,7 +49,7 @@ export interface ChannelDto {
 }
 
 export interface GiftDto {
-  id: number;
+  id: string;
   title: string;
   price: number;
   supply: number | null;

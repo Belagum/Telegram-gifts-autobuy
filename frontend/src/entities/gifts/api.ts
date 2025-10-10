@@ -9,7 +9,7 @@ import type { Gift, GiftsStreamEvent } from "./model";
 import type { GiftsSettings } from "../settings/model";
 
 export interface BuyGiftPayload {
-  giftId: number;
+  giftId: string;
   accountId: number;
   targetId: string;
 }

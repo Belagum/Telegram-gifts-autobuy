@@ -2,7 +2,7 @@
 // Copyright 2025 Vova Orig
 
 export interface Gift {
-  id: number;
+  id: string;
   title: string;
   price: number;
   supply: number | null;

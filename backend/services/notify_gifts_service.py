@@ -99,7 +99,9 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
         else (
             "video/webm"
             if path.endswith(".webm")
-            else "image/webp" if path.endswith(".webp") else "application/octet-stream"
+            else "image/webp"
+            if path.endswith(".webp")
+            else "application/octet-stream"
         )
     )
     try:
@@ -114,7 +116,9 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
             f"file=({sticker_name}, {mime}, {len(blob)}B)"
         )
         r = await http.post(send_url, data=data, files=files)
-        ok = r.status_code == 200 and r.json().get("ok", False)
+        raw_payload = r.json()
+        ok_flag = bool(raw_payload.get("ok", False)) if isinstance(raw_payload, dict) else False
+        ok = bool(r.status_code == 200 and ok_flag)
         if not ok:
             logger.warning(f"notify:sendSticker fail code={r.status_code} body={r.text[:200]}")
         else:

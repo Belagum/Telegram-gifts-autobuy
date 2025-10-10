@@ -159,7 +159,9 @@ async def _run_deferred_autobuy(uid: int, gift_id: int, account_id: int, run_at:
     finally:
         tasks = _DEFERRED_TASKS.get(uid)
         if tasks is not None:
-            await tasks.pop(key, None)
+            task = tasks.pop(key, None)
+            if task is not None and task is not asyncio.current_task():
+                task.cancel()
 
 
 async def _list_gifts_for_account_persist(

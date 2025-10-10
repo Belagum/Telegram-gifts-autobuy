@@ -62,9 +62,10 @@ export const ChannelsModal: React.FC<ChannelsModalProps> = ({ open, onClose }) =
   const describeChannel = (channel: Channel) => {
     const priceRange = [channel.priceMin, channel.priceMax].filter((value) => value != null).join(" – ");
     const supplyRange = [channel.supplyMin, channel.supplyMax].filter((value) => value != null).join(" – ");
+    const title = (channel.title && channel.title.trim() !== "") ? channel.title : null;
     return (
       <>
-        <div className="channel-title">{channel.title ?? channel.channelId}</div>
+        <div className="channel-title">{title || channel.channelId}</div>
         <div className="channel-meta">ID: {channel.channelId}</div>
         {priceRange && <div className="channel-meta">Цена: {priceRange}</div>}
         {supplyRange && <div className="channel-meta">Supply: {supplyRange}</div>}

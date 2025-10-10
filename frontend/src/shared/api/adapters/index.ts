@@ -48,7 +48,7 @@ export const mapApiProfile = (dto: ApiProfileDto): ApiProfile => ({
 export const mapChannel = (dto: ChannelDto): Channel => ({
   id: dto.id,
   channelId: dto.channel_id,
-  title: dto.title,
+  title: (dto.title ?? null) && dto.title.trim() !== "" ? dto.title : null,
   priceMin: dto.price_min,
   priceMax: dto.price_max,
   supplyMin: dto.supply_min,

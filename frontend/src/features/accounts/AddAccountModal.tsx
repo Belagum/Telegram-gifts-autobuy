@@ -16,6 +16,7 @@ import {
   type SendCodeResponse,
 } from "../auth/telegramLoginApi";
 import { showError, showInfo, showPromise } from "../../shared/ui/feedback/toast";
+import { extractApiErrorMessage } from "../../shared/api/errorMessages";
 
 export interface AddAccountModalProps {
   apiProfileId: number | null;
@@ -56,7 +57,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
     setBusy("phone");
     try {
       const promise = sendCode({ api_profile_id: apiProfileId, phone });
-      showPromise(promise, "Отправляю код…", "Код отправлен", "Ошибка отправки кода");
+      showPromise(
+        promise, 
+        "Отправляю код…", 
+        "Код отправлен", 
+        (err) => extractApiErrorMessage(err, "Ошибка отправки кода")
+      );
       const result: SendCodeResponse = await promise;
       setLoginId(result.login_id);
       setStep("code");
@@ -73,7 +79,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
     setBusy("code");
     try {
       const promise = confirmCode({ login_id: loginId, code });
-      showPromise(promise, "Проверяю код…", "Код подтверждён", "Ошибка подтверждения");
+      showPromise(
+        promise, 
+        "Проверяю код…", 
+        "Код подтверждён", 
+        (err) => extractApiErrorMessage(err, "Ошибка подтверждения")
+      );
       const result: ConfirmCodeResponse = await promise;
       if (result?.need_2fa) {
         setStep("password");
@@ -97,7 +108,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
     setBusy("password");
     try {
       const promise = confirmPassword({ login_id: loginId, password });
-      showPromise(promise, "Входим…", "Аккаунт добавлен", "Ошибка пароля");
+      showPromise(
+        promise, 
+        "Входим…", 
+        "Аккаунт добавлен", 
+        (err) => extractApiErrorMessage(err, "Ошибка пароля")
+      );
       const result: ConfirmPasswordResponse = await promise;
       if (result?.ok) {
         onSuccess();
@@ -115,7 +131,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
     try {
       if (loginId) {
         const promise = cancelLogin({ login_id: loginId });
-        showPromise(promise, "Отменяю…", "Вход отменён", "Не удалось отменить");
+        showPromise(
+          promise, 
+          "Отменяю…", 
+          "Вход отменён", 
+          (err) => extractApiErrorMessage(err, "Не удалось отменить")
+        );
         await promise;
       }
     } finally {

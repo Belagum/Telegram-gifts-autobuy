@@ -58,8 +58,8 @@ export const DashboardPage: React.FC = () => {
     setAccountModalOpen(true);
   };
 
-  const handleApiSaved = async (id: number) => {
-    await refreshApiProfiles();
+  const handleApiSaved = (id: number) => {
+    void refreshApiProfiles();
     handleChooseApiProfile(id);
   };
 

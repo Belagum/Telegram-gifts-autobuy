@@ -143,7 +143,7 @@ def list_channels(db: Session, user_id: int) -> list[dict]:
         {
             "id": r.id,
             "channel_id": int(r.channel_id),
-            "title": r.title or "",
+            "title": r.title,
             "price_min": r.price_min,
             "price_max": r.price_max,
             "supply_min": r.supply_min,
@@ -180,7 +180,7 @@ def create_channel(
     probed_title, joined = _probe_any_account(db, user_id, ch_id)
     if not joined:
         return {"error": "not_joined", "detail": "в канал не войдено ни на каком аккаунте"}
-    title = (title_input or "").strip() or (probed_title or "")
+    title = (title_input or "").strip() or (probed_title or None)
     ch = Channel(
         user_id=user_id,
         channel_id=ch_id,
@@ -200,7 +200,8 @@ def update_channel(db: Session, user_id: int, ch_id: int, **f) -> dict:
     if not ch:
         return {"error": "not_found"}
     if "title" in f:
-        f["title"] = (f["title"] or "").strip()
+        t = (f["title"] or "").strip()
+        f["title"] = t or None
     if "price_min" in f or "price_max" in f:
         try:
             lo, hi = _coerce_range(

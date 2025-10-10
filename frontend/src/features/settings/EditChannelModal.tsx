@@ -44,18 +44,6 @@ export interface EditChannelModalProps {
 
 export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initial, onClose, onSaved }) => {
   const isEdit = Boolean(initial?.id);
-  const formRef = React.useRef<HTMLFormElement | null>(null);
-  const defaultValues: EditChannelFormValues = React.useMemo(
-    () => ({
-      channelId: initial?.channelId ?? "",
-      title: initial?.title ?? "",
-      priceMin: initial?.priceMin ?? null,
-      priceMax: initial?.priceMax ?? null,
-      supplyMin: initial?.supplyMin ?? null,
-      supplyMax: initial?.supplyMax ?? null,
-    }),
-    [initial],
-  );
 
   const {
     register,
@@ -64,12 +52,38 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     formState: { errors, isSubmitting },
   } = useForm<EditChannelFormValues>({
     resolver: zodResolver(schema),
-    defaultValues,
+    defaultValues: {
+      channelId: initial?.channelId ?? "",
+      title: initial?.title ?? "",
+      priceMin: initial?.priceMin ?? null,
+      priceMax: initial?.priceMax ?? null,
+      supplyMin: initial?.supplyMin ?? null,
+      supplyMax: initial?.supplyMax ?? null,
+    },
   });
 
   React.useEffect(() => {
-    reset(defaultValues);
-  }, [defaultValues, reset]);
+    if (!open) return;
+    if (initial && initial.id) {
+      reset({
+        channelId: initial.channelId ?? "",
+        title: initial.title ?? "",
+        priceMin: initial.priceMin ?? null,
+        priceMax: initial.priceMax ?? null,
+        supplyMin: initial.supplyMin ?? null,
+        supplyMax: initial.supplyMax ?? null,
+      });
+    } else {
+      reset({
+        channelId: "",
+        title: "",
+        priceMin: null,
+        priceMax: null,
+        supplyMin: null,
+        supplyMax: null,
+      });
+    }
+  }, [open, initial, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     const { channelId, title, priceMin, priceMax, supplyMin, supplyMax } = values;
@@ -94,8 +108,21 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     };
     try {
       if (isEdit && initial) {
+        // Отправляем только изменённые поля, чтобы избежать случайного затирания значений
+        const diff: Partial<Channel> = {};
+        if ((payload.title ?? null) !== (initial.title ?? null)) diff.title = payload.title ?? null;
+        if (payload.priceMin !== initial.priceMin) diff.priceMin = payload.priceMin ?? null;
+        if (payload.priceMax !== initial.priceMax) diff.priceMax = payload.priceMax ?? null;
+        if (payload.supplyMin !== initial.supplyMin) diff.supplyMin = payload.supplyMin ?? null;
+        if (payload.supplyMax !== initial.supplyMax) diff.supplyMax = payload.supplyMax ?? null;
+
+        if (Object.keys(diff).length === 0) {
+          showError({ error: "Нет изменений для сохранения" });
+          return;
+        }
+
         await showPromise(
-          updateChannel(initial.id, payload),
+          updateChannel(initial.id, diff),
           "Сохраняю изменения…",
           "Сохранено",
           (err) => extractApiErrorMessage(err, "Не удалось сохранить изменения"),
@@ -122,19 +149,9 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     }
   });
 
-  const handleSaveClick = React.useCallback(() => {
-    const formElement = formRef.current as (HTMLFormElement & {
-      requestSubmit?: () => void;
-    }) | null;
-    if (!formElement) {
-      return;
-    }
-    if (typeof formElement.requestSubmit === "function") {
-      formElement.requestSubmit();
-    } else {
-      formElement.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-    }
-  }, []);
+  const handleSaveClick = () => {
+    void onSubmit();
+  };
 
   return (
     <Modal
@@ -142,13 +159,17 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
       onClose={onClose}
       title={isEdit ? "Редактирование канала" : "Добавление канала"}
       footer={
-        <Button type="button" onClick={handleSaveClick} loading={isSubmitting} disabled={isSubmitting}>
+        <Button
+          type="button"
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          onClick={handleSaveClick}
+        >
           Сохранить
         </Button>
       }
     >
-      <form id="edit-channel-form" ref={formRef} onSubmit={onSubmit} className="modal-form" noValidate>
-        <button type="submit" hidden aria-hidden="true" />
+      <form id="edit-channel-form" onSubmit={onSubmit} className="modal-form" noValidate>
         {!isEdit && (
           <FormField label="ID канала" error={errors.channelId?.message ?? undefined} required>
             <Input placeholder="-1001234567890" {...register("channelId", { required: !isEdit })} />

@@ -8,6 +8,19 @@ import { mapGift, mapGiftsStreamEvent, mapGiftsSettings } from "../../shared/api
 import type { Gift, GiftsStreamEvent } from "./model";
 import type { GiftsSettings } from "../settings/model";
 
+export interface BuyGiftPayload {
+  giftId: number;
+  accountId: number;
+  targetId: string;
+}
+
+export interface BuyGiftResponse {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  detail?: string;
+}
+
 export const listGifts = async (): Promise<Gift[]> => {
   const dto = await httpClient<{ items?: GiftDto[]; gifts?: GiftDto[] }>("/gifts");
   const items = Array.isArray(dto.items)
@@ -39,6 +52,22 @@ export const setGiftsSettings = async (autoRefresh: boolean): Promise<GiftsSetti
     body: { auto_refresh: autoRefresh },
   });
   return mapGiftsSettings(dto);
+};
+
+export const buyGift = async ({ giftId, accountId, targetId }: BuyGiftPayload): Promise<BuyGiftResponse> => {
+  const response = await httpClient<BuyGiftResponse>(`/gifts/${giftId}/buy`, {
+    method: "POST",
+    body: {
+      account_id: accountId,
+      target_id: targetId,
+    },
+  });
+  return {
+    ok: Boolean(response.ok),
+    message: response.message,
+    error: response.error,
+    detail: response.detail,
+  };
 };
 
 export const subscribeGiftsStream = (

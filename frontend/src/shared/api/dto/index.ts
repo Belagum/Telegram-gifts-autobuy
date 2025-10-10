@@ -55,11 +55,17 @@ export interface GiftDto {
   supply: number | null;
   is_limited: boolean;
   available_amount?: number | null;
+  total_amount?: number | null;
+  limited_per_user?: boolean | null;
+  per_user_available?: number | null;
+  per_user_remains?: number | null;
   require_premium?: boolean;
   sticker_file_id?: string | null;
   sticker_unique_id?: string | null;
   sticker_mime?: string | null;
   animated_url: string | null;
+  locks?: Record<string, string | null> | null;
+  locked_until_date?: string | null;
 }
 
 export interface GiftsSettingsDto {

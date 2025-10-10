@@ -9,9 +9,11 @@ import { showError } from "../../shared/ui/feedback/toast";
 import { listGifts, refreshGifts, getGiftsSettings, setGiftsSettings } from "../../entities/gifts/api";
 import { listAccounts } from "../../entities/accounts/api";
 import type { Gift } from "../../entities/gifts/model";
+import type { Account } from "../../entities/accounts/model";
 import { useOnScreen } from "../../shared/lib/hooks/useOnScreen";
 import { openCentered } from "../../shared/lib/utils/openCentered";
 import { usePopupAutoSize } from "../../shared/lib/hooks/usePopupAutoSize";
+import { BuyGiftModal } from "./BuyGiftModal";
 import "./gifts.css";
 
 const TGS_CACHE = new Map<string, unknown>();
@@ -22,6 +24,76 @@ const dbg = (...args: unknown[]) => {
 
 const priceFormat = (value: number | null | undefined) =>
   typeof value === "number" ? value.toLocaleString("ru-RU") : value ?? "—";
+
+const lockDateFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const parseIsoToDate = (value: string | null | undefined): Date | null => {
+  if (!value) {
+    return null;
+  }
+  const text = value.trim();
+  if (!text) {
+    return null;
+  }
+  const normalized = text.endsWith("Z") ? `${text.slice(0, -1)}+00:00` : text;
+  const timestamp = Date.parse(normalized);
+  if (Number.isNaN(timestamp)) {
+    return null;
+  }
+  return new Date(timestamp);
+};
+
+const formatRelativeTime = (date: Date): string => {
+  const diffMs = date.getTime() - Date.now();
+  if (Number.isNaN(diffMs)) {
+    return "—";
+  }
+  if (diffMs <= 0) {
+    return "доступен";
+  }
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}д`);
+  if (hours > 0) parts.push(`${hours}ч`);
+  if (minutes > 0) parts.push(`${minutes}м`);
+  if (parts.length === 0) parts.push(`${seconds}с`);
+  return `через ${parts.join(" ")}`;
+};
+
+const getAvailableAmount = (gift: Gift): number | null => {
+  if (gift.availableAmount != null) return gift.availableAmount;
+  if (gift.perUserAvailable != null) return gift.perUserAvailable;
+  if (gift.perUserRemains != null) return gift.perUserRemains;
+  return null;
+};
+
+const isGiftBuyable = (gift: Gift): boolean => {
+  if (!gift.isLimited) {
+    return true;
+  }
+  const available = getAvailableAmount(gift);
+  return (available ?? 0) > 0;
+};
+
+const sortKeyForGift = (gift: Gift): [number, number, number, number, number] => {
+  const buyablePriority = isGiftBuyable(gift) ? 0 : 1;
+  const limitedPriority = gift.isLimited ? 0 : 1;
+  const supplyPriority = gift.isLimited
+    ? getAvailableAmount(gift) ?? Number.MAX_SAFE_INTEGER
+    : gift.supply ?? Number.MAX_SAFE_INTEGER;
+  const pricePriority = typeof gift.price === "number" ? gift.price : Number.MAX_SAFE_INTEGER;
+  return [buyablePriority, limitedPriority, supplyPriority, pricePriority, gift.id];
+};
 
 interface TgsThumbProps {
   gift: Gift;
@@ -141,17 +213,70 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
   return <div ref={containerRef} className="gift-thumb" />;
 };
 
-const GiftCard: React.FC<{ gift: Gift; onMissingToken: () => void }> = ({ gift, onMissingToken }) => {
-  const limited = gift.isLimited
-    ? `Лимит: ${gift.availableAmount != null ? gift.availableAmount : "?"}`
+interface GiftCardProps {
+  gift: Gift;
+  onMissingToken: () => void;
+  onBuy: (gift: Gift) => void;
+  disabled?: boolean;
+}
+
+const GiftCard: React.FC<GiftCardProps> = ({ gift, onMissingToken, onBuy, disabled }) => {
+  const available = getAvailableAmount(gift);
+  const totalSupply = gift.totalAmount ?? gift.supply;
+  const limitedDescription = gift.isLimited
+    ? `Доступно: ${
+        available != null ? available.toLocaleString("ru-RU") : "?"
+      }${typeof totalSupply === "number" ? ` из ${totalSupply.toLocaleString("ru-RU")}` : ""}`
     : "Без лимита";
+  const perAccountLimit =
+    gift.isLimited && gift.limitedPerUser
+      ? `Лимит на аккаунт: ${(
+          gift.perUserRemains ?? gift.perUserAvailable ?? 0
+        ).toLocaleString("ru-RU")}`
+      : null;
+  const lockEntries = React.useMemo(() => {
+    const entries: { accountId: number; formatted: string; relative: string }[] = [];
+    const locks = gift.locks ?? {};
+    Object.entries(locks).forEach(([accountKey, rawValue]) => {
+      if (!rawValue) return;
+      const date = parseIsoToDate(rawValue);
+      if (!date) return;
+      const accountId = Number(accountKey);
+      if (!Number.isFinite(accountId)) return;
+      entries.push({
+        accountId,
+        formatted: lockDateFormatter.format(date),
+        relative: formatRelativeTime(date),
+      });
+    });
+    entries.sort((a, b) => a.accountId - b.accountId);
+    return entries;
+  }, [gift.locks]);
+  const buyDisabled = !isGiftBuyable(gift) || Boolean(disabled);
+
   return (
     <div className="gift-card">
       <TgsThumb gift={gift} onMissingToken={onMissingToken} />
-      <div className="gift-card__meta">#{gift.id}</div>
-      <div className="gift-card__meta">Цена: {priceFormat(gift.price)}</div>
-      <div className="gift-card__meta">{limited}</div>
-      {gift.requiresPremium && <div className="gift-card__meta">Требует Premium</div>}
+      <div className="gift-card__header">
+        <div className="gift-card__meta">#{gift.id}</div>
+        <div className="gift-card__meta">Цена: {priceFormat(gift.price)}</div>
+        <div className="gift-card__meta">{limitedDescription}</div>
+        {perAccountLimit && <div className="gift-card__meta">{perAccountLimit}</div>}
+        {gift.requiresPremium && <div className="gift-card__meta">Требует Premium</div>}
+      </div>
+      {lockEntries.length > 0 && (
+        <div className="gift-card__locks">
+          <div className="gift-card__locks-title">Локи</div>
+          {lockEntries.map((lock) => (
+            <div key={lock.accountId} className="gift-card__lock-item">
+              <strong>{lock.accountId}</strong>: {lock.formatted} ({lock.relative})
+            </div>
+          ))}
+        </div>
+      )}
+      <Button className="gift-card__buy" onClick={() => onBuy(gift)} disabled={buyDisabled}>
+        Купить
+      </Button>
     </div>
   );
 };
@@ -178,6 +303,31 @@ export const GiftsPage: React.FC = () => {
   const [hasAccounts, setHasAccounts] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [missingToken, setMissingToken] = React.useState(false);
+  const [accounts, setAccounts] = React.useState<Account[]>([]);
+  const [selectedGift, setSelectedGift] = React.useState<Gift | null>(null);
+
+  const sortedGifts = React.useMemo(() => {
+    const items = [...gifts];
+    items.sort((a, b) => {
+      const aKey = sortKeyForGift(a);
+      const bKey = sortKeyForGift(b);
+      for (let i = 0; i < aKey.length; i += 1) {
+        if (aKey[i] !== bKey[i]) {
+          return aKey[i] - bKey[i];
+        }
+      }
+      return 0;
+    });
+    return items;
+  }, [gifts]);
+
+  const handleOpenBuy = React.useCallback((gift: Gift) => {
+    setSelectedGift(gift);
+  }, []);
+
+  const handleCloseBuy = React.useCallback(() => {
+    setSelectedGift(null);
+  }, []);
 
   const loadGifts = React.useCallback(async () => {
     try {
@@ -205,9 +355,10 @@ export const GiftsPage: React.FC = () => {
     })();
     (async () => {
       try {
-        const accounts = await listAccounts();
-        dbg("api.listAccounts", { count: accounts.length });
-        setHasAccounts(accounts.length > 0);
+        const fetched = await listAccounts();
+        dbg("api.listAccounts", { count: fetched.length });
+        setAccounts(fetched);
+        setHasAccounts(fetched.length > 0);
       } catch (error) {
         console.warn("Failed to check accounts", error);
       }
@@ -298,8 +449,8 @@ export const GiftsPage: React.FC = () => {
         )}
       </div>
       <div className="gifts-grid">
-        {gifts.length === 0 && !loading && <div className="gift-empty">Подарков нет</div>}
-        {gifts.length === 0 && loading && (
+        {sortedGifts.length === 0 && !loading && <div className="gift-empty">Подарков нет</div>}
+        {sortedGifts.length === 0 && loading && (
           <>
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="gift-card">
@@ -310,10 +461,23 @@ export const GiftsPage: React.FC = () => {
             ))}
           </>
         )}
-        {gifts.map((gift) => (
-          <GiftCard key={gift.id} gift={gift} onMissingToken={() => setMissingToken(true)} />
+        {sortedGifts.map((gift) => (
+          <GiftCard
+            key={gift.id}
+            gift={gift}
+            onMissingToken={() => setMissingToken(true)}
+            onBuy={handleOpenBuy}
+            disabled={!hasAccounts}
+          />
         ))}
       </div>
+      <BuyGiftModal
+        open={Boolean(selectedGift)}
+        gift={selectedGift}
+        accounts={accounts}
+        onClose={handleCloseBuy}
+        onPurchased={loadGifts}
+      />
     </div>
   );
 };

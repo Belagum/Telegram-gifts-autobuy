@@ -8,17 +8,18 @@ import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from queue import Queue
 from typing import Any, cast
 
 import httpx
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..auth import auth_required, authed_request
 from ..logger import logger
-from ..models import User, UserSettings
+from ..models import Account, User, UserSettings
 from ..services.gifts_service import (
     NoAccountsError,
     gifts_event_bus,
@@ -27,6 +28,7 @@ from ..services.gifts_service import (
     start_user_gifts,
     stop_user_gifts,
 )
+from ..services.tg_clients_service import tg_call
 from ..utils.asyncio_utils import run_async as _run_async
 from ..utils.fs import link_or_copy, save_atomic
 from ..utils.http import etag_for_path
@@ -112,6 +114,39 @@ def _promote_cached(src_key: str, dst_key: str) -> Path | None:
         return dst_path
 
 
+def _parse_iso_to_utc(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    except Exception:
+        return None
+
+
+def _format_remaining(delta: timedelta) -> str:
+    seconds = int(max(delta.total_seconds(), 0))
+    days, remainder = divmod(seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}д")
+    if hours:
+        parts.append(f"{hours}ч")
+    if minutes:
+        parts.append(f"{minutes}м")
+    if not parts:
+        parts.append(f"{seconds}с")
+    return " ".join(parts)
+
+
 @bp_gifts.get("/gifts", endpoint="gifts_list")
 @auth_required
 def gifts_list(db: Session):
@@ -150,6 +185,122 @@ def gifts_refresh(db: Session) -> Response | tuple[Response, int]:
     resp = Response(wrapped(), mimetype="application/x-ndjson")
     resp.headers["X-Accel-Buffering"] = "no"
     return resp
+
+
+@bp_gifts.post("/gifts/<int:gift_id>/buy", endpoint="gifts_buy")
+@auth_required
+def gifts_buy(gift_id: int, db: Session) -> Response | tuple[Response, int]:
+    payload = request.get_json(silent=True) or {}
+    account_raw = payload.get("account_id")
+    target_raw = (payload.get("target_id") or "").strip()
+
+    try:
+        account_id = int(account_raw)
+    except (TypeError, ValueError):
+        return jsonify({"error": "account_id_invalid"}), 400
+    if account_id <= 0:
+        return jsonify({"error": "account_id_invalid"}), 400
+
+    if not target_raw:
+        return jsonify({"error": "target_id_required"}), 400
+    try:
+        target_id = int(target_raw)
+    except ValueError:
+        return jsonify({"error": "target_id_invalid"}), 400
+
+    user_id = authed_request().user_id
+
+    account = (
+        db.query(Account)
+        .options(joinedload(Account.api_profile))
+        .filter(Account.user_id == user_id, Account.id == account_id)
+        .first()
+    )
+    if not account:
+        return jsonify({"error": "account_not_found"}), 404
+    if not account.api_profile:
+        return jsonify({"error": "api_profile_missing"}), 409
+
+    items = read_user_gifts(user_id)
+    gift = next(
+        (
+            row
+            for row in items
+            if isinstance(row.get("id"), int) and int(row.get("id", 0)) == gift_id
+        ),
+        None,
+    )
+    if not gift:
+        return jsonify({"error": "gift_not_found"}), 404
+
+    limited = bool(gift.get("is_limited"))
+    available_raw = gift.get("available_amount")
+    try:
+        available_amount = int(available_raw)
+    except (TypeError, ValueError):
+        available_amount = None
+    if limited and (available_amount is None or available_amount <= 0):
+        return jsonify({"error": "gift_unavailable", "detail": "Подарок недоступен"}), 409
+
+    locks = gift.get("locks") if isinstance(gift.get("locks"), dict) else {}
+    lock_value = None
+    if isinstance(locks, dict):
+        lock_value = locks.get(str(account_id)) or locks.get(account_id)
+    lock_until = _parse_iso_to_utc(lock_value if isinstance(lock_value, str) else None)
+    if lock_until and lock_until > datetime.now(UTC):
+        remaining = _format_remaining(lock_until - datetime.now(UTC))
+        detail = (
+            f"Аккаунт {account_id} заблокирован до {lock_until.isoformat().replace('+00:00', 'Z')}"
+        )
+        if remaining:
+            detail = f"{detail} (ещё {remaining})"
+        return jsonify({"error": "gift_locked", "detail": detail}), 409
+
+    if bool(gift.get("require_premium")) and not bool(getattr(account, "is_premium", False)):
+        return jsonify({"error": "requires_premium", "detail": "Аккаунт без Premium"}), 409
+
+    async def _send_once() -> None:
+        async def _call(client):
+            return await client.send_gift(chat_id=int(target_id), gift_id=int(gift_id))
+
+        await tg_call(
+            account.session_path,
+            account.api_profile.api_id,
+            account.api_profile.api_hash,
+            _call,
+            min_interval=0.7,
+        )
+
+    try:
+        _run_async(_send_once())
+    except Exception as exc:  # pragma: no cover - network issues
+        logger.exception(
+            "gifts.buy failed user_id={} gift_id={} account_id={} target_id={}",
+            user_id,
+            gift_id,
+            account_id,
+            target_id,
+        )
+        message = str(exc)
+        return jsonify({"error": "send_failed", "detail": message[:200]}), 502
+
+    logger.info(
+        "gifts.buy success user_id={} gift_id={} account_id={} target_id={}",
+        user_id,
+        gift_id,
+        account_id,
+        target_id,
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "message": f"Подарок {gift_id} отправлен с аккаунта {account_id}",
+            "gift_id": gift_id,
+            "account_id": account_id,
+            "target_id": target_id,
+        }
+    )
 
 
 @bp_gifts.get("/gifts/sticker.lottie", endpoint="gifts_sticker_lottie")

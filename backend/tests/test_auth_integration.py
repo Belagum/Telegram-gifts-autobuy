@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from backend.app import create_app
 from backend.infrastructure.db import ENGINE, Base, SessionLocal
@@ -7,7 +9,7 @@ from backend.infrastructure.db.models import SessionToken, User
 
 
 @pytest.fixture(autouse=True)
-def reset_database() -> None:
+def reset_database() -> Iterator[None]:
     Base.metadata.drop_all(bind=ENGINE)
     Base.metadata.create_all(bind=ENGINE)
     yield

@@ -79,7 +79,7 @@ def _parse_int(value: Any) -> int | None:
         return None
     if isinstance(value, bool):
         return int(value)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return int(value)
     if isinstance(value, str):
         text = value.strip()

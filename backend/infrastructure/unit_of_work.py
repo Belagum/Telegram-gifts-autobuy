@@ -10,9 +10,8 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import Protocol
 
-from sqlalchemy.orm import Session
-
 from backend.shared.logging import logger
+from sqlalchemy.orm import Session
 
 
 class UnitOfWork(Protocol):

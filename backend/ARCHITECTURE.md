@@ -1,8 +1,8 @@
 # Backend architecture overview
 
-The backend now lives under a conventional `src/` tree (`src/backend`) that makes
-the package importable without manipulating `PYTHONPATH`. Inside the package we
-retain the layered design for the autobuy subsystem:
+The backend package now sits directly under the repository's `backend/` root,
+so importing `backend.*` works without the extra `src/` hop. Inside the package
+we retain the layered design for the autobuy subsystem:
 
 - **Domain layer (`backend/domain`)** — immutable entities (`GiftCandidate`,
   `ChannelFilter`, `AccountSnapshot`) encapsulate invariants. A `PurchasePlan`
@@ -21,5 +21,5 @@ retain the layered design for the autobuy subsystem:
   instances enable a single error handler in Flask.
 
 Unit tests cover the planner, validator and use-case orchestration to prevent
-regressions in critical business rules. Pytest is configured to execute against
-`src/` so the same layout is used in development and production.
+regressions in critical business rules. Pytest uses the repository root as the
+import base so the runtime layout matches the development one.

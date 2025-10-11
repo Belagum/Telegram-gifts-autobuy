@@ -28,7 +28,7 @@ from ..services.gifts_service import (
     start_user_gifts,
     stop_user_gifts,
 )
-from ..services.tg_clients_service import tg_call
+from ..services.tg_clients_service import get_stars_balance, tg_call
 from ..utils.asyncio_utils import run_async as _run_async
 from ..utils.fs import link_or_copy, save_atomic
 from ..utils.http import etag_for_path
@@ -299,8 +299,60 @@ def gifts_buy(gift_id: str, db: Session) -> Response | tuple[Response, int]:
             account_id,
             target_id,
         )
-        message = str(exc)
-        return jsonify({"error": "send_failed", "detail": message[:200]}), 502
+        message = (str(exc) or "").upper()
+        if "BALANCE_TOO_LOW" in message:
+            try:
+                balance = int(
+                    _run_async(
+                        get_stars_balance(
+                            account.session_path,
+                            account.api_profile.api_id,
+                            account.api_profile.api_hash,
+                            min_interval=0.5,
+                        )
+                    )
+                )
+            except Exception:
+                balance = 0
+            try:
+                price = int(gift.get("price", 0) or 0)
+            except Exception:
+                price = 0
+            detail = f"Недостаточно Stars: баланс {balance}⭐, нужно {price}⭐"
+            return (
+                jsonify(
+                    {
+                        "error": "insufficient_balance",
+                        "detail": detail,
+                        "balance": balance,
+                        "price": price,
+                        "gift_id": gift_id,
+                        "account_id": account_id,
+                        "target_id": target_id,
+                    }
+                ),
+                409,
+            )
+        # Telegram: peer id is invalid or unknown for this account
+        if "PEER_ID_INVALID" in message or "PEER ID INVALID" in message:
+            return (
+                jsonify(
+                    {
+                        "error": "peer_id_invalid",
+                        "detail": (
+                            "Некорректный или неизвестный получатель. "
+                            "Убедитесь, что указали правильный ID и что выбранный аккаунт "
+                            "уже встречал этот чат/канал (начните диалог или вступите в канал)."
+                        ),
+                        "account_id": account_id,
+                        "target_id": target_id,
+                        "gift_id": gift_id,
+                    }
+                ),
+                409,
+            )
+        msg = str(exc)
+        return jsonify({"error": "send_failed", "detail": (msg or "")[:200]}), 502
 
     logger.info(
         "gifts.buy success user_id={} gift_id={} account_id={} target_id={}",

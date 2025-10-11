@@ -8,6 +8,7 @@ import { Skeleton } from "../../shared/ui/skeleton/Skeleton";
 import { showError } from "../../shared/ui/feedback/toast";
 import { listGifts, refreshGifts, getGiftsSettings, setGiftsSettings } from "../../entities/gifts/api";
 import { listAccounts } from "../../entities/accounts/api";
+import { getSettings } from "../../entities/settings/api";
 import type { Gift } from "../../entities/gifts/model";
 import type { Account } from "../../entities/accounts/model";
 import { useOnScreen } from "../../shared/lib/hooks/useOnScreen";
@@ -92,7 +93,8 @@ const sortKeyForGift = (gift: Gift): [number, number, number, number, number] =>
     ? getAvailableAmount(gift) ?? Number.MAX_SAFE_INTEGER
     : gift.supply ?? Number.MAX_SAFE_INTEGER;
   const pricePriority = typeof gift.price === "number" ? gift.price : Number.MAX_SAFE_INTEGER;
-  return [buyablePriority, limitedPriority, supplyPriority, pricePriority, gift.id];
+  const idPriority = Number.isFinite(Number(gift.id)) ? Number(gift.id) : Number.MAX_SAFE_INTEGER;
+  return [buyablePriority, limitedPriority, supplyPriority, pricePriority, idPriority];
 };
 
 interface TgsThumbProps {
@@ -351,6 +353,15 @@ export const GiftsPage: React.FC = () => {
         setAutoRefresh(settings.autoRefresh);
       } catch (error) {
         console.warn("Failed to load gifts settings", error);
+      }
+    })();
+    (async () => {
+      try {
+        const userSettings = await getSettings();
+        dbg("api.getSettings", { hasBotToken: Boolean(userSettings.botToken) });
+        setMissingToken(!userSettings.botToken);
+      } catch (error) {
+        console.warn("Failed to load settings", error);
       }
     })();
     (async () => {

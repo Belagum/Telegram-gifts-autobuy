@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from http import HTTPStatus
+from typing import cast
 
 
 @dataclass(slots=True)
@@ -22,10 +23,14 @@ class DomainError(AppError):
     """Domain-level invariant violation."""
 
     def __init__(self, message: str | None = None) -> None:
+        fallback_message = cast(str, getattr(self, "message", "domain_error"))
+        resolved_message = message if message is not None else fallback_message
+        resolved_code = cast(str, getattr(self, "code", "domain_error"))
+        resolved_status = cast(HTTPStatus, getattr(self, "status", HTTPStatus.BAD_REQUEST))
         super().__init__(
-            message=message or getattr(self, "message", "domain_error"),
-            code=getattr(self, "code", "domain_error"),
-            status=getattr(self, "status", HTTPStatus.BAD_REQUEST),
+            message=resolved_message,
+            code=resolved_code,
+            status=resolved_status,
         )
 
 

@@ -238,17 +238,6 @@ async def _list_gifts_for_account_persist(
         }
         locks = {str(account_id): locked_until_date}
         item["locks"] = locks
-        if locked_until_date:
-            item["locked_until_date"] = locked_until_date
-            try:
-                logger.info(f"gifts.parse: gift_id={item['id']} locked_until={locked_until_date}")
-            except Exception:
-                pass
-        else:
-            try:
-                logger.info(f"gifts.parse: gift_id={item['id']} unlocked")
-            except Exception:
-                pass
         out.append(item)
     return out
 

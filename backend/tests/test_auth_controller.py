@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
+from backend.application.use_cases.users.register_user import RegisterUserUseCase
 from backend.domain.users.entities import User
 from backend.interfaces.http.controllers.auth_controller import AuthController
 from backend.shared.middleware.error_handler import configure_error_handling
@@ -21,7 +23,7 @@ def test_register_endpoint_sets_cookie(flask_app: Flask) -> None:
     register_called: dict[str, tuple[str, str]] = {}
 
     class StubRegister:
-        def execute(self, username: str, password: str):
+        def execute(self, username: str, password: str) -> tuple[User, str]:
             register_called["args"] = (username, password)
             return (
                 User(
@@ -34,7 +36,7 @@ def test_register_endpoint_sets_cookie(flask_app: Flask) -> None:
             )
 
     controller = AuthController(
-        register_use_case=StubRegister(),
+        register_use_case=cast(RegisterUserUseCase, StubRegister()),
         login_use_case=MagicMock(),
         logout_use_case=MagicMock(),
     )

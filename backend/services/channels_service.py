@@ -7,9 +7,9 @@ from time import perf_counter
 
 from sqlalchemy.orm import Session
 
-from ..logger import logger
-from ..models import Account, Channel
-from .tg_clients_service import tg_call
+from backend.infrastructure.db.models import Account, Channel
+from backend.services.tg_clients_service import tg_call
+from backend.shared.logging import logger
 
 PROBE_CALL_TIMEOUT = 6.0
 

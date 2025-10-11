@@ -18,7 +18,7 @@ from backend.domain import (
     PurchaseOperation,
     PurchasePlan,
 )
-from backend.logger import logger
+from backend.shared.logging import logger
 
 from ..interfaces import (
     AccountRepository,

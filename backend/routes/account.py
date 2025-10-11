@@ -9,12 +9,11 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..auth import auth_required, authed_request
-from ..db import SessionLocal
-from ..logger import logger
-from ..models import Account, ApiProfile, User
-from ..pyro_login import PyroLoginManager
-from ..services.accounts_service import (
+from backend.auth import auth_required, authed_request
+from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.db.models import Account, ApiProfile, User
+from backend.pyro_login import PyroLoginManager
+from backend.services.accounts_service import (
     any_stale,
     begin_user_refresh,
     end_user_refresh,
@@ -23,6 +22,7 @@ from ..services.accounts_service import (
     schedule_user_refresh,
     wait_until_ready,
 )
+from backend.shared.logging import logger
 
 bp_acc = Blueprint("accounts", __name__, url_prefix="/api")
 _logins = PyroLoginManager()

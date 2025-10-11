@@ -5,9 +5,9 @@ import re
 
 from sqlalchemy.orm import Session
 
-from ..db import SessionLocal
-from ..models import UserSettings
-from .channels_service import norm_ch_id
+from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.db.models import UserSettings
+from backend.services.channels_service import norm_ch_id
 
 
 def _norm_peer_id(v) -> int:

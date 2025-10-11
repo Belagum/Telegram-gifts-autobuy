@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from backend.db import ENGINE
+from backend.infrastructure.db import ENGINE
 from sqlalchemy import text
 
 

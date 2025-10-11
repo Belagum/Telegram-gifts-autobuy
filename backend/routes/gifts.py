@@ -17,10 +17,9 @@ import httpx
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from sqlalchemy.orm import Session, joinedload
 
-from ..auth import auth_required, authed_request
-from ..logger import logger
-from ..models import Account, User, UserSettings
-from ..services.gifts_service import (
+from backend.auth import auth_required, authed_request
+from backend.infrastructure.db.models import Account, User, UserSettings
+from backend.services.gifts_service import (
     NoAccountsError,
     gifts_event_bus,
     read_user_gifts,
@@ -28,10 +27,11 @@ from ..services.gifts_service import (
     start_user_gifts,
     stop_user_gifts,
 )
-from ..services.tg_clients_service import get_stars_balance, tg_call
-from ..utils.asyncio_utils import run_async as _run_async
-from ..utils.fs import link_or_copy, save_atomic
-from ..utils.http import etag_for_path
+from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.shared.logging import logger
+from backend.utils.asyncio_utils import run_async as _run_async
+from backend.utils.fs import link_or_copy, save_atomic
+from backend.utils.http import etag_for_path
 
 bp_gifts = Blueprint("gifts", __name__, url_prefix="/api")
 

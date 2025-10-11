@@ -10,9 +10,9 @@ from flask import Request, jsonify, request
 from sqlalchemy.orm import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .db import get_db
-from .logger import logger
-from .models import SessionToken, token_default_exp
+from backend.infrastructure.db import get_db
+from backend.infrastructure.db.models import SessionToken, token_default_exp
+from backend.shared.logging import logger
 
 
 def hash_password(p: str) -> str:

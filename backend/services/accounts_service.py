@@ -13,11 +13,11 @@ from pyrogram.errors import AuthKeyUnregistered
 from pyrogram.raw.functions.help import GetPremiumPromo
 from sqlalchemy.orm import Session
 
-from ..db import SessionLocal
-from ..logger import logger
-from ..models import Account
-from .session_locks_service import session_lock_for
-from .tg_clients_service import get_stars_balance, tg_call
+from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.db.models import Account
+from backend.services.session_locks_service import session_lock_for
+from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.shared.logging import logger
 
 STALE_MINUTES = 60
 

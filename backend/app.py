@@ -12,18 +12,19 @@ from flask import Flask, Response, g, request
 from flask_cors import CORS
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from backend.config import load_config
-from backend.db import SessionLocal, init_db
+from backend.container import container
+from backend.infrastructure.db import SessionLocal, init_db
+from backend.infrastructure.db.models import User
 from backend.infrastructure.health import check_database
-from backend.logger import bind_flask, logger, setup_logging
-from backend.models import User
 from backend.routes.account import bp_acc
-from backend.routes.auth import bp_auth
 from backend.routes.channels import bp_channels
 from backend.routes.gifts import bp_gifts
 from backend.routes.misc import bp_misc
 from backend.routes.settings import bp_settings
 from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
+from backend.shared.config import load_config
+from backend.shared.logging import bind_flask, logger, setup_logging
+from backend.shared.middleware.error_handler import configure_error_handling
 
 _config = load_config()
 _BOOTSTRAPPED = threading.Event()
@@ -58,6 +59,7 @@ def create_app() -> Flask:
     setup_logging()
     app = Flask(__name__)
     bind_flask(app)
+    configure_error_handling(app)
     app.config.update(
         SECRET_KEY=_config.secret_key,
         SESSION_PERMANENT=True,
@@ -65,7 +67,7 @@ def create_app() -> Flask:
 
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     app.register_blueprint(bp_misc)
-    app.register_blueprint(bp_auth)
+    app.register_blueprint(container.auth_controller.as_blueprint())
     app.register_blueprint(bp_acc)
     app.register_blueprint(bp_gifts)
     app.register_blueprint(bp_settings)

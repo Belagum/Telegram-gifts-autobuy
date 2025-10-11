@@ -14,9 +14,9 @@ from pyrogram.errors import RPCError, SessionPasswordNeeded
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .logger import logger
-from .models import Account, ApiProfile
-from .services.accounts_service import fetch_profile_and_stars
+from backend.infrastructure.db.models import Account, ApiProfile
+from backend.services.accounts_service import fetch_profile_and_stars
+from backend.shared.logging import logger
 
 SESS_ROOT = os.path.join(os.path.dirname(__file__), "sessions")
 os.makedirs(SESS_ROOT, exist_ok=True)

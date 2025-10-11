@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from backend.logger import logger
+from backend.shared.logging import logger
 
 T = TypeVar("T")
 

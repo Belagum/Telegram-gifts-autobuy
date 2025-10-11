@@ -11,8 +11,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-from backend.config import load_config
-from backend.logger import logger
+from backend.shared.config import load_config
+from backend.shared.logging import logger
 from tenacity import (
     AsyncRetrying,
     RetryError,

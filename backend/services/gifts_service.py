@@ -12,14 +12,15 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..db import SessionLocal
-from ..logger import logger
-from ..models import Account
-from ..utils.gifts_utils import hash_items, merge_new
-from ..utils.jsonio import read_json_list_of_dicts, write_json_list
+
 from backend.infrastructure.container import container
 from .notify_gifts_service import broadcast_new_gifts
 from .tg_clients_service import tg_call, tg_shutdown
+from ..infrastructure.db import SessionLocal
+from ..infrastructure.db.models import Account
+from ..shared.logging import logger
+from ..shared.utils.gifts_utils import hash_items, merge_new
+from ..shared.utils.jsonio import read_json_list_of_dicts, write_json_list
 
 
 @dataclass
@@ -153,20 +154,6 @@ async def _list_gifts_for_account_persist(
             "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
             "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
         }
-        if locked_until_date:
-            item["locked_until_date"] = locked_until_date
-            try:
-                logger.info(
-                    f"gifts.parse: gift_id={item['id']} locked_until={locked_until_date}"
-                )
-            except Exception:
-                pass
-        else:
-            try:
-                logger.info(f"gifts.parse: gift_id={item['id']} unlocked")
-            except Exception:
-                pass
-        out.append(item)
     return out
 
 

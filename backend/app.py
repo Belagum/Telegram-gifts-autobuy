@@ -14,7 +14,7 @@ from backend.infrastructure.db.models import User
 from backend.interfaces.http.routes import bp_acc, bp_channels, bp_gifts, bp_misc, bp_settings
 from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
 from backend.shared.config import load_config
-from backend.shared.logging import bind_flask, logger, setup_logging
+from backend.shared.logging import logger, setup_logging
 from backend.shared.middleware.error_handler import configure_error_handling
 
 _config = load_config()
@@ -49,7 +49,6 @@ def create_app() -> Flask:
     init_db()
     setup_logging()
     app = Flask(__name__)
-    bind_flask(app)
     configure_error_handling(app)
     app.config.update(
         SECRET_KEY=_config.secret_key,

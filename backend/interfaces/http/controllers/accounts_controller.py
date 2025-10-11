@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account, ApiProfile, User
-from backend.infrastructure.telegram.pyro_login import PyroLoginManager
+from backend.infrastructure.telegram_adapters.pyro_login import PyroLoginManager
 from backend.services.accounts_service import (
     any_stale,
     begin_user_refresh,

@@ -1,10 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Runtime configuration loading and validation."""
-
-# mypy: ignore-errors
-
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -14,7 +10,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class DatabaseConfig(BaseModel):
-    """Database connectivity and pooling settings."""
 
     url: str = Field("sqlite:///app.db", alias="DATABASE_URL")
     pool_size: int = Field(10, ge=1, alias="DATABASE_POOL_SIZE")
@@ -25,7 +20,6 @@ class DatabaseConfig(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    """Cache-related settings."""
 
     directory: Path = Field(Path("backend/instance/gifts_cache"), alias="GIFTS_CACHE_DIR")
     ttl_seconds: int = Field(3600, ge=1, alias="CACHE_TTL")
@@ -34,7 +28,6 @@ class CacheConfig(BaseModel):
 
 
 class QueueConfig(BaseModel):
-    """Background queue related settings."""
 
     max_size: int = Field(1000, ge=1, alias="QUEUE_MAX_SIZE")
     visibility_timeout: float = Field(30.0, ge=0.1, alias="QUEUE_VISIBILITY_TIMEOUT")
@@ -43,7 +36,6 @@ class QueueConfig(BaseModel):
 
 
 class ResilienceConfig(BaseModel):
-    """Resilience knobs for retries/timeouts."""
 
     default_timeout: float = Field(15.0, ge=0.1, alias="RESILIENCE_TIMEOUT")
     max_retries: int = Field(3, ge=0, alias="RESILIENCE_RETRIES")
@@ -56,7 +48,6 @@ class ResilienceConfig(BaseModel):
 
 
 class ObservabilityConfig(BaseModel):
-    """Observability settings (metrics, tracing)."""
 
     metrics_enabled: bool = Field(True, alias="METRICS_ENABLED")
     tracing_enabled: bool = Field(False, alias="TRACING_ENABLED")
@@ -66,7 +57,6 @@ class ObservabilityConfig(BaseModel):
 
 
 class AppConfig(BaseSettings):
-    """Composite application configuration."""
 
     secret_key: str = Field("dev", alias="SECRET_KEY")
     gifts_dir: Path = Field(Path("gifts_data"), alias="GIFTS_DIR")
@@ -96,7 +86,6 @@ class AppConfig(BaseSettings):
 
 @lru_cache(maxsize=1)
 def load_config() -> AppConfig:
-    """Load configuration once per process."""
 
     return AppConfig()
 

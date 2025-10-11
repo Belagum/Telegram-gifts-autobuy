@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""HTTP controller for account-related endpoints."""
-
 from __future__ import annotations
 
 import json
@@ -14,10 +12,10 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.auth import auth_required, authed_request
+from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account, ApiProfile, User
-from backend.pyro_login import PyroLoginManager
+from backend.infrastructure.telegram.pyro_login import PyroLoginManager
 from backend.services.accounts_service import (
     any_stale,
     begin_user_refresh,
@@ -31,7 +29,6 @@ from backend.shared.logging import logger
 
 
 class AccountsController:
-    """Controller exposing account management endpoints."""
 
     def __init__(self, *, login_manager: PyroLoginManager | None = None) -> None:
         self._login_manager = login_manager or PyroLoginManager()
@@ -202,7 +199,7 @@ class AccountsController:
             )
             if existing_by_id:
                 logger.warning(
-                    "apiprofile.create: duplicate api_id "
+                    f"apiprofile.create: duplicate api_id "
                     f"(user_id={user_id}, existing_id={existing_by_id.id})"
                 )
                 return (
@@ -217,7 +214,7 @@ class AccountsController:
             )
             if existing_by_hash:
                 logger.warning(
-                    "apiprofile.create: duplicate api_hash "
+                    f"apiprofile.create: duplicate api_hash "
                     f"(user_id={user_id}, existing_id={existing_by_hash.id})"
                 )
                 return (
@@ -297,8 +294,8 @@ class AccountsController:
             )
             if count > 0:
                 logger.warning(
-                    "apiprofile.delete: in_use "
-                    f"(user_id={user_id}, ap_id={api_profile_id}, accounts={count})"
+                    f"apiprofile.delete: in_use (user_id={user_id}, ap_id={api_profile_id}, "
+                    f"accounts={count})"
                 )
                 return (
                     jsonify({"error": "api_profile_in_use", "accounts": int(count)}),
@@ -326,11 +323,8 @@ class AccountsController:
         api_profile_id = payload.get("api_profile_id")
         normalized_phone = self._normalize_phone(phone)
         logger.info(
-            "auth.send_code: start (user_id=%s, api_profile_id=%s, phone='%s', norm='%s')",
-            user_id,
-            api_profile_id,
-            phone,
-            normalized_phone,
+            f"auth.send_code: start (user_id={user_id}, api_profile_id={api_profile_id}, "
+            f"phone='{phone}', norm='{normalized_phone}')"
         )
         try:
             if not phone or not api_profile_id:
@@ -347,10 +341,8 @@ class AccountsController:
             )
             if existing:
                 logger.warning(
-                    "auth.send_code: phone_exists (user_id=%s, acc_id=%s, phone_db='%s')",
-                    user_id,
-                    existing.id,
-                    existing.phone,
+                    f"auth.send_code: phone_exists (user_id={user_id}, acc_id={existing.id}, "
+                    f"phone_db='{existing.phone}')"
                 )
                 return (
                     jsonify(
@@ -371,9 +363,7 @@ class AccountsController:
             )
             if "error" in result:
                 logger.warning(
-                    "auth.send_code: fail (user_id=%s, error='%s')",
-                    user_id,
-                    result.get("error"),
+                    f"auth.send_code: fail (user_id={user_id}, error='{result.get('error')}')"
                 )
                 return jsonify(result), int(result.get("http", 400))
 
@@ -398,9 +388,7 @@ class AccountsController:
             result = self._login_manager.confirm_code(db, login_id, code)
             if "error" in result:
                 logger.warning(
-                    "auth.confirm_code: fail (user_id=%s, error='%s')",
-                    user_id,
-                    result.get("error"),
+                    f"auth.confirm_code: fail (user_id={user_id}, error='{result.get('error')}')"
                 )
                 return jsonify(result), int(result.get("http", 400))
             dt = (perf_counter() - t0) * 1000
@@ -424,9 +412,8 @@ class AccountsController:
             result = self._login_manager.confirm_password(db, login_id, password)
             if "error" in result:
                 logger.warning(
-                    "auth.confirm_password: fail (user_id=%s, error='%s')",
-                    user_id,
-                    result.get("error"),
+                    f"auth.confirm_password: fail (user_id={user_id}, "
+                    f"error='{result.get('error')}')"
                 )
                 return jsonify(result), int(result.get("http", 400))
             dt = (perf_counter() - t0) * 1000
@@ -490,9 +477,8 @@ class AccountsController:
                 )
                 if not account_copy:
                     logger.warning(
-                        "account.refresh.stream: acc not_found (user_id=%s, acc_id=%s)",
-                        user_id,
-                        account_id,
+                        f"account.refresh.stream: acc not_found (user_id={user_id}, "
+                        f"acc_id={account_id})"
                     )
                     yield json.dumps({"error": "not_found"}, ensure_ascii=False) + "\n"
                     return
@@ -504,18 +490,13 @@ class AccountsController:
                 ):
                     if event.get("stage"):
                         logger.debug(
-                            "account.refresh.stream: stage=%s (user_id=%s, acc_id=%s)",
-                            event["stage"],
-                            user_id,
-                            account_id,
+                            f"account.refresh.stream: stage={event['stage']} "
+                            f"(user_id={user_id}, acc_id={account_id})"
                         )
                     if event.get("error"):
                         logger.warning(
-                            "account.refresh.stream: error='%s' detail='%s' user_id=%s acc_id=%s",
-                            event.get("error"),
-                            event.get("detail"),
-                            user_id,
-                            account_id,
+                            f"account.refresh.stream: error='{event.get('error')}' "
+                            f"detail='{event.get('detail')}' user_id={user_id} acc_id={account_id}"
                         )
                     yield json.dumps(event, ensure_ascii=False) + "\n"
                 logger.debug(

@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Application layer with use-cases orchestrating domain logic."""
-
 from .interfaces import (
     AccountRepository,
     ChannelRepository,

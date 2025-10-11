@@ -1,14 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Telegram-facing adapters implementing application ports."""
-
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable, Sequence
 
 import httpx
+
 from backend.application import NotificationPort, TelegramPort
 from backend.domain import AccountSnapshot, PurchaseOperation
 from backend.infrastructure.resilience import CircuitBreaker, resilient_call
@@ -20,7 +19,6 @@ _config = load_config()
 
 
 class TelegramRpcPort(TelegramPort):
-    """Adapter that proxies domain calls to Pyrogram clients."""
 
     def __init__(self, *, balance_interval: float = 0.5, send_interval: float = 0.7):
         self._balance_interval = balance_interval
@@ -74,7 +72,6 @@ class TelegramRpcPort(TelegramPort):
 
 
 class TelegramNotificationAdapter(NotificationPort):
-    """Sends structured reports to Telegram chats using Bot API."""
 
     def __init__(self, *, timeout: float = 30.0, send_interval: float = 0.05):
         self._timeout = timeout

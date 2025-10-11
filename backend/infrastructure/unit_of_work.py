@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Database unit of work implementation."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
@@ -10,12 +8,12 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import Protocol
 
-from backend.shared.logging import logger
 from sqlalchemy.orm import Session
+
+from backend.shared.logging import logger
 
 
 class UnitOfWork(Protocol):
-    """Unit of work protocol for transactional operations."""
 
     def __enter__(self) -> UnitOfWork: ...
 
@@ -31,7 +29,6 @@ class UnitOfWork(Protocol):
 
 @dataclass(slots=True)
 class SqlAlchemyUnitOfWork(AbstractContextManager, UnitOfWork):
-    """SQLAlchemy-backed unit of work."""
 
     session_factory: Callable[[], Session]
 
@@ -83,7 +80,6 @@ class SqlAlchemyUnitOfWork(AbstractContextManager, UnitOfWork):
 
 @contextmanager
 def unit_of_work_scope(factory: Callable[[], Session]) -> Iterator[Session]:
-    """Provide a context manager yielding a session."""
 
     with SqlAlchemyUnitOfWork(factory) as uow:
         yield uow.session

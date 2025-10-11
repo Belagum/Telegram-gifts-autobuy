@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Simple in-memory cache layer with TTL semantics."""
-
 from __future__ import annotations
 
 import time
@@ -19,7 +17,6 @@ V = TypeVar("V")
 
 @dataclass(slots=True)
 class CacheEntry(Generic[V]):  # noqa: UP046
-    """Single cache entry."""
 
     value: V
     expires_at: float
@@ -29,7 +26,6 @@ class CacheEntry(Generic[V]):  # noqa: UP046
 
 
 class InMemoryTTLCache(Generic[K, V]):  # noqa: UP046
-    """Thread-safe cache with TTL and lazy refresh support."""
 
     def __init__(self, ttl_seconds: int) -> None:
         self._ttl = ttl_seconds

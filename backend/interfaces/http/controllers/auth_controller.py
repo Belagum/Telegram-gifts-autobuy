@@ -1,5 +1,5 @@
-"""HTTP controller for authentication endpoints."""
-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
 from __future__ import annotations
 
 from flask import Blueprint, Response, jsonify, request

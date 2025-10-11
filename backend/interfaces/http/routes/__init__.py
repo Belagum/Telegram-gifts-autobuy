@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""HTTP blueprints exposed by the web application."""
-
 from backend.interfaces.http.controllers.accounts_controller import AccountsController
 from backend.interfaces.http.controllers.channels_controller import ChannelsController
 from backend.interfaces.http.controllers.gifts_controller import GiftsController

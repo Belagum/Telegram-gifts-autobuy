@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""HTTP controller for gifts-related endpoints."""
-
 from __future__ import annotations
 
 import gzip
@@ -21,7 +19,7 @@ import httpx
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from sqlalchemy.orm import Session, joinedload
 
-from backend.auth import auth_required, authed_request
+from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db.models import Account, User, UserSettings
 from backend.services.gifts_service import (
     NoAccountsError,
@@ -32,6 +30,19 @@ from backend.services.gifts_service import (
     stop_user_gifts,
 )
 from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.shared.errors import (
+    InvalidGiftIdError,
+    InvalidAccountIdError,
+    TargetIdRequiredError,
+    InvalidTargetIdError,
+    AccountNotFoundError,
+    ApiProfileMissingError,
+    GiftNotFoundError,
+    GiftUnavailableError,
+    InsufficientBalanceError,
+    BadTgsError,
+    InfrastructureError,
+)
 from backend.shared.logging import logger
 from backend.shared.utils.asyncio_utils import run_async as _run_async
 from backend.shared.utils.fs import link_or_copy, save_atomic
@@ -106,7 +117,7 @@ def _send_lottie_json_from_tgs(path: Path) -> Response | tuple[Response, int]:
     try:
         data = gzip.decompress(raw)
     except Exception:
-        return jsonify({"error": "bad_tgs"}), 415
+        raise BadTgsError()
     response = Response(data, mimetype="application/json")
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     response.headers["ETag"] = etag
@@ -269,18 +280,18 @@ class GiftsController:
         try:
             gift_id_int = int(gift_id)
         except (TypeError, ValueError):
-            return jsonify({"error": "gift_id_invalid"}), 400
+            raise InvalidGiftIdError(gift_id)
 
         account_id = _parse_int(account_raw)
         if account_id is None or account_id <= 0:
-            return jsonify({"error": "account_id_invalid"}), 400
+            raise InvalidAccountIdError()
 
         target_text = str(target_raw or "").strip()
         if not target_text:
-            return jsonify({"error": "target_id_required"}), 400
+            raise TargetIdRequiredError()
         target_id = _parse_int(target_text)
         if target_id is None:
-            return jsonify({"error": "target_id_invalid"}), 400
+            raise InvalidTargetIdError()
 
         user_id = authed_request().user_id
 
@@ -291,9 +302,9 @@ class GiftsController:
             .first()
         )
         if not account:
-            return jsonify({"error": "account_not_found"}), 404
+            raise AccountNotFoundError(account_id)
         if not account.api_profile:
-            return jsonify({"error": "api_profile_missing"}), 409
+            raise ApiProfileMissingError()
 
         items = read_user_gifts(user_id)
         gift = next(
@@ -305,12 +316,12 @@ class GiftsController:
             None,
         )
         if not gift:
-            return jsonify({"error": "gift_not_found"}), 404
+            raise GiftNotFoundError(gift_id_int)
 
         limited = bool(gift.get("is_limited"))
         available_amount = _parse_int(gift.get("available_amount"))
         if limited and (available_amount is None or available_amount <= 0):
-            return jsonify({"error": "gift_unavailable", "detail": "Подарок недоступен"}), 409
+            raise GiftUnavailableError()
 
         locks = gift.get("locks") if isinstance(gift.get("locks"), dict) else {}
         lock_value = None
@@ -344,11 +355,8 @@ class GiftsController:
             _run_async(_send_once())
         except Exception as exc:  # pragma: no cover - network issues
             logger.exception(
-                "gifts.buy failed user_id={} gift_id={} account_id={} target_id={}",
-                user_id,
-                gift_id,
-                account_id,
-                target_id,
+                f"gifts.buy failed user_id={user_id} gift_id={gift_id} account_id={account_id} "
+                f"target_id={target_id}"
             )
             message = (str(exc) or "").upper()
             if "BALANCE_TOO_LOW" in message:
@@ -366,47 +374,15 @@ class GiftsController:
                 except Exception:
                     balance = 0
                 price = _parse_int(gift.get("price")) or 0
-                detail = f"Недостаточно Stars: баланс {balance}⭐, нужно {price}⭐"
-                return (
-                    jsonify(
-                        {
-                            "error": "insufficient_balance",
-                            "detail": detail,
-                            "balance": balance,
-                            "price": price,
-                            "gift_id": gift_id,
-                            "account_id": account_id,
-                            "target_id": target_id,
-                        }
-                    ),
-                    409,
-                )
+                raise InsufficientBalanceError(balance, price)
             if "PEER_ID_INVALID" in message or "PEER ID INVALID" in message:
-                return (
-                    jsonify(
-                        {
-                            "error": "peer_id_invalid",
-                            "detail": (
-                                "Некорректный или неизвестный получатель. "
-                                "Убедитесь, что указали правильный ID и что выбранный аккаунт "
-                                "уже встречал этот чат/канал (начните диалог или вступите в канал)."
-                            ),
-                            "account_id": account_id,
-                            "target_id": target_id,
-                            "gift_id": gift_id,
-                        }
-                    ),
-                    409,
-                )
+                raise InvalidTargetIdError()
             message_text = str(exc)
-            return jsonify({"error": "send_failed", "detail": (message_text or "")[:200]}), 502
+            raise InfrastructureError(f"Failed to send gift: {message_text[:200]}")
 
         logger.info(
-            "gifts.buy success user_id={} gift_id={} account_id={} target_id={}",
-            user_id,
-            gift_id,
-            account_id,
-            target_id,
+            f"gifts.buy success user_id={user_id} gift_id={gift_id} account_id={account_id} "
+            f"target_id={target_id}"
         )
 
         return jsonify(

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
 
-"""HTTP controller package."""
 
 from .auth_controller import AuthController
 

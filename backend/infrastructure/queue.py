@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""In-memory resilient queue implementation."""
-
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +15,6 @@ T = TypeVar("T")
 
 @dataclass(slots=True)
 class QueueMessage(Generic[T]):  # noqa: UP046
-    """Message wrapper with idempotency token."""
 
     payload: T
     message_id: str
@@ -25,7 +22,6 @@ class QueueMessage(Generic[T]):  # noqa: UP046
 
 
 class ResilientQueue(Generic[T]):  # noqa: UP046
-    """Queue with visibility timeout to emulate external brokers."""
 
     def __init__(self, max_size: int, visibility_timeout: float) -> None:
         self._queue: asyncio.Queue[QueueMessage[T]] = asyncio.Queue(maxsize=max_size)

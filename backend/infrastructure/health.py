@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Health and readiness checks."""
-
 from __future__ import annotations
 
-from backend.infrastructure.db import ENGINE
 from sqlalchemy import text
+
+from backend.infrastructure.db import ENGINE
 
 
 def check_database() -> bool:

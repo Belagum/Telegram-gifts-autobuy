@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Resilience utilities (timeouts, retries, circuit breaker)."""
-
 from __future__ import annotations
 
 import asyncio
@@ -11,8 +9,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-from backend.shared.config import load_config
-from backend.shared.logging import logger
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -21,13 +17,15 @@ from tenacity import (
     wait_exponential,
 )
 
+from backend.shared.config import load_config
+from backend.shared.logging import logger
+
 _config = load_config()
 T = TypeVar("T")
 
 
 @dataclass
 class CircuitBreaker:
-    """Simple in-memory circuit breaker."""
 
     failure_threshold: int
     reset_timeout: float
@@ -65,7 +63,6 @@ async def resilient_call(  # noqa: UP047
     timeout: float | None = None,
     **kwargs: Any,
 ) -> T:
-    """Execute call with retries, timeout, and optional circuit breaker."""
 
     breaker = breaker or CircuitBreaker(
         failure_threshold=_config.resilience.circuit_fail_threshold,

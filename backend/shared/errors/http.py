@@ -1,4 +1,5 @@
-"""HTTP error mapping utilities."""
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
 
 from __future__ import annotations
 
@@ -29,11 +30,7 @@ def register_error_handler(
 
     @app.errorhandler(Exception)
     def _handle_unexpected(exc: Exception):
-        response = jsonify({"error": "internal_error", "message": str(exc)})
+        response = jsonify({"error": "internal_error", "message": "An unexpected error occurred"})
         return response, default_status
 
 
-def map_exception(exc_type: type[Exception], error: AppError) -> AppError:
-    if isinstance(error, exc_type):
-        return error
-    raise error

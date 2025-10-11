@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""SQLAlchemy-backed repository adapters."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+
+from sqlalchemy.orm import Session, joinedload
 
 from backend.application import (
     AccountRepository,
@@ -15,11 +15,9 @@ from backend.application import (
 from backend.domain import AccountSnapshot, ChannelFilter
 from backend.infrastructure.db.models import Account, Channel, UserSettings
 from backend.infrastructure.unit_of_work import unit_of_work_scope
-from sqlalchemy.orm import Session, joinedload
 
 
 class SqlAlchemyAccountRepository(AccountRepository):
-    """Reads account information and maps it into domain objects."""
 
     def __init__(self, session_factory: Callable[[], Session]):
         self._session_factory = session_factory
@@ -48,7 +46,6 @@ class SqlAlchemyAccountRepository(AccountRepository):
 
 
 class SqlAlchemyChannelRepository(ChannelRepository):
-    """Loads channel filters for a user."""
 
     def __init__(self, session_factory: Callable[[], Session]):
         self._session_factory = session_factory
@@ -76,7 +73,6 @@ class SqlAlchemyChannelRepository(ChannelRepository):
 
 
 class SqlAlchemyUserSettingsRepository(UserSettingsRepository):
-    """Fetches user-level settings used by application services."""
 
     def __init__(self, session_factory: Callable[[], Session]):
         self._session_factory = session_factory

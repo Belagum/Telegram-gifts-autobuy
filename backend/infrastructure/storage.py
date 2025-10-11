@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""File storage adapter."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,7 +10,6 @@ from backend.shared.logging import logger
 
 
 class StoragePort(Protocol):
-    """Protocol for storage operations."""
 
     def read_bytes(self, path: str) -> bytes: ...
 
@@ -20,7 +17,6 @@ class StoragePort(Protocol):
 
 
 class LocalFileStorage(StoragePort):
-    """Stores files on local filesystem within configured root."""
 
     def __init__(self, root: Path) -> None:
         self._root = root

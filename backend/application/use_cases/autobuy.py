@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Autobuy use-case implemented in object oriented style."""
-
 from __future__ import annotations
 
 import asyncio
@@ -612,6 +610,48 @@ class AutobuyUseCase:
         self._settings = settings
         self._validator = GiftValidator()
         self._report = ReportBuilder()
+
+    async def execute_with_user_check(self, user_id: int, gifts: list[dict]) -> AutobuyOutput:
+        from backend.infrastructure.db import SessionLocal
+        from backend.infrastructure.db.models import User, UserSettings
+        
+        session = SessionLocal()
+        try:
+            user = session.get(User, user_id)
+            if not user or not bool(getattr(user, "gifts_autorefresh", False)):
+                logger.info(f"autobuy:skip user_id={user_id} reason=autorefresh_off")
+                return AutobuyOutput(
+                    purchased=[],
+                    skipped=len(gifts or []),
+                    stats={
+                        "channels": {},
+                        "accounts": {},
+                        "global_skips": [{"reason": "autorefresh_off"}],
+                        "plan_skips": [],
+                        "plan": [],
+                    },
+                    deferred=[],
+                )
+            
+            settings = session.get(UserSettings, user_id)
+            forced_channel_id = (
+                int(settings.buy_target_id) if settings and settings.buy_target_id is not None else None
+            )
+            forced_channel_fallback = (
+                bool(getattr(settings, "buy_target_on_fail_only", False)) if settings else False
+            )
+            if forced_channel_id is None:
+                forced_channel_fallback = False
+        finally:
+            session.close()
+
+        data = AutobuyInput(
+            user_id=user_id,
+            gifts=list(gifts or []),
+            forced_channel_id=forced_channel_id,
+            forced_channel_fallback=forced_channel_fallback,
+        )
+        return await self.execute(data)
 
     async def execute(self, data: AutobuyInput) -> AutobuyOutput:
         logger.bind(user_id=data.user_id).info(f"autobuy:start gifts={len(data.gifts)}")

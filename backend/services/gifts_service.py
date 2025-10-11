@@ -12,14 +12,14 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session, joinedload
 
-from backend.infrastructure.db import SessionLocal
-from backend.infrastructure.db.models import Account
-from backend.services.autobuy_service import autobuy_new_gifts
-from backend.services.notify_gifts_service import broadcast_new_gifts
-from backend.services.tg_clients_service import tg_call, tg_shutdown
-from backend.shared.logging import logger
-from backend.shared.utils.gifts_utils import hash_items, merge_new
-from backend.shared.utils.jsonio import read_json_list_of_dicts, write_json_list
+from ..db import SessionLocal
+from ..logger import logger
+from ..models import Account
+from ..utils.gifts_utils import hash_items, merge_new
+from ..utils.jsonio import read_json_list_of_dicts, write_json_list
+from backend.infrastructure.container import container
+from .notify_gifts_service import broadcast_new_gifts
+from .tg_clients_service import tg_call, tg_shutdown
 
 
 @dataclass
@@ -29,7 +29,6 @@ class _WorkerState:
 
 
 GIFTS_THREADS: dict[int, _WorkerState] = {}
-_DEFERRED_TASKS: dict[int, dict[tuple[int, int], asyncio.Task[Any]]] = {}
 _GIFTS_DIR = os.getenv("GIFTS_DIR", "gifts_data")
 ACC_TTL = float(os.getenv("GIFTS_ACCS_TTL", "60.0"))
 
@@ -81,91 +80,8 @@ class _GiftsEventBus:
 gifts_event_bus = _GiftsEventBus()
 
 
-def _parse_iso_datetime(value: str) -> datetime | None:
-    try:
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        if cleaned.endswith("Z"):
-            cleaned = cleaned[:-1] + "+00:00"
-        parsed = datetime.fromisoformat(cleaned)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=UTC)
-        return parsed.astimezone(UTC)
-    except Exception:
-        return None
-
-
-def _cancel_deferred_runs(uid: int) -> None:
-    tasks = _DEFERRED_TASKS.pop(uid, {})
-    for task in tasks.values():
-        task.cancel()
-
-
-def _schedule_deferred_runs(uid: int, rows: list[dict[str, Any]]) -> None:
-    if not rows:
-        return
-    tasks = _DEFERRED_TASKS.setdefault(uid, {})
-    for row in rows:
-        gift_id = int(row.get("gift_id", 0))
-        account_id = int(row.get("account_id", 0))
-        run_at_raw = row.get("run_at")
-        if gift_id <= 0 or account_id <= 0 or not isinstance(run_at_raw, str):
-            continue
-        run_at = _parse_iso_datetime(run_at_raw)
-        if run_at is None:
-            continue
-        key = (gift_id, account_id)
-        existing = tasks.get(key)
-        if existing and not existing.done():
-            existing.cancel()
-        task = asyncio.create_task(_run_deferred_autobuy(uid, gift_id, account_id, run_at))
-        tasks[key] = task
-        try:
-            logger.info(
-                f"gifts.worker: scheduled deferred user_id={uid} gift_id={gift_id} "
-                f"acc_id={account_id} run_at={run_at_raw}"
-            )
-        except Exception:
-            pass
-
-
-async def _run_deferred_autobuy(uid: int, gift_id: int, account_id: int, run_at: datetime) -> None:
-    key = (gift_id, account_id)
-    try:
-        delay = max((run_at - datetime.now(UTC)).total_seconds(), 0.0)
-        if delay > 0:
-            await asyncio.sleep(delay)
-        items = read_json_list_of_dicts(_gifts_path(uid))
-        gift = next(
-            (g for g in items if isinstance(g.get("id"), int) and int(g.get("id", 0)) == gift_id),
-            None,
-        )
-        if not gift:
-            logger.info(
-                f"gifts.worker: deferred skip user_id={uid} gift_id={gift_id} reason=not_found"
-            )
-            return
-        logger.info(
-            f"gifts.worker: deferred trigger user_id={uid} gift_id={gift_id} acc_id={account_id}"
-        )
-        await autobuy_new_gifts(uid, [gift])
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        logger.exception(
-            f"gifts.worker: deferred run failed user_id={uid} gift_id={gift_id} acc_id={account_id}"
-        )
-    finally:
-        tasks = _DEFERRED_TASKS.get(uid)
-        if tasks is not None:
-            task = tasks.pop(key, None)
-            if task is not None and task is not asyncio.current_task():
-                task.cancel()
-
-
 async def _list_gifts_for_account_persist(
-    account_id: int, session_path: str, api_id: int, api_hash: str
+    session_path: str, api_id: int, api_hash: str
 ) -> list[dict[str, Any]]:
     gifts = cast(
         list[Any],
@@ -196,7 +112,7 @@ async def _list_gifts_for_account_persist(
             try:
                 if value is None:
                     return None
-                if isinstance(value, int | float):
+                if isinstance(value, (int, float)):
                     dt = datetime.fromtimestamp(int(value), tz=UTC)
                     return dt.isoformat().replace("+00:00", "Z")
                 if isinstance(value, datetime):
@@ -227,7 +143,8 @@ async def _list_gifts_for_account_persist(
             "price": int(getattr(g, "price", 0)),
             "is_limited": is_limited,
             "available_amount": avail_total,
-            "total_amount": getattr(g, "total_amount", None) or getattr(raw, "total_amount", None),
+            "total_amount": getattr(g, "total_amount", None)
+            or getattr(raw, "total_amount", None),
             "require_premium": bool(getattr(raw, "require_premium", False)),
             "limited_per_user": limited_per_user,
             "per_user_remains": per_user_remains,
@@ -236,8 +153,19 @@ async def _list_gifts_for_account_persist(
             "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
             "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
         }
-        locks = {str(account_id): locked_until_date}
-        item["locks"] = locks
+        if locked_until_date:
+            item["locked_until_date"] = locked_until_date
+            try:
+                logger.info(
+                    f"gifts.parse: gift_id={item['id']} locked_until={locked_until_date}"
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                logger.info(f"gifts.parse: gift_id={item['id']} unlocked")
+            except Exception:
+                pass
         out.append(item)
     return out
 
@@ -292,31 +220,14 @@ async def _worker_async(uid: int) -> None:
                 disk_items = read_json_list_of_dicts(_gifts_path(uid))
                 prev_ids = {int(x.get("id", 0)) for x in disk_items if isinstance(x.get("id"), int)}
                 gifts = await _list_gifts_for_account_persist(
-                    a.id, a.session_path, a.api_profile.api_id, a.api_profile.api_hash
+                    a.session_path, a.api_profile.api_id, a.api_profile.api_hash
                 )
                 merged_all = merge_new(disk_items or [], gifts)
-                added_ids = {
-                    int(g.get("id", 0))
+                added = [
+                    g
                     for g in merged_all
-                    if isinstance(g.get("id"), int) and int(g.get("id", 0)) not in prev_ids
-                }
-                added = []
-                if added_ids:
-                    for extra in accs:
-                        if extra.id == a.id:
-                            continue
-                        extra_gifts = await _list_gifts_for_account_persist(
-                            extra.id,
-                            extra.session_path,
-                            extra.api_profile.api_id,
-                            extra.api_profile.api_hash,
-                        )
-                        merged_all = merge_new(merged_all, extra_gifts)
-                    added = [
-                        g
-                        for g in merged_all
-                        if isinstance(g.get("id"), int) and int(g.get("id", 0)) in added_ids
-                    ]
+                    if isinstance(g.get("id"), int) and g["id"] not in prev_ids
+                ]
             except Exception:
                 logger.exception(f"gifts.worker: fetch failed (acc_id={a.id})")
                 gifts = []
@@ -339,7 +250,7 @@ async def _worker_async(uid: int) -> None:
                 if added:
                     logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
 
-                    buy_task = asyncio.create_task(autobuy_new_gifts(uid, added))
+                    buy_task = asyncio.create_task(container.autobuy_use_case.execute_with_user_check(uid, added))
                     notify_future = asyncio.to_thread(_notify_run_blocking, added)
 
                     res: dict[str, Any] = {"purchased": [], "skipped": len(added), "stats": {}}
@@ -353,13 +264,14 @@ async def _worker_async(uid: int) -> None:
                     if isinstance(buy_res, Exception):
                         logger.error(f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}")
                     else:
-                        res = cast(dict[str, Any], buy_res or res)
+                        output = buy_res
+                        res = {
+                            "purchased": output.purchased,
+                            "skipped": output.skipped,
+                            "stats": output.stats,
+                            "deferred": output.deferred,
+                        }
                         stats = cast(dict[str, Any], res.get("stats") or {})
-                        deferred_rows = cast(list[dict[str, Any]], res.get("deferred") or [])
-                        if not deferred_rows and stats:
-                            deferred_rows = cast(list[dict[str, Any]], stats.get("deferred") or [])
-                        if deferred_rows:
-                            _schedule_deferred_runs(uid, deferred_rows)
 
                     if isinstance(notify_res, Exception):
                         notify_error = (
@@ -417,7 +329,6 @@ async def _worker_async(uid: int) -> None:
             i = (i + 1) % n
             await asyncio.sleep(step)
     finally:
-        _cancel_deferred_runs(uid)
         try:
             await tg_shutdown(known_paths)
         finally:
@@ -443,7 +354,6 @@ def stop_user_gifts(uid: int) -> None:
     if not state:
         return
     state.stop.set()
-    _cancel_deferred_runs(uid)
     GIFTS_THREADS.pop(uid, None)
 
 
@@ -461,7 +371,7 @@ def refresh_once(uid: int) -> list[dict[str, Any]]:
             raise NoAccountsError("no_accounts")
         gifts = asyncio.run(
             _list_gifts_for_account_persist(
-                acc.id, acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
+                acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
             )
         )
         path = _gifts_path(uid)

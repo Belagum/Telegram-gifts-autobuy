@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Domain-specific exceptions."""
 
 from __future__ import annotations
 
@@ -11,7 +10,6 @@ class DomainError(Exception):
 
 
 class InvariantViolationError(DomainError):
-    """Raised when a domain entity invariant is violated."""
 
     def __init__(self, message: str, *, field: str | None = None):
         super().__init__(message)

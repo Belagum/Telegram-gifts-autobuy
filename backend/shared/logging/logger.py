@@ -1,4 +1,5 @@
-"""Structured logging utilities."""
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
 
 from __future__ import annotations
 
@@ -44,7 +45,6 @@ class _InterceptHandler(logging.Handler):
 
 
 class ContextualLogger:
-    """Proxy for loguru that injects correlation ids via ContextVar."""
 
     def __getattr__(self, name):  # pragma: no cover
         bound = _logger.bind(correlation_id=_CORRELATION_ID.get())
@@ -92,60 +92,6 @@ def setup_logging(level: str | None = None) -> None:
     logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
     logging.getLogger("werkzeug").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-
-
-def bind_flask(app) -> None:
-    import time
-
-    from flask import g, jsonify, request, send_file
-    from werkzeug.exceptions import HTTPException
-
-    from backend.shared.errors.base import AppError
-
-    @app.before_request
-    def _start_timer() -> None:
-        g._t0 = time.perf_counter()
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-        g._correlation_id = request_id
-        set_correlation_id(request_id)
-
-    @app.after_request
-    def _log_response(resp):
-        try:
-            dt = (time.perf_counter() - getattr(g, "_t0", time.perf_counter())) * 1000.0
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-            logger.info(
-                f"{request.method} {request.path} -> {resp.status_code} in {dt:.1f} ms from {ip}"
-            )
-        except Exception:
-            pass
-        return resp
-
-    @app.teardown_request
-    def _teardown(_exc):
-        clear_correlation_id()
-
-    @app.errorhandler(Exception)
-    def _err(e: Exception):
-        if isinstance(e, HTTPException):
-            return e
-        if isinstance(e, AppError):
-            logger.warning(f"Handled application error {e.code} on {request.method} {request.path}")
-            return jsonify(e.to_dict()), e.status
-        logger.exception(f"Unhandled error on {request.method} {request.path}")
-        return jsonify({"error": "internal_error"}), 500
-
-    @app.get("/api/logs/download")
-    def download_logs():
-        log_file = _log_file_path()
-        if not os.path.exists(log_file):
-            return jsonify({"error": "log_file_not_found"}), 404
-        return send_file(
-            log_file,
-            mimetype="text/plain",
-            as_attachment=True,
-            download_name="giftbuyer.log",
-        )
 
 
 logger = ContextualLogger()

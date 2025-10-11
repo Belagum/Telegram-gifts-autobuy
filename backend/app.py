@@ -1,21 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Flask application factory."""
-
 import atexit
 import os
 import threading
-import time
 
-from flask import Flask, Response, g, request
+from flask import Flask
 from flask_cors import CORS
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from backend.container import container
+from backend.infrastructure.container import container
 from backend.infrastructure.db import SessionLocal, init_db
 from backend.infrastructure.db.models import User
-from backend.infrastructure.health import check_database
 from backend.interfaces.http.routes import bp_acc, bp_channels, bp_gifts, bp_misc, bp_settings
 from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
 from backend.shared.config import load_config
@@ -69,36 +64,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_settings)
     app.register_blueprint(bp_channels)
 
-    @app.before_request
-    def _start_timer() -> None:
-        g._request_start = time.perf_counter()
 
-    @app.after_request
-    def _record_metrics(response: Response) -> Response:
-        start = getattr(g, "_request_start", None)
-        if start is not None:
-            duration = time.perf_counter() - start
-            endpoint = request.endpoint or "unknown"
-            status = str(response.status_code)
-            from backend.infrastructure.observability import REQUEST_COUNTER, REQUEST_LATENCY
-
-            REQUEST_LATENCY.observe(duration)
-            REQUEST_COUNTER.labels(endpoint=endpoint, status=status).inc()
-        return response
-
-    @app.get("/metrics")
-    def metrics() -> Response:
-        payload = generate_latest()
-        return Response(payload, mimetype=CONTENT_TYPE_LATEST)
-
-    @app.get("/healthz")
-    def health() -> Response:
-        return Response("ok", mimetype="text/plain")
-
-    @app.get("/readyz")
-    def ready() -> Response:
-        check_database()
-        return Response("ready", mimetype="text/plain")
 
     if _should_boot() and not _BOOTSTRAPPED.is_set():
         _BOOTSTRAPPED.set()

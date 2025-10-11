@@ -1,4 +1,31 @@
-from .base import AppError, DomainError, InfrastructureError, ValidationError
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Vova Orig
+
+from .base import (
+    AppError, 
+    DomainError, 
+    InfrastructureError, 
+    ValidationError,
+    ChannelNotFoundError,
+    DuplicateChannelError,
+    BadChannelIdError,
+    InvalidBotTokenError,
+    InvalidChatIdError,
+    InvalidTargetIdError,
+    InvalidFallbackError,
+    InvalidNotifyChatIdError,
+    InvalidBuyTargetIdError,
+    InvalidGiftIdError,
+    InvalidAccountIdError,
+    TargetIdRequiredError,
+    InvalidTargetIdError,
+    AccountNotFoundError,
+    ApiProfileMissingError,
+    GiftNotFoundError,
+    GiftUnavailableError,
+    InsufficientBalanceError,
+    BadTgsError
+)
 from .http import handle_app_error, register_error_handler
 
 __all__ = [
@@ -6,6 +33,25 @@ __all__ = [
     "DomainError",
     "InfrastructureError",
     "ValidationError",
+    "ChannelNotFoundError",
+    "DuplicateChannelError",
+    "BadChannelIdError",
+    "InvalidBotTokenError",
+    "InvalidChatIdError",
+    "InvalidTargetIdError",
+    "InvalidFallbackError",
+    "InvalidNotifyChatIdError",
+    "InvalidBuyTargetIdError",
+    "InvalidGiftIdError",
+    "InvalidAccountIdError",
+    "TargetIdRequiredError",
+    "InvalidTargetIdError",
+    "AccountNotFoundError",
+    "ApiProfileMissingError",
+    "GiftNotFoundError",
+    "GiftUnavailableError",
+    "InsufficientBalanceError",
+    "BadTgsError",
     "handle_app_error",
     "register_error_handler",
 ]

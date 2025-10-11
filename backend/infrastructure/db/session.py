@@ -1,18 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Database layer helpers and session utilities."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from backend.shared.config import load_config
-from backend.shared.logging import logger
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
+
+from backend.shared.config import load_config
+from backend.shared.logging import logger
 
 _config = load_config()
 
@@ -40,22 +39,6 @@ ENGINE: Engine = create_engine(
 )
 
 
-@event.listens_for(ENGINE, "connect")
-def _set_sqlite_pragmas(dbapi_conn, _):
-    """Apply safety PRAGMAs when using SQLite."""
-
-    if not _config.database.url.startswith("sqlite"):
-        return
-    cur = dbapi_conn.cursor()
-    try:
-        cur.execute("PRAGMA journal_mode=WAL;")
-        cur.execute("PRAGMA synchronous=NORMAL;")
-        cur.execute("PRAGMA foreign_keys=ON;")
-        cur.execute("PRAGMA busy_timeout=30000;")
-    except Exception:
-        logger.exception("Failed to apply SQLite PRAGMAs")
-    finally:
-        cur.close()
 
 
 SessionLocal = scoped_session(

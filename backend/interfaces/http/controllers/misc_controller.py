@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""HTTP controller for miscellaneous endpoints."""
-
 from __future__ import annotations
 
 from flask import Blueprint, jsonify
@@ -11,7 +9,6 @@ from backend.infrastructure.health import check_database
 
 
 class MiscController:
-    """Controller exposing health checks."""
 
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("misc", __name__)

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-"""Domain entities that encapsulate GiftBuyer business rules."""
 
 from __future__ import annotations
 
@@ -15,7 +14,6 @@ INF_SUPPLY = 10**12
 
 @dataclass(slots=True, frozen=True)
 class ChannelFilter:
-    """Channel purchase constraints owned by a user."""
 
     id: int
     user_id: int
@@ -62,7 +60,6 @@ class ChannelFilter:
 
 @dataclass(slots=True, frozen=True)
 class GiftCandidate:
-    """Gift exposed by Telegram that can potentially be purchased."""
 
     gift_id: int
     price: int
@@ -92,7 +89,6 @@ class GiftCandidate:
 
 @dataclass(slots=True)
 class AccountSnapshot:
-    """Immutable information about a Telegram account participating in autobuy."""
 
     id: int
     user_id: int
@@ -129,7 +125,6 @@ class AccountSnapshot:
 
 @dataclass(slots=True, frozen=True)
 class PurchaseOperation:
-    """Single purchase request planned by the system."""
 
     account_id: int
     channel_id: int
@@ -144,7 +139,6 @@ class PurchaseOperation:
 
 @dataclass(slots=True)
 class PurchasePlan:
-    """A collection of operations with aggregate helpers (Unit of Work)."""
 
     operations: list[PurchaseOperation] = field(default_factory=list)
 

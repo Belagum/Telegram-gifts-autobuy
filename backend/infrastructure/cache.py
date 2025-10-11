@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Generic, TypeVar
 
-from backend.logger import logger
+from backend.shared.logging import logger
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")

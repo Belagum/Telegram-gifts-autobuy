@@ -1,5 +1,6 @@
-# SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Vova Orig
+"""Structured logging utilities."""
+
+from __future__ import annotations
 
 import logging
 import os
@@ -21,12 +22,12 @@ _CORRELATION_ID: ContextVar[str] = ContextVar("correlation_id", default="-")
 
 
 def _log_file_path() -> str:
-    p = os.getenv("LOG_FILE")
-    if p:
-        return p
-    base = os.path.abspath(os.path.join(os.path.dirname(__file__), "instance"))
-    os.makedirs(base, exist_ok=True)
-    return os.path.join(base, "app.log")
+    base = os.getenv("LOG_FILE")
+    if base:
+        return base
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../instance"))
+    os.makedirs(root, exist_ok=True)
+    return os.path.join(root, "app.log")
 
 
 class _InterceptHandler(logging.Handler):
@@ -36,14 +37,16 @@ class _InterceptHandler(logging.Handler):
         except ValueError:
             level = str(record.levelno)
         _logger.opt(depth=6, exception=record.exc_info).log(
-            level, record.getMessage(), correlation_id=_CORRELATION_ID.get()
+            level,
+            record.getMessage(),
+            correlation_id=_CORRELATION_ID.get(),
         )
 
 
 class ContextualLogger:
-    """Loguru proxy that injects correlation identifiers."""
+    """Proxy for loguru that injects correlation ids via ContextVar."""
 
-    def __getattr__(self, name):  # pragma: no cover - delegation
+    def __getattr__(self, name):  # pragma: no cover
         bound = _logger.bind(correlation_id=_CORRELATION_ID.get())
         return getattr(bound, name)
 
@@ -65,10 +68,7 @@ def setup_logging(level: str | None = None) -> None:
     log_file = _log_file_path()
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-    # Полностью пересобираем sinks
     _logger.remove()
-
-    # stderr (для dev / journalctl)
     _logger.add(
         sys.stderr,
         level=level,
@@ -76,9 +76,7 @@ def setup_logging(level: str | None = None) -> None:
         colorize=True,
         backtrace=False,
         diagnose=False,
-        enqueue=False,
     )
-
     _logger.add(
         log_file,
         level=level,
@@ -91,10 +89,7 @@ def setup_logging(level: str | None = None) -> None:
         encoding="utf-8",
     )
 
-    # Стандартный logging отправляем в loguru
     logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
-
-    # Понижаем болтливые библиотеки
     logging.getLogger("werkzeug").setLevel(logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -105,10 +100,10 @@ def bind_flask(app) -> None:
     from flask import g, jsonify, request, send_file
     from werkzeug.exceptions import HTTPException
 
-    from .utils.errors import ApplicationError
+    from backend.shared.errors.base import AppError
 
     @app.before_request
-    def _start_timer():
+    def _start_timer() -> None:
         g._t0 = time.perf_counter()
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         g._correlation_id = request_id
@@ -131,13 +126,12 @@ def bind_flask(app) -> None:
         clear_correlation_id()
 
     @app.errorhandler(Exception)
-    def _err(e):
-        # HTTP-исключения отдаём как есть
+    def _err(e: Exception):
         if isinstance(e, HTTPException):
             return e
-        if isinstance(e, ApplicationError):
+        if isinstance(e, AppError):
             logger.warning(f"Handled application error {e.code} on {request.method} {request.path}")
-            return jsonify({"error": e.code, "message": e.message}), e.status_code
+            return jsonify(e.to_dict()), e.status
         logger.exception(f"Unhandled error on {request.method} {request.path}")
         return jsonify({"error": "internal_error"}), 500
 
@@ -146,7 +140,6 @@ def bind_flask(app) -> None:
         log_file = _log_file_path()
         if not os.path.exists(log_file):
             return jsonify({"error": "log_file_not_found"}), 404
-        # attachment для скачивания
         return send_file(
             log_file,
             mimetype="text/plain",

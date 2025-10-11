@@ -13,8 +13,8 @@ from backend.application import (
     UserSettingsRepository,
 )
 from backend.domain import AccountSnapshot, ChannelFilter
+from backend.infrastructure.db.models import Account, Channel, UserSettings
 from backend.infrastructure.unit_of_work import unit_of_work_scope
-from backend.models import Account, Channel, UserSettings
 from sqlalchemy.orm import Session, joinedload
 
 

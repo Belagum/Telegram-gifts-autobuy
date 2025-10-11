@@ -15,7 +15,7 @@ This iteration introduces a layered design for the autobuy subsystem:
 - **Composition (`backend/container.py`)** — a lightweight DI container wires
   together application services and adapters.
 - **Cross-cutting concerns** — structured logging with per-request correlation
-  identifiers lives in `backend/logger.py`; reusable `ApplicationError`
+  identifiers lives in `backend/shared/logging`; reusable `ApplicationError`
   instances enable a single error handler in Flask.
 
 Unit tests cover the planner, validator and use-case orchestration to prevent

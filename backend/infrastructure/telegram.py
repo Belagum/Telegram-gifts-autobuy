@@ -10,11 +10,11 @@ from collections.abc import Iterable, Sequence
 
 import httpx
 from backend.application import NotificationPort, TelegramPort
-from backend.config import load_config
 from backend.domain import AccountSnapshot, PurchaseOperation
 from backend.infrastructure.resilience import CircuitBreaker, resilient_call
-from backend.logger import logger
 from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.shared.config import load_config
+from backend.shared.logging import logger
 
 _config = load_config()
 

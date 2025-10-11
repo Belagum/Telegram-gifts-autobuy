@@ -10,7 +10,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import Protocol
 
-from backend.logger import logger
+from backend.shared.logging import logger
 from sqlalchemy.orm import Session
 
 

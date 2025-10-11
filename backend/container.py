@@ -1,75 +1,62 @@
-# SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Vova Orig
-
-"""Dependency container wiring infrastructure adapters."""
+"""Application dependency container."""
 
 from __future__ import annotations
 
 from functools import cached_property
 
-from backend.application import AutobuyUseCase
-from backend.application.interfaces import (
-    AccountRepository,
-    ChannelRepository,
-    NotificationPort,
-    TelegramPort,
-    UserSettingsRepository,
+from backend.application.services.password_hashing import WerkzeugPasswordHasher
+from backend.application.use_cases.users.login_user import LoginUserUseCase
+from backend.application.use_cases.users.logout_user import LogoutUserUseCase
+from backend.application.use_cases.users.register_user import RegisterUserUseCase
+from backend.infrastructure.repositories.users.sqlalchemy_user_repository import (
+    SqlAlchemySessionTokenRepository,
+    SqlAlchemyUserRepository,
 )
-from backend.config import load_config
-from backend.db import SessionLocal
-from backend.infrastructure.cache import InMemoryTTLCache
-from backend.infrastructure.repositories import (
-    SqlAlchemyAccountRepository,
-    SqlAlchemyChannelRepository,
-    SqlAlchemyUserSettingsRepository,
-)
-from backend.infrastructure.telegram import (
-    TelegramNotificationAdapter,
-    TelegramRpcPort,
-)
-from backend.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+from backend.interfaces.http.controllers.auth_controller import AuthController
 
 
 class Container:
-    """Constructs and caches infrastructure adapters."""
-
     def __init__(self) -> None:
-        self._config = load_config()
-        self._session_factory = SessionLocal
-        self._cache = InMemoryTTLCache[str, list[int]](self._config.cache.ttl_seconds)
+        pass
 
     @cached_property
-    def unit_of_work(self) -> SqlAlchemyUnitOfWork:
-        return SqlAlchemyUnitOfWork(self._session_factory)
+    def password_hasher(self) -> WerkzeugPasswordHasher:
+        return WerkzeugPasswordHasher()
 
     @cached_property
-    def account_repository(self) -> AccountRepository:
-        return SqlAlchemyAccountRepository(self._session_factory)
+    def user_repository(self) -> SqlAlchemyUserRepository:
+        return SqlAlchemyUserRepository()
 
     @cached_property
-    def channel_repository(self) -> ChannelRepository:
-        return SqlAlchemyChannelRepository(self._session_factory)
+    def session_token_repository(self) -> SqlAlchemySessionTokenRepository:
+        return SqlAlchemySessionTokenRepository()
 
     @cached_property
-    def settings_repository(self) -> UserSettingsRepository:
-        return SqlAlchemyUserSettingsRepository(self._session_factory)
+    def register_user_use_case(self) -> RegisterUserUseCase:
+        return RegisterUserUseCase(
+            users=self.user_repository,
+            tokens=self.session_token_repository,
+            password_hasher=self.password_hasher,
+        )
 
     @cached_property
-    def telegram_port(self) -> TelegramPort:
-        return TelegramRpcPort()
+    def login_user_use_case(self) -> LoginUserUseCase:
+        return LoginUserUseCase(
+            users=self.user_repository,
+            tokens=self.session_token_repository,
+            password_hasher=self.password_hasher,
+        )
 
     @cached_property
-    def notification_port(self) -> NotificationPort:
-        return TelegramNotificationAdapter()
+    def logout_user_use_case(self) -> LogoutUserUseCase:
+        return LogoutUserUseCase(tokens=self.session_token_repository)
 
     @cached_property
-    def autobuy_use_case(self) -> AutobuyUseCase:
-        return AutobuyUseCase(
-            accounts=self.account_repository,
-            channels=self.channel_repository,
-            telegram=self.telegram_port,
-            notifications=self.notification_port,
-            settings=self.settings_repository,
+    def auth_controller(self) -> AuthController:
+        return AuthController(
+            register_use_case=self.register_user_use_case,
+            login_use_case=self.login_user_use_case,
+            logout_use_case=self.logout_user_use_case,
         )
 
 

@@ -12,14 +12,14 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..db import SessionLocal
-from ..logger import logger
-from ..models import Account
-from ..utils.gifts_utils import hash_items, merge_new
-from ..utils.jsonio import read_json_list_of_dicts, write_json_list
-from .autobuy_service import autobuy_new_gifts
-from .notify_gifts_service import broadcast_new_gifts
-from .tg_clients_service import tg_call, tg_shutdown
+from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.db.models import Account
+from backend.services.autobuy_service import autobuy_new_gifts
+from backend.services.notify_gifts_service import broadcast_new_gifts
+from backend.services.tg_clients_service import tg_call, tg_shutdown
+from backend.shared.logging import logger
+from backend.utils.gifts_utils import hash_items, merge_new
+from backend.utils.jsonio import read_json_list_of_dicts, write_json_list
 
 
 @dataclass

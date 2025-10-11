@@ -9,6 +9,7 @@ import asyncio
 from collections.abc import Iterable, Sequence
 
 import httpx
+
 from backend.application import NotificationPort, TelegramPort
 from backend.domain import AccountSnapshot, PurchaseOperation
 from backend.infrastructure.resilience import CircuitBreaker, resilient_call

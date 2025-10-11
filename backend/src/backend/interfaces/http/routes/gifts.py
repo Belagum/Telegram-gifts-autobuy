@@ -71,7 +71,25 @@ async def _botapi_download(file_id: str, token: str) -> bytes:
         fp = p["result"]["file_path"]
         r2 = await http.get(f"{base}/{fp}", follow_redirects=True)
         r2.raise_for_status()
-        return cast(bytes, r2.content)
+        return r2.content
+
+
+def _parse_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return None
+    return None
 
 
 def _send_lottie_json_from_tgs(path: Path) -> Response | tuple[Response, int]:
@@ -205,25 +223,24 @@ def gifts_refresh(db: Session) -> Response | tuple[Response, int]:
 def gifts_buy(gift_id: str, db: Session) -> Response | tuple[Response, int]:
     payload = request.get_json(silent=True) or {}
     account_raw = payload.get("account_id")
-    target_raw = (payload.get("target_id") or "").strip()
+    target_raw = payload.get("target_id")
 
     try:
         gift_id_int = int(gift_id)
     except (TypeError, ValueError):
         return jsonify({"error": "gift_id_invalid"}), 400
 
-    try:
-        account_id = int(account_raw)
-    except (TypeError, ValueError):
+    account_id = _parse_int(account_raw)
+    if account_id is None:
         return jsonify({"error": "account_id_invalid"}), 400
     if account_id <= 0:
         return jsonify({"error": "account_id_invalid"}), 400
 
-    if not target_raw:
+    target_text = str(target_raw or "").strip()
+    if not target_text:
         return jsonify({"error": "target_id_required"}), 400
-    try:
-        target_id = int(target_raw)
-    except ValueError:
+    target_id = _parse_int(target_text)
+    if target_id is None:
         return jsonify({"error": "target_id_invalid"}), 400
 
     user_id = authed_request().user_id
@@ -252,11 +269,7 @@ def gifts_buy(gift_id: str, db: Session) -> Response | tuple[Response, int]:
         return jsonify({"error": "gift_not_found"}), 404
 
     limited = bool(gift.get("is_limited"))
-    available_raw = gift.get("available_amount")
-    try:
-        available_amount = int(available_raw)
-    except (TypeError, ValueError):
-        available_amount = None
+    available_amount = _parse_int(gift.get("available_amount"))
     if limited and (available_amount is None or available_amount <= 0):
         return jsonify({"error": "gift_unavailable", "detail": "Подарок недоступен"}), 409
 
@@ -314,10 +327,7 @@ def gifts_buy(gift_id: str, db: Session) -> Response | tuple[Response, int]:
                 )
             except Exception:
                 balance = 0
-            try:
-                price = int(gift.get("price", 0) or 0)
-            except Exception:
-                price = 0
+            price = _parse_int(gift.get("price")) or 0
             detail = f"Недостаточно Stars: баланс {balance}⭐, нужно {price}⭐"
             return (
                 jsonify(

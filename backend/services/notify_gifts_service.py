@@ -99,9 +99,7 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
         else (
             "video/webm"
             if path.endswith(".webm")
-            else "image/webp"
-            if path.endswith(".webp")
-            else "application/octet-stream"
+            else "image/webp" if path.endswith(".webp") else "application/octet-stream"
         )
     )
     try:

@@ -16,11 +16,11 @@ from backend.container import container
 from backend.infrastructure.db import SessionLocal, init_db
 from backend.infrastructure.db.models import User
 from backend.infrastructure.health import check_database
-from backend.routes.account import bp_acc
-from backend.routes.channels import bp_channels
-from backend.routes.gifts import bp_gifts
-from backend.routes.misc import bp_misc
-from backend.routes.settings import bp_settings
+from backend.interfaces.http.routes import bp_acc
+from backend.interfaces.http.routes import bp_channels
+from backend.interfaces.http.routes import bp_gifts
+from backend.interfaces.http.routes import bp_misc
+from backend.interfaces.http.routes import bp_settings
 from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
 from backend.shared.config import load_config
 from backend.shared.logging import bind_flask, logger, setup_logging

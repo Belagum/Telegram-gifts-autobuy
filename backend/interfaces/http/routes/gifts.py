@@ -29,9 +29,9 @@ from backend.services.gifts_service import (
 )
 from backend.services.tg_clients_service import get_stars_balance, tg_call
 from backend.shared.logging import logger
-from backend.utils.asyncio_utils import run_async as _run_async
-from backend.utils.fs import link_or_copy, save_atomic
-from backend.utils.http import etag_for_path
+from backend.shared.utils.asyncio_utils import run_async as _run_async
+from backend.shared.utils.fs import link_or_copy, save_atomic
+from backend.shared.utils.http import etag_for_path
 
 bp_gifts = Blueprint("gifts", __name__, url_prefix="/api")
 

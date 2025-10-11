@@ -18,8 +18,8 @@ from backend.services.autobuy_service import autobuy_new_gifts
 from backend.services.notify_gifts_service import broadcast_new_gifts
 from backend.services.tg_clients_service import tg_call, tg_shutdown
 from backend.shared.logging import logger
-from backend.utils.gifts_utils import hash_items, merge_new
-from backend.utils.jsonio import read_json_list_of_dicts, write_json_list
+from backend.shared.utils.gifts_utils import hash_items, merge_new
+from backend.shared.utils.jsonio import read_json_list_of_dicts, write_json_list
 
 
 @dataclass

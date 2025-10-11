@@ -4,8 +4,8 @@
 from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
-from ..auth import auth_required, authed_request
-from ..services.settings_service import read_user_settings, set_user_settings
+from backend.auth import auth_required, authed_request
+from backend.services.settings_service import read_user_settings, set_user_settings
 
 bp_settings = Blueprint("settings", __name__, url_prefix="/api")
 

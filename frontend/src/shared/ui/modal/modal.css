@@ -17,6 +17,7 @@
   backdrop-filter: blur(4px);
   z-index: var(--z-modal-backdrop);
   outline: none;
+  animation: modal-backdrop-in 180ms ease-out;
 }
 
 .ui-modal__backdrop:focus {
@@ -35,6 +36,8 @@
   flex-direction: column;
   gap: var(--spacing-md);
   z-index: var(--z-modal);
+  transform-origin: 50% 46%;
+  animation: modal-content-in 200ms ease-out;
 }
 
 .ui-modal__header h2 {
@@ -63,4 +66,14 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--spacing-sm);
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-content-in {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

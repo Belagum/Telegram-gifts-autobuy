@@ -11,10 +11,10 @@
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: var(--color-accent);
-  color: var(--color-text);
+  color: #ffffff;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .ui-button:hover:not(:disabled) {
@@ -35,14 +35,23 @@
   color: var(--color-text);
 }
 
+.ui-button--secondary:hover:not(:disabled) {
+  color: #ffffff;
+}
+
 .ui-button--danger {
   background: var(--color-danger);
+  color: #ffffff;
 }
 
 .ui-button--ghost {
   background: transparent;
   border-color: transparent;
   color: var(--color-text);
+}
+
+.ui-button--ghost:hover:not(:disabled) {
+  color: #ffffff;
 }
 
 .ui-button--sm {

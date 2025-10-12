@@ -11,6 +11,9 @@ interface UiState {
   toggleTheme: () => void;
   globalLoading: boolean;
   setGlobalLoading: (value: boolean) => void;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (value: boolean) => void;
+  toggleSidebar: () => void;
 }
 
 const detectInitialTheme = (): ThemeName => {
@@ -47,6 +50,19 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   globalLoading: false,
   setGlobalLoading: (value) => set({ globalLoading: value }),
+  sidebarCollapsed: typeof window !== "undefined" 
+    ? window.localStorage.getItem("ui.sidebarCollapsed") === "true" 
+    : false,
+  setSidebarCollapsed: (value) => {
+    set({ sidebarCollapsed: value });
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("ui.sidebarCollapsed", String(value));
+    }
+  },
+  toggleSidebar: () => {
+    const next = !get().sidebarCollapsed;
+    get().setSidebarCollapsed(next);
+  },
 }));
 
 export const initializeThemeDom = () => {

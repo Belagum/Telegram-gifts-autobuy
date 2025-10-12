@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "../../shared/ui/button/Button";
-import { FormField } from "../../shared/ui/form-field/FormField";
 import { Input } from "../../shared/ui/input/Input";
 import { register as registerUser } from "./api";
 import { showError, showSuccess } from "../../shared/ui/feedback/toast";
@@ -48,15 +47,21 @@ export const RegisterForm: React.FC = () => {
 
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
-      <FormField label="Логин" error={errors.username?.message} required>
+      <div>
+        <label className="auth-form__label">Логин</label>
         <Input placeholder="username" autoComplete="username" {...register("username")} />
-      </FormField>
-      <FormField label="Пароль" error={errors.password?.message} required>
-        <Input type="password" placeholder="password" {...register("password")} />
-      </FormField>
-      <FormField label="Подтверждение пароля" error={errors.confirmPassword?.message} required>
-        <Input type="password" placeholder="repeat password" {...register("confirmPassword")} />
-      </FormField>
+        {errors.username && <div className="ui-input__error">{errors.username.message}</div>}
+      </div>
+      <div>
+        <label className="auth-form__label">Пароль</label>
+        <Input type="password" placeholder="••••••••" {...register("password")} />
+        {errors.password && <div className="ui-input__error">{errors.password.message}</div>}
+      </div>
+      <div>
+        <label className="auth-form__label">Подтверждение пароля</label>
+        <Input type="password" placeholder="••••••••" {...register("confirmPassword")} />
+        {errors.confirmPassword && <div className="ui-input__error">{errors.confirmPassword.message}</div>}
+      </div>
       <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
         {isSubmitting ? "Загрузка…" : "Создать аккаунт"}
       </Button>

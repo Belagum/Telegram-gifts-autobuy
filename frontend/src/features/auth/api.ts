@@ -11,6 +11,10 @@ export interface Credentials {
   password: string;
 }
 
+export interface LoginCredentials extends Credentials {
+  rememberMe?: boolean;
+}
+
 export const register = async (credentials: Credentials): Promise<SessionUser> => {
   const dto = await httpClient<SessionDto>("/auth/register", {
     method: "POST",
@@ -19,10 +23,14 @@ export const register = async (credentials: Credentials): Promise<SessionUser> =
   return mapSession(dto);
 };
 
-export const login = async (credentials: Credentials): Promise<SessionUser> => {
+export const login = async (credentials: LoginCredentials): Promise<SessionUser> => {
   const dto = await httpClient<SessionDto>("/auth/login", {
     method: "POST",
-    body: credentials,
+    body: {
+      username: credentials.username,
+      password: credentials.password,
+      remember_me: credentials.rememberMe || false,
+    },
   });
   return mapSession(dto);
 };

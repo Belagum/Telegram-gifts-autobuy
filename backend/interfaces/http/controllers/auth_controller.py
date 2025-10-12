@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
+
 from __future__ import annotations
 
 from flask import Blueprint, Response, jsonify, request
@@ -52,15 +53,20 @@ class AuthController:
         token = self._login_use_case.execute(dto.username, dto.password)
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
-        response.set_cookie(
-            "auth_token",
-            token,
-            httponly=True,
-            samesite="Lax",
-            secure=False,
-            max_age=60 * 60 * 24 * 7,
-        )
-        logger.info(f"auth.login: ok username={dto.username}")
+        
+        # Если remember_me=True, cookie живет 7 дней, иначе это session cookie (удаляется при закрытии браузера)
+        cookie_params = {
+            "key": "auth_token",
+            "value": token,
+            "httponly": True,
+            "samesite": "Lax",
+            "secure": False,
+        }
+        if dto.remember_me:
+            cookie_params["max_age"] = 60 * 60 * 24 * 7  # 7 дней
+        
+        response.set_cookie(**cookie_params)
+        logger.info(f"auth.login: ok username={dto.username} remember_me={dto.remember_me}")
         return response, 200
 
     def logout(self) -> tuple[Response, int]:
@@ -74,7 +80,7 @@ class AuthController:
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
         response.delete_cookie("auth_token")
-        logger.info("auth.logout: ok")
+        logger.info(f"auth.logout: ok")
         return response, 200
 
     def as_blueprint(self) -> Blueprint:

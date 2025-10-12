@@ -11,7 +11,8 @@ from .base import AppError
 
 
 def handle_app_error(error: AppError) -> tuple[Response, HTTPStatus]:
-    response = jsonify(error.to_dict())
+    payload = {"error": error.code, "message": error.message, "detail": error.message}
+    response = jsonify(payload)
     return response, error.status
 
 

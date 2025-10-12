@@ -35,6 +35,7 @@ from backend.shared.errors import (
     InvalidAccountIdError,
     TargetIdRequiredError,
     InvalidTargetIdError,
+    PeerIdInvalidError,
     AccountNotFoundError,
     ApiProfileMissingError,
     GiftNotFoundError,
@@ -375,8 +376,13 @@ class GiftsController:
                     balance = 0
                 price = _parse_int(gift.get("price")) or 0
                 raise InsufficientBalanceError(balance, price)
-            if "PEER_ID_INVALID" in message or "PEER ID INVALID" in message:
-                raise InvalidTargetIdError()
+            if (
+                "PEER_ID_INVALID" in message
+                or "PEER ID INVALID" in message
+                or "USER_ID_INVALID" in message
+                or "CHAT_ID_INVALID" in message
+            ):
+                raise PeerIdInvalidError()
             message_text = str(exc)
             raise InfrastructureError(f"Failed to send gift: {message_text[:200]}")
 

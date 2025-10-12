@@ -160,6 +160,19 @@ class InvalidTargetIdError(AppError):
         )
 
 
+class PeerIdInvalidError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Неверный ID получателя. Telegram сообщает: идентификатор недействителен "
+                "или ещё не известен. Сначала начните диалог с этим пользователем/чатом, "
+                "затем повторите попытку."
+            ),
+            code="peer_id_invalid",
+            status=HTTPStatus.BAD_REQUEST,
+        )
+
+
 class AccountNotFoundError(AppError):
     def __init__(self, account_id: int) -> None:
         super().__init__(
@@ -199,7 +212,7 @@ class GiftUnavailableError(AppError):
 class InsufficientBalanceError(AppError):
     def __init__(self, balance: int, price: int) -> None:
         super().__init__(
-            message=f"Insufficient balance: {balance}⭐, need {price}⭐",
+            message=f"Недостаточный баланс: {balance}⭐, нужно {price}⭐",
             code="insufficient_balance",
             status=HTTPStatus.CONFLICT
         )

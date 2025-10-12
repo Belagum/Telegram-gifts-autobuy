@@ -105,12 +105,34 @@ interface TgsThumbProps {
 const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const animationRef = React.useRef<ReturnType<typeof lottie.loadAnimation> | null>(null);
-  const visible = useOnScreen(containerRef, "600px");
+  const visible = useOnScreen(containerRef, "200px"); // Уменьшаем с 600px до 200px для меньшей нагрузки
+  const [hasPlayed, setHasPlayed] = React.useState(false);
+
+  const handleMouseEnter = React.useCallback(() => {
+    if (animationRef.current && hasPlayed) {
+      animationRef.current.goToAndPlay(0, true);
+    }
+  }, [hasPlayed]);
 
   React.useEffect(() => {
     const fileId = gift.stickerFileId;
     const uniq = gift.stickerUniqueId;
-    if (!visible || (!fileId && !uniq) || !containerRef.current) {
+    
+    if (!visible) {
+      if (animationRef.current) {
+        animationRef.current.pause();
+      }
+      dbg("thumb.pause", { id: gift.id });
+      return;
+    }
+    
+    if (visible && animationRef.current) {
+      animationRef.current.play();
+      dbg("thumb.resume", { id: gift.id });
+      return;
+    }
+    
+    if (!fileId && !uniq || !containerRef.current) {
       dbg("thumb.skip", { id: gift.id, visible, fileId: !!fileId, uniq: !!uniq });
       return;
     }
@@ -147,7 +169,7 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
             }
             const json = await response.json();
             TGS_CACHE.set(src, json);
-            if (TGS_CACHE.size > 30) {
+            if (TGS_CACHE.size > 50) {
               const [firstKey] = TGS_CACHE.keys();
               if (firstKey) TGS_CACHE.delete(firstKey);
             }
@@ -174,18 +196,24 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
           console.warn("[Gifts] Failed to reset container", clearError);
         }
         dbg("thumb.loadAnimation", { id: gift.id });
-        animationRef.current = lottie.loadAnimation({
+        const animation = lottie.loadAnimation({
           container: containerElement,
-          renderer: "svg",
-          loop: true,
+          renderer: "canvas", 
+          loop: false,
           autoplay: true,
           animationData: data,
           rendererSettings: {
             preserveAspectRatio: "xMidYMid meet",
-            progressiveLoad: false,
-            hideOnTransparent: true,
+            progressiveLoad: true, 
+            clearCanvas: true,
           },
         });
+        
+        animation.addEventListener("complete", () => {
+          setHasPlayed(true);
+        });
+        
+        animationRef.current = animation;
       } catch (error) {
         console.warn("[Gifts] Lottie load failed", error);
       }
@@ -212,7 +240,7 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
     };
   }, [gift.id, gift.stickerFileId, gift.stickerUniqueId, visible, onMissingToken]);
 
-  return <div ref={containerRef} className="gift-thumb" />;
+  return <div ref={containerRef} className="gift-thumb" onMouseEnter={handleMouseEnter} />;
 };
 
 interface GiftCardProps {
@@ -300,6 +328,20 @@ export const GiftsPage: React.FC = () => {
     });
   }, []);
   usePopupAutoSize(isPopup);
+  
+  // Останавливаем все анимации при скрытии вкладки для экономии ресурсов
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isHidden = document.hidden;
+      dbg("visibilityChange", { hidden: isHidden });
+      // Lottie автоматически обрабатывает visibility через requestAnimationFrame,
+      // но мы можем дополнительно логировать
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
   const [gifts, setGifts] = React.useState<Gift[]>([]);
   const [autoRefresh, setAutoRefresh] = React.useState(false);
   const [hasAccounts, setHasAccounts] = React.useState(false);

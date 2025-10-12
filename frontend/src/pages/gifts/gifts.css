@@ -63,6 +63,7 @@
   min-height: 200px;
   overflow: hidden;
   min-width: 0;
+  contain: layout style paint;
 }
 
 .gift-card__header {
@@ -111,6 +112,20 @@
   height: 120px;
   display: grid;
   place-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  will-change: transform;
+  transform: translateZ(0); 
+}
+
+.gift-thumb:hover {
+  transform: scale(1.05) translateZ(0);
+}
+
+.gift-thumb canvas {
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: optimizeSpeed;
 }
 
 .gift-empty {

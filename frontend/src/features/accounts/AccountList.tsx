@@ -12,9 +12,10 @@ import "./account-list.css";
 export interface AccountListProps {
   accounts: Account[];
   onReload: () => void;
+  isLoading?: boolean;
 }
 
-export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) => {
+export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload, isLoading = false }) => {
   const [items, setItems] = React.useState<Account[]>(accounts);
   const [loadingId, setLoadingId] = React.useState<number | null>(null);
   const [isBoot, setBoot] = React.useState(!accounts.length);
@@ -27,28 +28,33 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) 
   const handleRefresh = async (id: number) => {
     if (loadingId === id) return;
     setLoadingId(id);
+    
     const toastId = `acc-refresh-${id}`;
     upsertLoadingToast(toastId, "Обновление аккаунта...");
-    try {
-      await refreshAccountStream(id, (event) => {
+
+    const refreshPromise = new Promise<void>((resolve, reject) => {
+      refreshAccountStream(id, (event) => {
         if (event.message || event.stage) {
           const msg = event.message || `Этап: ${event.stage}`;
           upsertLoadingToast(toastId, msg);
         }
         if (event.error) {
-          failToast(toastId, event.detail || event.error || "Ошибка при обновлении аккаунта.");
+          reject(new Error(event.detail || event.error || "Ошибка при обновлении аккаунта."));
         }
         if (event.done && event.account) {
           setItems((prev) => prev.map((item) => (item.id === id ? event.account! : item)));
-          completeToast(toastId, "Аккаунт успешно обновлён.");
+          resolve();
         }
       });
-    } catch (error) {
-      failToast(toastId, "Не удалось обновить аккаунт.");
-    } finally {
-      setLoadingId(null);
-      onReload();
-    }
+    });
+
+    refreshPromise
+      .then(() => completeToast(toastId, "Аккаунт успешно обновлён"))
+      .catch((err) => failToast(toastId, err?.message || "Не удалось обновить аккаунт"))
+      .finally(() => {
+        setLoadingId(null);
+        onReload();
+      });
   };
 
   if (isBoot) {
@@ -68,7 +74,11 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload }) 
   }
 
   if (!items.length) {
-    return <div className="account-empty">Нет аккаунтов</div>;
+    return (
+      <div className="account-empty">
+        {isLoading ? "Обновление..." : "Нет аккаунтов"}
+      </div>
+    );
   }
 
   return (

@@ -64,16 +64,16 @@ export const createChannel = async (payload: Partial<Channel>): Promise<void> =>
 };
 
 export const updateChannel = async (id: number, payload: Partial<Channel>): Promise<void> => {
+  const body: Record<string, unknown> = {};
+  if ("title" in payload) body.title = payload.title ?? null;
+  if ("priceMin" in payload) body.price_min = payload.priceMin ?? null;
+  if ("priceMax" in payload) body.price_max = payload.priceMax ?? null;
+  if ("supplyMin" in payload) body.supply_min = payload.supplyMin ?? null;
+  if ("supplyMax" in payload) body.supply_max = payload.supplyMax ?? null;
+
   await httpClient(`/channel/${id}`, {
     method: "PATCH",
-    body: {
-      channel_id: payload.channelId,
-      title: payload.title ?? null,
-      price_min: payload.priceMin ?? null,
-      price_max: payload.priceMax ?? null,
-      supply_min: payload.supplyMin ?? null,
-      supply_max: payload.supplyMax ?? null,
-    },
+    body,
     parseJson: false,
   });
 };

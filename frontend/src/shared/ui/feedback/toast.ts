@@ -2,6 +2,7 @@
 // Copyright 2025 Vova Orig
 
 import { toast } from "react-toastify";
+import type { ToastOptions } from "react-toastify";
 import type { ApiErrorDto } from "../../api/dto";
 
 export const showSuccess = (message: string) => toast.success(message);
@@ -25,21 +26,34 @@ export const showError = (error: unknown, fallback = "Что-то пошло н�
 export const showPromise = <T,>(
   promise: Promise<T>,
   pending: string,
-  success: string,
+  success: string | ((data: T) => string),
   error: string | ((err: unknown) => string),
+  options?: ToastOptions,
 ) => {
-  if (typeof error === "string") {
-    return toast.promise(promise, { pending, success, error });
-  }
-  return toast.promise(promise, {
-    pending,
-    success,
-    error: {
-      render({ data }) {
-        return error(data);
-      },
+  return toast.promise(
+    promise,
+    {
+      pending,
+      success:
+        typeof success === "function"
+          ? {
+              render({ data }) {
+                // data is the resolved value of the promise
+                return success(data as T);
+              },
+            }
+          : success,
+      error:
+        typeof error === "function"
+          ? {
+              render({ data }) {
+                return error(data);
+              },
+            }
+          : error,
     },
-  });
+    options,
+  );
 };
 
 export const upsertLoadingToast = (id: string, message: string) => {

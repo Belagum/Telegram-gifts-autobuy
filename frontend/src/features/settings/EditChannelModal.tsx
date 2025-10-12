@@ -25,7 +25,13 @@ const numericNullable = z.preprocess(
 );
 
 const schema = z.object({
-  channelId: z.string().optional(),
+  channelId: z.preprocess(
+    (value) => {
+      if (value === "" || value == null) return undefined;
+      return String(value);
+    },
+    z.string().optional(),
+  ),
   title: z.string().optional(),
   priceMin: numericNullable,
   priceMax: numericNullable,
@@ -44,6 +50,7 @@ export interface EditChannelModalProps {
 
 export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initial, onClose, onSaved }) => {
   const isEdit = Boolean(initial?.id);
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   const {
     register,
@@ -85,7 +92,9 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     }
   }, [open, initial, reset]);
 
-  const onSubmit = handleSubmit(async (values) => {
+  const onSubmit = handleSubmit(
+    async (values) => {
+    console.log("onSubmit called", { values, isEdit, initial });
     const { channelId, title, priceMin, priceMax, supplyMin, supplyMax } = values;
     if (!isEdit && !channelId) {
       showError({ error: "Введите ID канала" });
@@ -108,7 +117,6 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     };
     try {
       if (isEdit && initial) {
-        // Отправляем только изменённые поля, чтобы избежать случайного затирания значений
         const diff: Partial<Channel> = {};
         if ((payload.title ?? null) !== (initial.title ?? null)) diff.title = payload.title ?? null;
         if (payload.priceMin !== initial.priceMin) diff.priceMin = payload.priceMin ?? null;
@@ -147,10 +155,37 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
     } catch (error) {
       console.error("Failed to save channel", error);
     }
-  });
+    },
+    (invalidErrors) => {
+      console.log("onInvalid called", invalidErrors);
+      showError({ error: "Исправьте ошибки в форме" });
+    },
+  );
 
   const handleSaveClick = () => {
-    void onSubmit();
+    const currentForm = formRef.current;
+    console.log("handleSaveClick called, formRef.current:", currentForm);
+    console.log("requestSubmit available?", Boolean(currentForm && (currentForm as any).requestSubmit));
+
+    if (currentForm) {
+      const formEl = currentForm as HTMLFormElement;
+      if (typeof (formEl as any).requestSubmit === 'function') {
+        console.log("calling formEl.requestSubmit()");
+        try {
+          (formEl as any).requestSubmit();
+          console.log("formEl.requestSubmit() completed");
+        } catch (err) {
+          console.error("formEl.requestSubmit() error:", err);
+        }
+      } else {
+        console.log("requestSubmit not supported, trying dispatchEvent");
+        const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+        const dispatched = formEl.dispatchEvent(submitEvent);
+        console.log("formEl.dispatchEvent('submit') returned:", dispatched);
+      }
+    } else {
+      console.error("formRef.current is null!");
+    }
   };
 
   return (
@@ -169,7 +204,18 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
         </Button>
       }
     >
-      <form id="edit-channel-form" onSubmit={onSubmit} className="modal-form" noValidate>
+      <form 
+        ref={formRef}
+        id="edit-channel-form" 
+        onSubmit={(e) => {
+          console.log("form onSubmit handler called", e);
+          const result = onSubmit(e);
+          console.log("onSubmit returned:", result);
+          return result;
+        }}
+        className="modal-form" 
+        noValidate
+      >
         {!isEdit && (
           <FormField label="ID канала" error={errors.channelId?.message ?? undefined} required>
             <Input placeholder="-1001234567890" {...register("channelId", { required: !isEdit })} />

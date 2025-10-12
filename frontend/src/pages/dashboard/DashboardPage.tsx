@@ -24,13 +24,17 @@ export const DashboardPage: React.FC = () => {
   const [accountModalOpen, setAccountModalOpen] = React.useState(false);
   const [channelsOpen, setChannelsOpen] = React.useState(false);
   const [selectedApiProfile, setSelectedApiProfile] = React.useState<number | null>(null);
+  const [isLoadingAccounts, setIsLoadingAccounts] = React.useState(false);
 
   const loadAccounts = React.useCallback(async () => {
     try {
+      setIsLoadingAccounts(true);
       const items = await listAccounts();
       setAccounts(items);
     } catch (error) {
       showError(error, "Не удалось загрузить аккаунты");
+    } finally {
+      setIsLoadingAccounts(false);
     }
   }, []);
 
@@ -43,8 +47,14 @@ export const DashboardPage: React.FC = () => {
     }
   }, []);
 
+  const loadedRef = React.useRef(false);
   React.useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     void loadAccounts();
+    return () => {
+      loadedRef.current = false;
+    };
   }, [loadAccounts]);
 
   const handleAddAccount = async () => {
@@ -91,7 +101,7 @@ export const DashboardPage: React.FC = () => {
           <Button onClick={handleAddAccount}>Добавить аккаунт</Button>
         </div>
       </header>
-      <AccountList accounts={accounts} onReload={loadAccounts} />
+      <AccountList accounts={accounts} onReload={loadAccounts} isLoading={isLoadingAccounts} />
 
       <SelectApiProfileModal
         open={selectModalOpen}

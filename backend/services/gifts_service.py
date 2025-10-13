@@ -12,15 +12,15 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session, joinedload
 
-
 from backend.infrastructure.container import container
-from .notify_gifts_service import broadcast_new_gifts
-from .tg_clients_service import tg_call, tg_shutdown
+
 from ..infrastructure.db import SessionLocal
 from ..infrastructure.db.models import Account
 from ..shared.logging import logger
 from ..shared.utils.gifts_utils import hash_items, merge_new
 from ..shared.utils.jsonio import read_json_list_of_dicts, write_json_list
+from .notify_gifts_service import broadcast_new_gifts
+from .tg_clients_service import tg_call, tg_shutdown
 
 
 @dataclass
@@ -91,70 +91,92 @@ async def _list_gifts_for_account_persist(
         ),
     )
     out: list[dict[str, Any]] = []
+    append = out.append
     for g in gifts or []:
-        raw = getattr(g, "raw", None)
-        is_limited = bool(getattr(g, "is_limited", False))
-        avail_total: int | None = int(getattr(g, "available_amount", 0)) if is_limited else None
-
-        limited_per_user = bool(getattr(raw, "limited_per_user", False))
-        per_user_remains: int | None = (
-            int(getattr(raw, "per_user_remains", 0)) if limited_per_user else None
-        )
-
-        if limited_per_user:
-            if isinstance(avail_total, int) and per_user_remains is not None:
-                per_user_available: int | None = min(avail_total, per_user_remains)
-            else:
-                per_user_available = per_user_remains
-        else:
-            per_user_available = avail_total
-
-        def _to_iso_utc(value: Any) -> str | None:
-            try:
-                if value is None:
-                    return None
-                if isinstance(value, (int, float)):
-                    dt = datetime.fromtimestamp(int(value), tz=UTC)
-                    return dt.isoformat().replace("+00:00", "Z")
-                if isinstance(value, datetime):
-                    dt = value if value.tzinfo else value.replace(tzinfo=UTC)
-                    dt = dt.astimezone(UTC)
-                    return dt.isoformat().replace("+00:00", "Z")
-                if isinstance(value, str):
-                    s = value.strip()
-                    if s:
-                        return s
-                ts = getattr(value, "timestamp", None)
-                if callable(ts):
-                    return _to_iso_utc(ts())
-            except Exception:
-                return None
-            return None
-
-        locked_raw = (
-            getattr(g, "locked_until_date", None)
-            or getattr(raw, "locked_until_date", None)
-            or getattr(g, "locked_until", None)
-            or getattr(raw, "locked_until", None)
-        )
-        locked_until_date = _to_iso_utc(locked_raw)
-
-        item = {
-            "id": int(getattr(g, "id", 0)),
-            "price": int(getattr(g, "price", 0)),
-            "is_limited": is_limited,
-            "available_amount": avail_total,
-            "total_amount": getattr(g, "total_amount", None)
-            or getattr(raw, "total_amount", None),
-            "require_premium": bool(getattr(raw, "require_premium", False)),
-            "limited_per_user": limited_per_user,
-            "per_user_remains": per_user_remains,
-            "per_user_available": per_user_available,
-            "sticker_file_id": getattr(getattr(g, "sticker", None), "file_id", None),
-            "sticker_unique_id": getattr(getattr(g, "sticker", None), "file_unique_id", None),
-            "sticker_mime": getattr(getattr(g, "sticker", None), "mime_type", None),
-        }
+        append(_normalize_gift(g))
     return out
+
+
+def _normalize_gift(gift: Any) -> dict[str, Any]:
+    raw = getattr(gift, "raw", None)
+    sticker = getattr(gift, "sticker", None)
+
+    is_limited = bool(getattr(gift, "is_limited", False))
+    available_amount = _safe_int(getattr(gift, "available_amount", None)) if is_limited else None
+
+    limited_per_user = bool(getattr(raw, "limited_per_user", False))
+    per_user_remains = (
+        _safe_int(getattr(raw, "per_user_remains", None)) if limited_per_user else None
+    )
+    per_user_available: int | None
+    if limited_per_user:
+        if available_amount is not None and per_user_remains is not None:
+            per_user_available = min(available_amount, per_user_remains)
+        else:
+            per_user_available = per_user_remains
+    else:
+        per_user_available = available_amount
+
+    locked_raw = (
+        getattr(gift, "locked_until_date", None)
+        or getattr(raw, "locked_until_date", None)
+        or getattr(gift, "locked_until", None)
+        or getattr(raw, "locked_until", None)
+    )
+
+    return {
+        "id": _safe_int(getattr(gift, "id", None), default=0) or 0,
+        "price": _safe_int(getattr(gift, "price", None), default=0) or 0,
+        "is_limited": is_limited,
+        "available_amount": available_amount,
+        "total_amount": _coalesce(
+            getattr(gift, "total_amount", None), getattr(raw, "total_amount", None)
+        ),
+        "require_premium": bool(getattr(raw, "require_premium", False)),
+        "limited_per_user": limited_per_user,
+        "per_user_remains": per_user_remains,
+        "per_user_available": per_user_available,
+        "locked_until_date": _to_iso_utc(locked_raw),
+        "sticker_file_id": getattr(sticker, "file_id", None),
+        "sticker_unique_id": getattr(sticker, "file_unique_id", None),
+        "sticker_mime": getattr(sticker, "mime_type", None),
+    }
+
+
+def _coalesce(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _safe_int(value: Any, *, default: int | None = None) -> int | None:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_iso_utc(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value if value.tzinfo else value.replace(tzinfo=UTC)
+        return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    if isinstance(value, int | float):
+        return datetime.fromtimestamp(float(value), tz=UTC).isoformat().replace("+00:00", "Z")
+    if isinstance(value, str):
+        cleaned = value.strip()
+        return cleaned or None
+    timestamp = getattr(value, "timestamp", None)
+    if callable(timestamp):
+        try:
+            return _to_iso_utc(timestamp())
+        except Exception:
+            return None
+    return None
 
 
 def _notify_run_blocking(items: list[dict[str, Any]]) -> int | Exception:
@@ -237,7 +259,9 @@ async def _worker_async(uid: int) -> None:
                 if added:
                     logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
 
-                    buy_task = asyncio.create_task(container.autobuy_use_case.execute_with_user_check(uid, added))
+                    buy_task = asyncio.create_task(
+                        container.autobuy_use_case.execute_with_user_check(uid, added)
+                    )
                     notify_future = asyncio.to_thread(_notify_run_blocking, added)
 
                     res: dict[str, Any] = {"purchased": [], "skipped": len(added), "stats": {}}

@@ -27,6 +27,21 @@ export const Modal: React.FC<ModalProps> = ({ open, title, children, footer, onC
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    
+    const handleEscapeKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscapeKey);
+    return () => {
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [open, onClose]);
+
   if (!open || !portalElement) {
     return null;
   }

@@ -97,6 +97,22 @@ export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
     }
   }, [open, step]);
 
+  React.useEffect(() => {
+    if (step !== "result") return;
+
+    const handleResultKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleResultKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleResultKeyDown);
+    };
+  }, [step, onClose]);
+
   const handleSubmit = async () => {
     const normalized = targetId.trim();
     if (!normalized) {
@@ -159,6 +175,12 @@ export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
         ref={inputRef}
         value={targetId}
         onChange={(event) => setTargetId(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            handleSubmit();
+          }
+        }}
         placeholder="Например, -1001234567890"
         error={inputError ?? undefined}
       />
@@ -178,10 +200,40 @@ export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
 
   const renderResult = () => (
     <div className="buy-modal__centered">
-      <div
-        className={resultOk ? "buy-modal__status buy-modal__status--success" : "buy-modal__status buy-modal__status--error"}
-      >
-        {resultOk ? "✅" : "❌"}
+      <div className="buy-modal__status-container">
+        <svg
+          className={resultOk ? "buy-modal__status buy-modal__status--success" : "buy-modal__status buy-modal__status--error"}
+          viewBox="0 0 52 52"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            className="buy-modal__status-circle"
+            cx="26"
+            cy="26"
+            r="25"
+            fill="none"
+          />
+          {resultOk ? (
+            <path
+              className="buy-modal__status-check"
+              fill="none"
+              d="M14.1 27.2l7.1 7.2 16.7-16.8"
+            />
+          ) : (
+            <>
+              <path
+                className="buy-modal__status-cross"
+                fill="none"
+                d="M16 16 l20 20"
+              />
+              <path
+                className="buy-modal__status-cross"
+                fill="none"
+                d="M36 16 l-20 20"
+              />
+            </>
+          )}
+        </svg>
       </div>
       <p className="buy-modal__result-message">{resultMessage}</p>
       <Button variant="secondary" onClick={onClose}>

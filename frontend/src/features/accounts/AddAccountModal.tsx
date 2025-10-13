@@ -172,12 +172,32 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
     <Modal open={open} onClose={handleCancel} title="Добавить аккаунт" footer={footer}>
       {step === "phone" && (
         <FormField label="Телефон" description="Формат +79998887766" required>
-          <Input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={busy !== null} />
+          <Input 
+            value={phone} 
+            onChange={(event) => setPhone(event.target.value)} 
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && busy === null) {
+                event.preventDefault();
+                handleSendCode();
+              }
+            }}
+            disabled={busy !== null} 
+          />
         </FormField>
       )}
       {step === "code" && (
         <FormField label="Код из Telegram" required>
-          <Input value={code} onChange={(event) => setCode(event.target.value)} disabled={busy !== null} />
+          <Input 
+            value={code} 
+            onChange={(event) => setCode(event.target.value)} 
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && busy === null) {
+                event.preventDefault();
+                handleConfirmCode();
+              }
+            }}
+            disabled={busy !== null} 
+          />
         </FormField>
       )}
       {step === "password" && (
@@ -186,6 +206,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && busy === null) {
+                event.preventDefault();
+                handleConfirmPassword();
+              }
+            }}
             disabled={busy !== null}
           />
         </FormField>

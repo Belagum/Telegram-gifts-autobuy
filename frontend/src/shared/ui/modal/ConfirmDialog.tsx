@@ -23,22 +23,40 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = "Отмена",
   onConfirm,
   onCancel,
-}) => (
-  <Modal
-    open={open}
-    onClose={onCancel}
-    title={title}
-    footer={
-      <div className="modal-footer-grid">
-        <Button variant="ghost" onClick={onCancel}>
-          {cancelLabel}
-        </Button>
-        <Button variant="danger" onClick={onConfirm}>
-          {confirmLabel}
-        </Button>
-      </div>
-    }
-  >
-    <p>{message}</p>
-  </Modal>
-);
+}) => {
+  React.useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        onConfirm();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onConfirm]);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={title}
+      footer={
+        <div className="modal-footer-grid">
+          <Button variant="ghost" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+          <Button variant="danger" onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      }
+    >
+      <p>{message}</p>
+    </Modal>
+  );
+};

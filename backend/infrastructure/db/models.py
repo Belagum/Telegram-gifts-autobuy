@@ -3,11 +3,10 @@
 
 from datetime import UTC, datetime, timedelta
 
+from backend.infrastructure.db.session import Base
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Boolean
-
-from backend.infrastructure.db.session import Base
 
 
 class Channel(Base):

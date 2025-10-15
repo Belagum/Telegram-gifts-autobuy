@@ -15,6 +15,7 @@ from backend.interfaces.http.routes import bp_acc, bp_channels, bp_gifts, bp_mis
 from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
 from backend.shared.config import load_config
 from backend.shared.logging import logger, setup_logging
+from backend.shared.middleware.csrf import configure_csrf
 from backend.shared.middleware.error_handler import configure_error_handling
 
 _config = load_config()
@@ -50,12 +51,16 @@ def create_app() -> Flask:
     setup_logging()
     app = Flask(__name__)
     configure_error_handling(app)
+    configure_csrf(app)
     app.config.update(
         SECRET_KEY=_config.secret_key,
         SESSION_PERMANENT=True,
     )
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    cors_kwargs = {"resources": {r"/api/*": {"origins": _config.security.allowed_origins}}}
+    if any(o != "*" for o in _config.security.allowed_origins):
+        cors_kwargs["supports_credentials"] = True
+    CORS(app, **cors_kwargs)
     app.register_blueprint(bp_misc)
     app.register_blueprint(container.auth_controller.as_blueprint())
     app.register_blueprint(bp_acc)
@@ -69,6 +74,18 @@ def create_app() -> Flask:
         _BOOTSTRAPPED.set()
         threading.Thread(target=_bootstrap_gifts_workers, daemon=True).start()
         atexit.register(_stop_all_gifts)
+
+    @app.after_request
+    def _add_security_headers(resp):
+        resp.headers.setdefault("X-Frame-Options", "DENY")
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        if _config.security.enable_hsts:
+            resp.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains; preload",
+            )
+        return resp
 
     logger.info("Flask app initialized")
     return app

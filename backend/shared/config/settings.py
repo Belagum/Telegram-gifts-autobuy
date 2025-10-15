@@ -56,6 +56,41 @@ class ObservabilityConfig(BaseModel):
     model_config = ConfigDict(validate_by_name=True)
 
 
+class SecurityConfig(BaseModel):
+
+    # Cookie security
+    cookie_secure: bool = Field(False, alias="COOKIE_SECURE")
+    cookie_samesite: str = Field("Strict", alias="COOKIE_SAMESITE")
+    
+    # CORS
+    allowed_origins: list[str] = Field(["*"], alias="ALLOWED_ORIGINS")
+    
+    # CSRF protection
+    enable_csrf: bool = Field(False, alias="ENABLE_CSRF")
+    
+    # Rate limiting
+    enable_rate_limit: bool = Field(True, alias="ENABLE_RATE_LIMIT")
+    rate_limit_requests: int = Field(10, alias="RL_LIMIT")
+    rate_limit_window: float = Field(60.0, alias="RL_WINDOW")
+    
+    # HSTS
+    enable_hsts: bool = Field(False, alias="ENABLE_HSTS")
+
+    model_config = ConfigDict(validate_by_name=True)
+
+    @field_validator("allowed_origins", mode="before")
+    def _parse_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("cookie_secure", "enable_csrf", "enable_rate_limit", "enable_hsts", mode="before")
+    def _parse_bool(cls, value: str | bool) -> bool:
+        if isinstance(value, str):
+            return value.lower() in ("1", "true", "yes")
+        return bool(value)
+
+
 class AppConfig(BaseSettings):
 
     secret_key: str = Field("dev", alias="SECRET_KEY")
@@ -67,6 +102,7 @@ class AppConfig(BaseSettings):
     queue: QueueConfig = Field(default_factory=lambda: QueueConfig())
     resilience: ResilienceConfig = Field(default_factory=lambda: ResilienceConfig())
     observability: ObservabilityConfig = Field(default_factory=lambda: ObservabilityConfig())
+    security: SecurityConfig = Field(default_factory=lambda: SecurityConfig())
 
     model_config = SettingsConfigDict(
         env_file=".env",

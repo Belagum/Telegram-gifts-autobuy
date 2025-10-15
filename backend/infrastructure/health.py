@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from sqlalchemy import text
-
 from backend.infrastructure.db import ENGINE
+from sqlalchemy import text
 
 
 def check_database() -> bool:

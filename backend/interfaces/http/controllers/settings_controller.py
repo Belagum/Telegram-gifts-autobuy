@@ -9,14 +9,15 @@ from sqlalchemy.orm import Session
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.services.settings_service import read_user_settings, set_user_settings
 from backend.shared.errors import (
+    InfrastructureError,
     InvalidBotTokenError,
+    InvalidBuyTargetIdError,
     InvalidChatIdError,
-    InvalidTargetIdError,
     InvalidFallbackError,
     InvalidNotifyChatIdError,
-    InvalidBuyTargetIdError,
-    InfrastructureError,
+    InvalidTargetIdError,
 )
+from backend.shared.middleware.csrf import csrf_protect
 
 
 class SettingsController:
@@ -39,6 +40,7 @@ class SettingsController:
         return jsonify(read_user_settings(authed_request().user_id))
 
     @auth_required
+    @csrf_protect
     def update_settings(self, _db: Session):
         payload = request.get_json(silent=True) or {}
         token = payload.get("bot_token")

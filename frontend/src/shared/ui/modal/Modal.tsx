@@ -2,7 +2,7 @@
 // Copyright 2025 Vova Orig
 
 import type { KeyboardEvent, ReactNode } from "react";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import "./modal.css";
 
@@ -16,7 +16,12 @@ export interface ModalProps {
 
 const portalElement = typeof document !== "undefined" ? document.body : null;
 
+let modalStack: number[] = [];
+let nextModalId = 0;
+
 export const Modal: React.FC<ModalProps> = ({ open, title, children, footer, onClose }) => {
+  const modalIdRef = useRef<number>(nextModalId++);
+  
   useEffect(() => {
     if (!portalElement) return;
     if (open) {
@@ -30,9 +35,23 @@ export const Modal: React.FC<ModalProps> = ({ open, title, children, footer, onC
   useEffect(() => {
     if (!open) return;
     
+    const modalId = modalIdRef.current;
+    modalStack.push(modalId);
+    
+    return () => {
+      modalStack = modalStack.filter(id => id !== modalId);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    
     const handleEscapeKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        const lastModalId = modalStack[modalStack.length - 1];
+        if (lastModalId === modalIdRef.current) {
+          onClose();
+        }
       }
     };
 

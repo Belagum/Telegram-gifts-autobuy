@@ -26,6 +26,7 @@ from backend.services.accounts_service import (
     wait_until_ready,
 )
 from backend.shared.logging import logger
+from backend.shared.middleware.csrf import csrf_protect
 
 
 class AccountsController:
@@ -178,6 +179,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def create_api_profile(self, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -238,6 +240,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def rename_api_profile(self, api_profile_id: int, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -271,6 +274,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def delete_api_profile(self, api_profile_id: int, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -315,6 +319,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def send_code(self, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -375,6 +380,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def confirm_code(self, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -399,6 +405,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def confirm_password(self, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -424,6 +431,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def cancel_login(self, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -443,6 +451,7 @@ class AccountsController:
             return jsonify({"error": "internal_error"}), 500
 
     @auth_required
+    @csrf_protect
     def refresh_account(self, account_id: int, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id

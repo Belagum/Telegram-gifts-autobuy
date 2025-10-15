@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-
 from backend.app import create_app
 from backend.infrastructure.db import ENGINE, Base, SessionLocal
 from backend.infrastructure.db.models import SessionToken, User

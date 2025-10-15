@@ -31,20 +31,21 @@ from backend.services.gifts_service import (
 )
 from backend.services.tg_clients_service import get_stars_balance, tg_call
 from backend.shared.errors import (
-    InvalidGiftIdError,
-    InvalidAccountIdError,
-    TargetIdRequiredError,
-    InvalidTargetIdError,
-    PeerIdInvalidError,
     AccountNotFoundError,
     ApiProfileMissingError,
+    BadTgsError,
     GiftNotFoundError,
     GiftUnavailableError,
-    InsufficientBalanceError,
-    BadTgsError,
     InfrastructureError,
+    InsufficientBalanceError,
+    InvalidAccountIdError,
+    InvalidGiftIdError,
+    InvalidTargetIdError,
+    PeerIdInvalidError,
+    TargetIdRequiredError,
 )
 from backend.shared.logging import logger
+from backend.shared.middleware.csrf import csrf_protect
 from backend.shared.utils.asyncio_utils import run_async as _run_async
 from backend.shared.utils.fs import link_or_copy, save_atomic
 from backend.shared.utils.http import etag_for_path
@@ -239,6 +240,7 @@ class GiftsController:
         return jsonify({"items": _convert_gift_ids_to_strings(items)})
 
     @auth_required
+    @csrf_protect
     def refresh_gifts(self, _db: Session) -> Response | tuple[Response, int]:
         want_stream = request.args.get("stream") == "1" or "application/x-ndjson" in (
             request.headers.get("Accept") or ""
@@ -273,6 +275,7 @@ class GiftsController:
         return response
 
     @auth_required
+    @csrf_protect
     def buy_gift(self, gift_id: str, db: Session) -> Response | tuple[Response, int]:
         payload = request.get_json(silent=True) or {}
         account_raw = payload.get("account_id")
@@ -443,6 +446,7 @@ class GiftsController:
         return jsonify({"auto_refresh": bool(getattr(user, "gifts_autorefresh", False))})
 
     @auth_required
+    @csrf_protect
     def settings_set(self, db: Session) -> Response | tuple[Response, int]:
         data = request.get_json(silent=True) or {}
         enabled = bool(data.get("auto_refresh"))

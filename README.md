@@ -86,27 +86,131 @@ python -m venv .venv
 
 pip install -r requirements.txt
 
-# (опционально) миграция/инициализация БД,
-# если у вас есть перенос схемы:
-python -m backend.migrate_app_db
-
-# либо через новый скрипт (создаёт резервную копию):
-python -m backend.scripts.migrate_data app.db --migration 0001_initial.sql
-
 # запуск dev-сервера (Flask)
 python -m backend.app     # http://localhost:5000
 ```
 
-**Переменные окружения (необязательно):**
+## Переменные окружения
 
-* `SECRET_KEY` — секрет Flask.
-* `DATABASE_URL` — строка подключения SQLAlchemy (по умолчанию `sqlite:///app.db`).
-* `DATABASE_POOL_SIZE` / `DATABASE_MAX_OVERFLOW` / `DATABASE_POOL_TIMEOUT` — настройки пула подключений.
-* `GIFTS_DIR` — каталог с данными подарков (по умолчанию `gifts_data`).
-* `GIFTS_CACHE_DIR` — кэш .tgs (по умолчанию `backend/instance/gifts_cache`).
-* `GIFTS_ACCS_TTL` — период (сек) переобновления списка аккаунтов воркером (по умолчанию `60`).
-* `METRICS_ENABLED` — включить экспорт Prometheus-метрик (по умолчанию `True`).
-* `RESILIENCE_TIMEOUT`, `RESILIENCE_RETRIES`, `RESILIENCE_BACKOFF_BASE`, `RESILIENCE_BACKOFF_CAP` — таймауты и параметры повторов.
+Создайте файл `.env` в корне проекта (рядом с `backend/` и `frontend/`). Все настройки автоматически загружаются из переменных окружения.
+
+### Базовые настройки
+
+* `SECRET_KEY` — секретный ключ Flask (обязательно в продакшене!)
+* `DATABASE_URL` — строка подключения к БД (по умолчанию `sqlite:///app.db`)
+* `DATABASE_POOL_SIZE` — размер пула подключений (по умолчанию `10`)
+* `DATABASE_MAX_OVERFLOW` — максимальное переполнение пула (по умолчанию `5`)
+* `DATABASE_POOL_TIMEOUT` — таймаут пула в секундах (по умолчанию `30.0`)
+
+### Настройки подарков и кэша
+
+* `GIFTS_DIR` — каталог с данными подарков (по умолчанию `gifts_data`)
+* `GIFTS_CACHE_DIR` — кэш .tgs файлов (по умолчанию `backend/instance/gifts_cache`)
+* `GIFTS_ACCS_TTL` — период обновления аккаунтов воркером в секундах (по умолчанию `60`)
+
+### Настройки безопасности
+
+* `COOKIE_SECURE` — использовать Secure флаг для cookies (по умолчанию `false`, в продакшене `true`)
+* `COOKIE_SAMESITE` — SameSite политика для cookies (по умолчанию `Strict`)
+* `ALLOWED_ORIGINS` — разрешенные домены для CORS через запятую (по умолчанию `*`)
+* `ENABLE_CSRF` — включить CSRF защиту (по умолчанию `false`, в продакшене `true`)
+* `ENABLE_RATE_LIMIT` — включить rate limiting (по умолчанию `true`)
+* `RL_LIMIT` — лимит запросов на окно (по умолчанию `10`)
+* `RL_WINDOW` — окно rate limiting в секундах (по умолчанию `60`)
+* `ENABLE_HSTS` — включить HSTS заголовок (по умолчанию `false`, только для HTTPS)
+
+### Настройки устойчивости
+
+* `RESILIENCE_TIMEOUT` — таймаут внешних запросов (по умолчанию `15.0`)
+* `RESILIENCE_RETRIES` — количество повторов (по умолчанию `3`)
+* `RESILIENCE_BACKOFF_BASE` — базовая задержка для экспоненциального backoff (по умолчанию `0.5`)
+* `RESILIENCE_BACKOFF_CAP` — максимальная задержка (по умолчанию `8.0`)
+* `RESILIENCE_CIRCUIT_THRESHOLD` — порог срабатывания circuit breaker (по умолчанию `5`)
+* `RESILIENCE_CIRCUIT_RESET` — время сброса circuit breaker в секундах (по умолчанию `60.0`)
+
+### Настройки наблюдаемости
+
+* `METRICS_ENABLED` — включить Prometheus метрики (по умолчанию `true`)
+* `TRACING_ENABLED` — включить трейсинг (по умолчанию `false`)
+* `SERVICE_NAME` — имя сервиса для метрик (по умолчанию `giftbuyer-backend`)
+
+### Настройки очереди
+
+* `QUEUE_MAX_SIZE` — максимальный размер очереди (по умолчанию `1000`)
+* `QUEUE_VISIBILITY_TIMEOUT` — таймаут видимости сообщений в очереди (по умолчанию `30.0`)
+
+### Настройки кэша
+
+* `CACHE_TTL` — время жизни кэша в секундах (по умолчанию `3600`)
+
+## Примеры конфигурации
+
+### Для разработки (.env)
+
+```bash
+# Базовые настройки
+SECRET_KEY=dev-secret-key-change-in-production
+DATABASE_URL=sqlite:///app.db
+
+# Безопасность (мягкие настройки для разработки)
+COOKIE_SECURE=false
+COOKIE_SAMESITE=Lax
+ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+ENABLE_CSRF=false
+ENABLE_HSTS=false
+
+# Rate limiting (можно отключить для удобства)
+ENABLE_RATE_LIMIT=false
+```
+
+### Для продакшена (.env)
+
+```bash
+# Базовые настройки
+SECRET_KEY=your-super-secret-key-generated-by-secrets-token-urlsafe-32
+DATABASE_URL=postgresql://user:password@localhost:5432/giftbuyer
+
+# Безопасность (строгие настройки)
+COOKIE_SECURE=true
+COOKIE_SAMESITE=Strict
+ALLOWED_ORIGINS=https://your-frontend.com,https://www.your-frontend.com
+ENABLE_CSRF=true
+ENABLE_HSTS=true
+
+# Rate limiting
+ENABLE_RATE_LIMIT=true
+RL_LIMIT=10
+RL_WINDOW=60
+```
+
+### Для Docker (.env)
+
+```bash
+# База данных в контейнере
+DATABASE_URL=postgresql://giftbuyer:password@postgres:5432/giftbuyer
+
+# CORS для контейнерной среды
+ALLOWED_ORIGINS=https://your-domain.com
+
+# Остальные настройки как в продакшене
+COOKIE_SECURE=true
+ENABLE_CSRF=true
+ENABLE_HSTS=true
+```
+
+### Создание .env файла
+
+1. Скопируйте `env.example` в `.env`:
+   ```bash
+   cp env.example .env
+   ```
+
+2. Отредактируйте `.env` под свои нужды
+
+3. Сгенерируйте SECRET_KEY:
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
 
 ### Frontend
 

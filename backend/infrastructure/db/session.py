@@ -6,12 +6,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
-
 from backend.shared.config import load_config
 from backend.shared.logging import logger
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase, scoped_session, sessionmaker
 
 _config = load_config()
 

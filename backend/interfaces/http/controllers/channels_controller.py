@@ -23,6 +23,7 @@ from backend.shared.errors import (
     InfrastructureError,
 )
 from backend.shared.logging import logger
+from backend.shared.middleware.csrf import csrf_protect
 
 
 class ChannelsController:
@@ -57,6 +58,7 @@ class ChannelsController:
             raise InfrastructureError(f"Failed to list channels: {exc}") from exc
 
     @auth_required
+    @csrf_protect
     def create(self, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -96,6 +98,7 @@ class ChannelsController:
             raise InfrastructureError(f"Failed to create channel: {exc}") from exc
 
     @auth_required
+    @csrf_protect
     def update(self, channel_id: int, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
@@ -118,6 +121,7 @@ class ChannelsController:
             raise InfrastructureError(f"Failed to update channel: {exc}") from exc
 
     @auth_required
+    @csrf_protect
     def delete(self, channel_id: int, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id

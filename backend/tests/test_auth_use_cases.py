@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-
 from backend.application.use_cases.users.login_user import LoginUserUseCase
 from backend.application.use_cases.users.logout_user import LogoutUserUseCase
 from backend.application.use_cases.users.register_user import RegisterUserUseCase

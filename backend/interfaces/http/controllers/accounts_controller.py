@@ -30,7 +30,6 @@ from backend.shared.middleware.csrf import csrf_protect
 
 
 class AccountsController:
-
     def __init__(self, *, login_manager: PyroLoginManager | None = None) -> None:
         self._login_manager = login_manager or PyroLoginManager()
 
@@ -205,7 +204,12 @@ class AccountsController:
                     f"(user_id={user_id}, existing_id={existing_by_id.id})"
                 )
                 return (
-                    jsonify({"error": "duplicate_api_id", "existing_id": existing_by_id.id}),
+                    jsonify(
+                        {
+                            "error": "duplicate_api_id",
+                            "context": {"existing_id": existing_by_id.id},
+                        }
+                    ),
                     409,
                 )
 
@@ -220,7 +224,12 @@ class AccountsController:
                     f"(user_id={user_id}, existing_id={existing_by_hash.id})"
                 )
                 return (
-                    jsonify({"error": "duplicate_api_hash", "existing_id": existing_by_hash.id}),
+                    jsonify(
+                        {
+                            "error": "duplicate_api_hash",
+                            "context": {"existing_id": existing_by_hash.id},
+                        }
+                    ),
                     409,
                 )
 
@@ -302,7 +311,12 @@ class AccountsController:
                     f"accounts={count})"
                 )
                 return (
-                    jsonify({"error": "api_profile_in_use", "accounts": int(count)}),
+                    jsonify(
+                        {
+                            "error": "api_profile_in_use",
+                            "context": {"accounts": int(count)},
+                        }
+                    ),
                     409,
                 )
             db.delete(api_profile)
@@ -353,8 +367,10 @@ class AccountsController:
                     jsonify(
                         {
                             "error": "phone_already_added",
-                            "account_id": int(existing.id),
-                            "phone": existing.phone,
+                            "context": {
+                                "account_id": int(existing.id),
+                                "phone": existing.phone,
+                            },
                         }
                     ),
                     409,
@@ -504,8 +520,11 @@ class AccountsController:
                         )
                     if event.get("error"):
                         logger.warning(
-                            f"account.refresh.stream: error='{event.get('error')}' "
-                            f"detail='{event.get('detail')}' user_id={user_id} acc_id={account_id}"
+                            "account.refresh.stream: error='%s' code='%s' user_id=%s acc_id=%s",
+                            event.get("error"),
+                            event.get("error_code"),
+                            user_id,
+                            account_id,
                         )
                     yield json.dumps(event, ensure_ascii=False) + "\n"
                 logger.debug(

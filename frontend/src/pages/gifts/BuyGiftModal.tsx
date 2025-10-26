@@ -8,7 +8,8 @@ import { Input } from "../../shared/ui/input/Input";
 import type { Gift } from "../../entities/gifts/model";
 import type { Account } from "../../entities/accounts/model";
 import { buyGift } from "../../entities/gifts/api";
-import type { HttpError } from "../../shared/api/httpClient";
+import { extractApiErrorMessage } from "../../shared/api/errorMessages";
+import { resolveErrorMessage, resolveSuccessMessage } from "../../shared/api/messages";
 
 export interface BuyGiftModalProps {
   open: boolean;
@@ -34,23 +35,6 @@ const resolveAccountLabel = (account: Account) => {
     return `${nick} (${account.id})`;
   }
   return `${account.id}`;
-};
-
-const extractErrorMessage = (error: unknown) => {
-  if (!error) {
-    return "Не удалось купить подарок";
-  }
-  const http = error as HttpError;
-  const payload = (http && typeof http === "object" ? http.payload : null) as
-    | { detail?: string; error?: string; message?: string }
-    | undefined;
-  if (payload) {
-    return payload.detail || payload.message || payload.error || "Не удалось купить подарок";
-  }
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return "Не удалось купить подарок";
 };
 
 export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
@@ -132,15 +116,23 @@ export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
         targetId: normalized,
       });
       if (!response.ok) {
-        throw new Error(response.detail || response.message || response.error || "Ошибка покупки");
+        const message = resolveErrorMessage(
+          response.error,
+          response.errorCode,
+          response.context ?? undefined,
+          "Не удалось купить подарок",
+        );
+        throw new Error(message);
       }
       setResultOk(true);
-      setResultMessage(response.message || "Подарок успешно куплен");
+      setResultMessage(
+        resolveSuccessMessage(response.result, response.context ?? undefined, "Подарок успешно куплен"),
+      );
       setStep("result");
       await onPurchased?.();
     } catch (error) {
       setResultOk(false);
-      setResultMessage(extractErrorMessage(error));
+      setResultMessage(extractApiErrorMessage(error, "Не удалось купить подарок"));
       setStep("result");
     }
   };

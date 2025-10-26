@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 
 
 class UnitOfWork(Protocol):
-
     def __enter__(self) -> UnitOfWork: ...
 
     def __exit__(self, exc_type, exc, tb) -> None: ...
@@ -28,7 +27,6 @@ class UnitOfWork(Protocol):
 
 @dataclass(slots=True)
 class SqlAlchemyUnitOfWork(AbstractContextManager, UnitOfWork):
-
     session_factory: Callable[[], Session]
 
     def __post_init__(self) -> None:
@@ -79,6 +77,5 @@ class SqlAlchemyUnitOfWork(AbstractContextManager, UnitOfWork):
 
 @contextmanager
 def unit_of_work_scope(factory: Callable[[], Session]) -> Iterator[Session]:
-
     with SqlAlchemyUnitOfWork(factory) as uow:
         yield uow.session

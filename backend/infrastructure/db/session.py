@@ -38,8 +38,6 @@ ENGINE: Engine = create_engine(
 )
 
 
-
-
 SessionLocal = scoped_session(
     sessionmaker(bind=ENGINE, autoflush=False, autocommit=False, expire_on_commit=False)
 )

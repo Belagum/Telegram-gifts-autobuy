@@ -614,7 +614,7 @@ class AutobuyUseCase:
     async def execute_with_user_check(self, user_id: int, gifts: list[dict]) -> AutobuyOutput:
         from backend.infrastructure.db import SessionLocal
         from backend.infrastructure.db.models import User, UserSettings
-        
+
         session = SessionLocal()
         try:
             user = session.get(User, user_id)
@@ -632,11 +632,11 @@ class AutobuyUseCase:
                     },
                     deferred=[],
                 )
-            
+
             settings = session.get(UserSettings, user_id)
-            forced_channel_id = (
-                int(settings.buy_target_id) if settings and settings.buy_target_id is not None else None
-            )
+            forced_channel_id = None
+            if settings and settings.buy_target_id is not None:
+                forced_channel_id = int(settings.buy_target_id)
             forced_channel_fallback = (
                 bool(getattr(settings, "buy_target_on_fail_only", False)) if settings else False
             )
@@ -764,7 +764,7 @@ class AutobuyUseCase:
                 account.balance -= op.price
                 stats.record_purchase(op, balance_after=account.balance, supply=op.supply)
             except Exception as exc:  # pragma: no cover - network failure branch
-                reason = {"code": type(exc).__name__, "message": str(exc)[:400]}
+                reason = {"code": type(exc).__name__}
                 stats.record_failure(op, reason="send_gift_failed", rpc=reason)
                 logger.opt(exception=exc).warning(
                     f"autobuy:send_fail account_id={op.account_id} channel={op.channel_id} "

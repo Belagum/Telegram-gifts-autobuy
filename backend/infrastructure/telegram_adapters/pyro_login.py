@@ -26,7 +26,6 @@ def _rpc(e: RPCError) -> dict:
     return {
         "error": "telegram_rpc",
         "error_code": e.__class__.__name__,
-        "detail": str(e),
         "http": 400,
     }
 
@@ -164,13 +163,17 @@ class PyroLoginManager:
             lt.stop()
             self._purge(sess)
             return _rpc(e)
-        except Exception as e:
+        except Exception:
             logger.exception(
                 f"pyro_login: start_login unexpected error user_id={user_id} phone={phone}"
             )
             lt.stop()
             self._purge(sess)
-            return {"error": "unexpected", "detail": str(e), "http": 500}
+            return {
+                "error": "unexpected",
+                "error_code": "start_login_failed",
+                "http": 500,
+            }
 
         lid = self._lid()
         pending = PendingLogin(
@@ -218,10 +221,14 @@ class PyroLoginManager:
             logger.warning(f"pyro_login: complete_login RPC error login_id={login_id} detail={e}")
             self._cleanup_pending(p, purge=True)
             return _rpc(e)
-        except Exception as e:
+        except Exception:
             logger.exception(f"pyro_login: complete_login unexpected error login_id={login_id}")
             self._cleanup_pending(p, purge=True)
-            return {"error": "unexpected", "detail": str(e), "http": 500}
+            return {
+                "error": "unexpected",
+                "error_code": "complete_login_failed",
+                "http": 500,
+            }
 
         self._finalize(db, p, me, stars, premium, until)
         self._cleanup_pending(p)
@@ -253,10 +260,14 @@ class PyroLoginManager:
             logger.warning(f"pyro_login: confirm_password RPC error login_id={login_id} detail={e}")
             self._cleanup_pending(p, purge=True)
             return _rpc(e)
-        except Exception as e:
+        except Exception:
             logger.exception(f"pyro_login: confirm_password unexpected error login_id={login_id}")
             self._cleanup_pending(p, purge=True)
-            return {"error": "unexpected", "detail": str(e), "http": 500}
+            return {
+                "error": "unexpected",
+                "error_code": "confirm_password_failed",
+                "http": 500,
+            }
 
         self._finalize(db, p, me, stars, premium, until)
         self._cleanup_pending(p)

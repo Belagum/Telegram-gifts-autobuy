@@ -19,13 +19,17 @@ export interface ConfirmCodeResponse {
   ok?: boolean;
   need_2fa?: boolean;
   error?: string;
+  error_code?: string;
   detail?: string;
+  context?: Record<string, unknown>;
 }
 
 export interface ConfirmPasswordResponse {
   ok?: boolean;
   error?: string;
+  error_code?: string;
   detail?: string;
+  context?: Record<string, unknown>;
 }
 
 export const sendCode = async (payload: LoginPayload): Promise<SendCodeResponse> => {

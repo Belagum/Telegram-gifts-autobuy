@@ -18,7 +18,6 @@ _config = load_config()
 
 
 class TelegramRpcPort(TelegramPort):
-
     def __init__(self, *, balance_interval: float = 0.5, send_interval: float = 0.7):
         self._balance_interval = balance_interval
         self._send_interval = send_interval
@@ -71,7 +70,6 @@ class TelegramRpcPort(TelegramPort):
 
 
 class TelegramNotificationAdapter(NotificationPort):
-
     def __init__(self, *, timeout: float = 30.0, send_interval: float = 0.05):
         self._timeout = timeout
         self._interval = send_interval

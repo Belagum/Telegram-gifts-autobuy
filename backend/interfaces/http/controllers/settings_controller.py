@@ -17,11 +17,11 @@ from backend.shared.errors import (
     InvalidNotifyChatIdError,
     InvalidTargetIdError,
 )
+from backend.shared.logging import logger
 from backend.shared.middleware.csrf import csrf_protect
 
 
 class SettingsController:
-
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("settings", __name__, url_prefix="/api")
         bp.add_url_rule(
@@ -47,7 +47,7 @@ class SettingsController:
         chat = payload.get("notify_chat_id")
         target = payload.get("buy_target_id")
         fallback = payload.get("buy_target_on_fail_only")
-        
+
         if token is not None and not isinstance(token, str):
             raise InvalidBotTokenError()
         if chat is not None and not isinstance(chat, (str, int)):
@@ -56,7 +56,7 @@ class SettingsController:
             raise InvalidTargetIdError()
         if fallback is not None and not isinstance(fallback, bool):
             raise InvalidFallbackError()
-            
+
         try:
             user_id = authed_request().user_id
             settings = set_user_settings(
@@ -65,9 +65,10 @@ class SettingsController:
         except ValueError as exc:
             message = str(exc)
             if "channel" in message or "100" in message:
-                raise InvalidNotifyChatIdError()
-            raise InvalidBuyTargetIdError()
+                raise InvalidNotifyChatIdError() from None
+            raise InvalidBuyTargetIdError() from None
         except Exception as exc:
-            raise InfrastructureError(f"Failed to update settings: {exc}") from exc
-            
+            logger.exception("settings.update: unexpected failure")
+            raise InfrastructureError(code="settings_update_failed") from exc
+
         return jsonify({"ok": True, "settings": settings})

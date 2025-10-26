@@ -9,7 +9,6 @@ from backend.infrastructure.health import check_database
 
 
 class MiscController:
-
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("misc", __name__)
         bp.add_url_rule("/api/health", view_func=self.health, methods=["GET"])

@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from sqlalchemy.orm import Session, joinedload
 
+from backend.application.use_cases.autobuy import AutobuyOutput
 from backend.infrastructure.container import container
 
 from ..infrastructure.db import SessionLocal
@@ -264,7 +265,12 @@ async def _worker_async(uid: int) -> None:
                     )
                     notify_future = asyncio.to_thread(_notify_run_blocking, added)
 
-                    res: dict[str, Any] = {"purchased": [], "skipped": len(added), "stats": {}}
+                    res: dict[str, Any] = {
+                        "purchased": [],
+                        "skipped": len(added),
+                        "stats": {},
+                        "deferred": [],
+                    }
                     stats: dict[str, Any] = {}
                     sent = 0
 
@@ -272,19 +278,18 @@ async def _worker_async(uid: int) -> None:
                         buy_task, notify_future, return_exceptions=True
                     )
 
-                    if isinstance(buy_res, Exception):
-                        logger.error(f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}")
-                    else:
-                        output = buy_res
+                    if isinstance(buy_res, AutobuyOutput):
                         res = {
-                            "purchased": output.purchased,
-                            "skipped": output.skipped,
-                            "stats": output.stats,
-                            "deferred": output.deferred,
+                            "purchased": buy_res.purchased,
+                            "skipped": buy_res.skipped,
+                            "stats": buy_res.stats,
+                            "deferred": buy_res.deferred,
                         }
                         stats = cast(dict[str, Any], res.get("stats") or {})
+                    elif isinstance(buy_res, BaseException):
+                        logger.error(f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}")
 
-                    if isinstance(notify_res, Exception):
+                    if isinstance(notify_res, BaseException):
                         notify_error = (
                             "gifts.notify failed (thread): "
                             f"{type(notify_res).__name__}: {notify_res}"

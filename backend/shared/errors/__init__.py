@@ -23,6 +23,7 @@ from .base import (
     InvalidNotifyChatIdError,
     InvalidTargetIdError,
     PeerIdInvalidError,
+    TargetIdInvalidError,
     TargetIdRequiredError,
     ValidationError,
 )
@@ -46,7 +47,7 @@ __all__ = [
     "InvalidGiftIdError",
     "InvalidAccountIdError",
     "TargetIdRequiredError",
-    "InvalidTargetIdError",
+    "TargetIdInvalidError",
     "AccountNotFoundError",
     "ApiProfileMissingError",
     "GiftNotFoundError",

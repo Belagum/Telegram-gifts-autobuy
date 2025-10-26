@@ -26,6 +26,9 @@ export type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export const RegisterForm: React.FC = () => {
   const navigate = useNavigate();
+  const usernameId = React.useId();
+  const passwordId = React.useId();
+  const confirmId = React.useId();
   const {
     handleSubmit,
     register,
@@ -48,18 +51,39 @@ export const RegisterForm: React.FC = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div>
-        <label className="auth-form__label">Логин</label>
-        <Input placeholder="username" autoComplete="username" {...register("username")} />
+        <label className="auth-form__label" htmlFor={usernameId}>
+          Логин
+        </label>
+        <Input
+          id={usernameId}
+          placeholder="username"
+          autoComplete="username"
+          {...register("username")}
+        />
         {errors.username && <div className="ui-input__error">{errors.username.message}</div>}
       </div>
       <div>
-        <label className="auth-form__label">Пароль</label>
-        <Input type="password" placeholder="••••••••" {...register("password")} />
+        <label className="auth-form__label" htmlFor={passwordId}>
+          Пароль
+        </label>
+        <Input
+          id={passwordId}
+          type="password"
+          placeholder="••••••••"
+          {...register("password")}
+        />
         {errors.password && <div className="ui-input__error">{errors.password.message}</div>}
       </div>
       <div>
-        <label className="auth-form__label">Подтверждение пароля</label>
-        <Input type="password" placeholder="••••••••" {...register("confirmPassword")} />
+        <label className="auth-form__label" htmlFor={confirmId}>
+          Подтверждение пароля
+        </label>
+        <Input
+          id={confirmId}
+          type="password"
+          placeholder="••••••••"
+          {...register("confirmPassword")}
+        />
         {errors.confirmPassword && <div className="ui-input__error">{errors.confirmPassword.message}</div>}
       </div>
       <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>

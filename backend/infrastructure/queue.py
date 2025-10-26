@@ -15,14 +15,12 @@ T = TypeVar("T")
 
 @dataclass(slots=True)
 class QueueMessage(Generic[T]):  # noqa: UP046
-
     payload: T
     message_id: str
     inserted_at: float
 
 
 class ResilientQueue(Generic[T]):  # noqa: UP046
-
     def __init__(self, max_size: int, visibility_timeout: float) -> None:
         self._queue: asyncio.Queue[QueueMessage[T]] = asyncio.Queue(maxsize=max_size)
         self._visibility_timeout = visibility_timeout

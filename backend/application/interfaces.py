@@ -17,29 +17,24 @@ from backend.domain import (
 
 @dataclass(slots=True)
 class GiftPayload:
-
     raw: dict
     candidate: GiftCandidate
 
 
 class AccountRepository(Protocol):
-
     def list_for_user(self, user_id: int) -> Sequence[AccountSnapshot]:
         """Return all accounts for the user sorted by id."""
 
 
 class ChannelRepository(Protocol):
-
     def list_for_user(self, user_id: int) -> Sequence[ChannelFilter]: ...
 
 
 class UserSettingsRepository(Protocol):
-
     def get_bot_token(self, user_id: int) -> str | None: ...
 
 
 class TelegramPort(Protocol):
-
     async def fetch_balance(self, account: AccountSnapshot) -> int: ...
 
     async def send_gift(self, operation: PurchaseOperation, account: AccountSnapshot) -> None: ...
@@ -48,7 +43,6 @@ class TelegramPort(Protocol):
 
 
 class NotificationPort(Protocol):
-
     async def send_reports(
         self, token: str, chat_ids: Sequence[int], messages: Sequence[str]
     ) -> None: ...

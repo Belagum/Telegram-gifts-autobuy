@@ -36,7 +36,15 @@ class AuthController:
         try:
             dto = RegisterRequestDTO.model_validate(request.get_json(silent=True) or {})
         except ValidationError as exc:
-            raise DTOValidationError(message=str(exc)) from exc
+            fields = sorted(
+                {
+                    ".".join(str(part) for part in error.get("loc", ()) if part is not None)
+                    for error in exc.errors()
+                    if error.get("loc")
+                }
+            )
+            context = {"fields": fields} if fields else None
+            raise DTOValidationError(context=context) from exc
         user, token = self._register_use_case.execute(dto.username, dto.password)
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
@@ -51,6 +59,7 @@ class AuthController:
         )
         try:
             import secrets as _secrets
+
             csrf_token = _secrets.token_urlsafe(32)
         except Exception:
             csrf_token = ""
@@ -71,25 +80,32 @@ class AuthController:
         try:
             dto = LoginRequestDTO.model_validate(request.get_json(silent=True) or {})
         except ValidationError as exc:
-            raise DTOValidationError(message=str(exc)) from exc
+            fields = sorted(
+                {
+                    ".".join(str(part) for part in error.get("loc", ()) if part is not None)
+                    for error in exc.errors()
+                    if error.get("loc")
+                }
+            )
+            context = {"fields": fields} if fields else None
+            raise DTOValidationError(context=context) from exc
         token = self._login_use_case.execute(dto.username, dto.password)
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
-        
+
         config = load_config()
-        cookie_params = {
-            "key": "auth_token",
-            "value": token,
-            "httponly": True,
-            "samesite": config.security.cookie_samesite,
-            "secure": config.security.cookie_secure,
-        }
-        if dto.remember_me:
-            cookie_params["max_age"] = 60 * 60 * 24 * 7  # 7 дней
-        
-        response.set_cookie(**cookie_params)
+        remember_max_age = 60 * 60 * 24 * 7 if dto.remember_me else None
+        response.set_cookie(
+            "auth_token",
+            token,
+            httponly=True,
+            samesite=config.security.cookie_samesite,
+            secure=config.security.cookie_secure,
+            max_age=remember_max_age,
+        )
         try:
             import secrets as _secrets
+
             csrf_token = _secrets.token_urlsafe(32)
         except Exception:
             csrf_token = ""

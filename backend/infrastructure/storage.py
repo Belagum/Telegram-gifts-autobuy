@@ -10,14 +10,12 @@ from backend.shared.logging import logger
 
 
 class StoragePort(Protocol):
-
     def read_bytes(self, path: str) -> bytes: ...
 
     def write_bytes(self, path: str, data: bytes) -> None: ...
 
 
 class LocalFileStorage(StoragePort):
-
     def __init__(self, root: Path) -> None:
         self._root = root
         self._root.mkdir(parents=True, exist_ok=True)

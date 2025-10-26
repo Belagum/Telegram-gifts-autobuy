@@ -3,7 +3,7 @@
 
 import { toast } from "react-toastify";
 import type { ToastOptions } from "react-toastify";
-import type { ApiErrorDto } from "../../api/dto";
+import { extractApiErrorMessage } from "../../api/errorMessages";
 
 export const showSuccess = (message: string) => toast.success(message);
 
@@ -12,8 +12,7 @@ export const showInfo = (message: string) => toast.info(message);
 const activeToastIds = new Set<string>();
 
 export const showError = (error: unknown, fallback = "Что-то пошло не так, попробуйте ещё раз") => {
-  const payload = error as ApiErrorDto & { detail?: string };
-  const message = payload?.detail || payload?.error || fallback;
+  const message = extractApiErrorMessage(error, fallback);
   const id = `err-${message}`;
   if (activeToastIds.has(id)) return;
   activeToastIds.add(id);

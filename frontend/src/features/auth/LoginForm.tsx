@@ -21,6 +21,8 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
+  const usernameId = React.useId();
+  const passwordId = React.useId();
   const {
     handleSubmit,
     register,
@@ -47,13 +49,23 @@ export const LoginForm: React.FC = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div>
-        <label className="auth-form__label">Логин</label>
-        <Input placeholder="username" autoComplete="username" {...register("username")} />
+        <label className="auth-form__label" htmlFor={usernameId}>
+          Логин
+        </label>
+        <Input
+          id={usernameId}
+          placeholder="username"
+          autoComplete="username"
+          {...register("username")}
+        />
         {errors.username && <div className="ui-input__error">{errors.username.message}</div>}
       </div>
       <div>
-        <label className="auth-form__label">Пароль</label>
+        <label className="auth-form__label" htmlFor={passwordId}>
+          Пароль
+        </label>
         <Input
+          id={passwordId}
           type="password"
           placeholder="••••••••"
           autoComplete="current-password"
@@ -70,9 +82,9 @@ export const LoginForm: React.FC = () => {
           />
           <span className="auth-checkbox__label">Запомнить меня</span>
         </label>
-        <a href="#" className="auth-link" onClick={(e) => e.preventDefault()}>
+        <button type="button" className="auth-link">
           Забыли пароль?
-        </a>
+        </button>
       </div>
       <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
         {isSubmitting ? "Загрузка…" : "Войти"}

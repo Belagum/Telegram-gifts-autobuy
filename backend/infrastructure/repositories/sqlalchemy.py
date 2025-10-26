@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session, joinedload
 
 
 class SqlAlchemyAccountRepository(AccountRepository):
-
     def __init__(self, session_factory: Callable[[], Session]):
         self._session_factory = session_factory
 
@@ -45,7 +44,6 @@ class SqlAlchemyAccountRepository(AccountRepository):
 
 
 class SqlAlchemyChannelRepository(ChannelRepository):
-
     def __init__(self, session_factory: Callable[[], Session]):
         self._session_factory = session_factory
 
@@ -72,7 +70,6 @@ class SqlAlchemyChannelRepository(ChannelRepository):
 
 
 class SqlAlchemyUserSettingsRepository(UserSettingsRepository):
-
     def __init__(self, session_factory: Callable[[], Session]):
         self._session_factory = session_factory
 

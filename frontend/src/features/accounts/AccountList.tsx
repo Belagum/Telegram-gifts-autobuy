@@ -7,6 +7,7 @@ import { Skeleton } from "../../shared/ui/skeleton/Skeleton";
 import { Account } from "../../entities/accounts/model";
 import { refreshAccountStream } from "../../entities/accounts/api";
 import { upsertLoadingToast, completeToast, failToast } from "../../shared/ui/feedback/toast";
+import { resolveAccountStageMessage, resolveErrorMessage } from "../../shared/api/messages";
 import "./account-list.css";
 
 export interface AccountListProps {
@@ -34,12 +35,19 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, onReload, is
 
     const refreshPromise = new Promise<void>((resolve, reject) => {
       refreshAccountStream(id, (event) => {
-        if (event.message || event.stage) {
-          const msg = event.message || `Этап: ${event.stage}`;
+        if (event.stage) {
+          const msg = resolveAccountStageMessage(event.stage);
           upsertLoadingToast(toastId, msg);
         }
         if (event.error) {
-          reject(new Error(event.detail || event.error || "Ошибка при обновлении аккаунта."));
+          const message = resolveErrorMessage(
+            event.error,
+            event.error_code,
+            event.context,
+            "Ошибка при обновлении аккаунта.",
+          );
+          reject(new Error(message));
+          return;
         }
         if (event.done && event.account) {
           setItems((prev) => prev.map((item) => (item.id === id ? event.account! : item)));

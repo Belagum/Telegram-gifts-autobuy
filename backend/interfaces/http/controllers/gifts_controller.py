@@ -10,7 +10,7 @@ import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from queue import Queue
 from typing import Any, cast
@@ -40,8 +40,8 @@ from backend.shared.errors import (
     InsufficientBalanceError,
     InvalidAccountIdError,
     InvalidGiftIdError,
-    InvalidTargetIdError,
     PeerIdInvalidError,
+    TargetIdInvalidError,
     TargetIdRequiredError,
 )
 from backend.shared.logging import logger
@@ -118,8 +118,8 @@ def _send_lottie_json_from_tgs(path: Path) -> Response | tuple[Response, int]:
     raw = path.read_bytes()
     try:
         data = gzip.decompress(raw)
-    except Exception:
-        raise BadTgsError()
+    except Exception as exc:
+        raise BadTgsError() from exc
     response = Response(data, mimetype="application/json")
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     response.headers["ETag"] = etag
@@ -161,23 +161,6 @@ def _parse_iso_to_utc(value: str | None) -> datetime | None:
         return parsed.astimezone(UTC)
     except Exception:
         return None
-
-
-def _format_remaining(delta: timedelta) -> str:
-    seconds = int(max(delta.total_seconds(), 0))
-    days, remainder = divmod(seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    parts: list[str] = []
-    if days:
-        parts.append(f"{days}д")
-    if hours:
-        parts.append(f"{hours}ч")
-    if minutes:
-        parts.append(f"{minutes}м")
-    if not parts:
-        parts.append(f"{seconds}с")
-    return " ".join(parts)
 
 
 def _convert_gift_ids_to_strings(gifts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -283,8 +266,8 @@ class GiftsController:
 
         try:
             gift_id_int = int(gift_id)
-        except (TypeError, ValueError):
-            raise InvalidGiftIdError(gift_id)
+        except (TypeError, ValueError) as exc:
+            raise InvalidGiftIdError(gift_id) from exc
 
         account_id = _parse_int(account_raw)
         if account_id is None or account_id <= 0:
@@ -295,7 +278,7 @@ class GiftsController:
             raise TargetIdRequiredError()
         target_id = _parse_int(target_text)
         if target_id is None:
-            raise InvalidTargetIdError()
+            raise TargetIdInvalidError()
 
         user_id = authed_request().user_id
 
@@ -332,16 +315,21 @@ class GiftsController:
         if isinstance(locks, dict):
             lock_value = locks.get(str(account_id)) or locks.get(account_id)
         lock_until = _parse_iso_to_utc(lock_value if isinstance(lock_value, str) else None)
-        if lock_until and lock_until > datetime.now(UTC):
-            remaining = _format_remaining(lock_until - datetime.now(UTC))
-            lock_text = lock_until.isoformat().replace("+00:00", "Z")
-            detail = f"Аккаунт {account_id} заблокирован до {lock_text}"
-            if remaining:
-                detail = f"{detail} (ещё {remaining})"
-            return jsonify({"error": "gift_locked", "detail": detail}), 409
+        now_utc = datetime.now(UTC)
+        if lock_until and lock_until > now_utc:
+            remaining_seconds = int((lock_until - now_utc).total_seconds())
+            payload = {
+                "error": "gift_locked",
+                "context": {
+                    "account_id": account_id,
+                    "locked_until": lock_until.isoformat().replace("+00:00", "Z"),
+                    "remaining_seconds": max(remaining_seconds, 0),
+                },
+            }
+            return jsonify(payload), 409
 
         if bool(gift.get("require_premium")) and not bool(getattr(account, "is_premium", False)):
-            return jsonify({"error": "requires_premium", "detail": "Аккаунт без Premium"}), 409
+            return jsonify({"error": "requires_premium"}), 409
 
         async def _send_once() -> None:
             async def _call(client):
@@ -378,16 +366,15 @@ class GiftsController:
                 except Exception:
                     balance = 0
                 price = _parse_int(gift.get("price")) or 0
-                raise InsufficientBalanceError(balance, price)
+                raise InsufficientBalanceError(balance, price) from None
             if (
                 "PEER_ID_INVALID" in message
                 or "PEER ID INVALID" in message
                 or "USER_ID_INVALID" in message
                 or "CHAT_ID_INVALID" in message
             ):
-                raise PeerIdInvalidError()
-            message_text = str(exc)
-            raise InfrastructureError(f"Failed to send gift: {message_text[:200]}")
+                raise PeerIdInvalidError() from None
+            raise InfrastructureError(code="gift_send_failed") from exc
 
         logger.info(
             f"gifts.buy success user_id={user_id} gift_id={gift_id} account_id={account_id} "
@@ -397,10 +384,12 @@ class GiftsController:
         return jsonify(
             {
                 "ok": True,
-                "message": f"Подарок {gift_id} отправлен с аккаунта {account_id}",
-                "gift_id": gift_id,
-                "account_id": account_id,
-                "target_id": target_id,
+                "result": "gift_sent",
+                "context": {
+                    "gift_id": gift_id,
+                    "account_id": account_id,
+                    "target_id": target_id,
+                },
             }
         )
 

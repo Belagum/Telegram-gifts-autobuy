@@ -16,9 +16,10 @@ export interface BuyGiftPayload {
 
 export interface BuyGiftResponse {
   ok: boolean;
-  message?: string;
+  result?: string;
+  context?: Record<string, unknown> | null;
   error?: string;
-  detail?: string;
+  errorCode?: string;
 }
 
 export const listGifts = async (): Promise<Gift[]> => {
@@ -55,7 +56,9 @@ export const setGiftsSettings = async (autoRefresh: boolean): Promise<GiftsSetti
 };
 
 export const buyGift = async ({ giftId, accountId, targetId }: BuyGiftPayload): Promise<BuyGiftResponse> => {
-  const response = await httpClient<BuyGiftResponse>(`/gifts/${giftId}/buy`, {
+  const response = await httpClient<
+    BuyGiftResponse & { context?: Record<string, unknown>; error_code?: string }
+  >(`/gifts/${giftId}/buy`, {
     method: "POST",
     body: {
       account_id: accountId,
@@ -64,9 +67,16 @@ export const buyGift = async ({ giftId, accountId, targetId }: BuyGiftPayload): 
   });
   return {
     ok: Boolean(response.ok),
-    message: response.message,
-    error: response.error,
-    detail: response.detail,
+    result: typeof response.result === "string" ? response.result : undefined,
+    context:
+      response.context && typeof response.context === "object"
+        ? (response.context as Record<string, unknown>)
+        : null,
+    error: typeof response.error === "string" ? response.error : undefined,
+    errorCode:
+      typeof (response as { error_code?: string }).error_code === "string"
+        ? (response as { error_code?: string }).error_code
+        : undefined,
   };
 };
 

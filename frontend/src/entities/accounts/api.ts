@@ -6,24 +6,45 @@ import type { AccountDto, AccountRefreshEventDto } from "../../shared/api/dto";
 import { mapAccount, mapAccountEvent } from "../../shared/api/adapters";
 import type { Account } from "./model";
 
+type AccountsEnvelope = {
+  items?: unknown;
+  accounts?: unknown;
+  state?: unknown;
+};
+
+type AccountsResponse = AccountDto[] | AccountsEnvelope;
+
+const isEnvelope = (value: AccountsResponse): value is AccountsEnvelope => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const isRefreshing = (value: AccountsEnvelope): boolean => {
+  return value.state === "refreshing";
+};
+
+const extractAccountDtos = (value: AccountsResponse): AccountDto[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (Array.isArray(value.items)) {
+    return value.items as AccountDto[];
+  }
+  if (Array.isArray(value.accounts)) {
+    return value.accounts as AccountDto[];
+  }
+  return [];
+};
+
 export const listAccounts = async (): Promise<Account[]> => {
-  type AccountsResp = AccountDto[] | { items?: AccountDto[]; accounts?: AccountDto[]; state?: string };
+  const fetchOnce = () => httpClient<AccountsResponse>("/accounts?wait=1");
 
-  const fetchOnce = () => httpClient<AccountsResp>("/accounts?wait=1");
+  let data: AccountsResponse = await fetchOnce();
 
-  let data = await fetchOnce();
-
-  while (typeof data === "object" && data !== null && !Array.isArray(data) && (data as any).state === "refreshing") {
+  while (isEnvelope(data) && isRefreshing(data)) {
     data = await fetchOnce();
   }
 
-  const items = Array.isArray(data)
-    ? data
-    : Array.isArray((data as any)?.items)
-    ? (data as any).items
-    : Array.isArray((data as any)?.accounts)
-    ? (data as any).accounts
-    : [];
+  const items = extractAccountDtos(data);
 
   return items.map(mapAccount);
 };

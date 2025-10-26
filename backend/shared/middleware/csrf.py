@@ -50,12 +50,10 @@ def csrf_protect(f: Callable):
         header = (request.headers.get("X-CSRF-Token") or "").strip()
         cookie = (request.cookies.get("csrf_token") or "").strip()
         if not header or not cookie or header != cookie:
-            return jsonify({"error": "csrf", "message": "CSRF validation failed"}), 403
+            return jsonify({"error": "csrf"}), 403
         return f(*args, **kwargs)
 
     return wrapper
 
 
 __all__ = ["configure_csrf", "csrf_protect"]
-
-

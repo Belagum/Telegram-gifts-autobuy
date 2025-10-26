@@ -30,9 +30,7 @@ def issue_token(db: Session, user_id: int) -> str:
     db.add(row)
     db.commit()
 
-    logger.info(
-        f"Issued token for user={user_id} exp={row.expires_at.isoformat()}"
-    )
+    logger.info(f"Issued token for user={user_id} exp={row.expires_at.isoformat()}")
     return token
 
 

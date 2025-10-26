@@ -45,8 +45,8 @@ def rate_limit(limit: int | None = None, window_seconds: float | None = None):
     config = load_config()
     enabled = config.security.enable_rate_limit
     limiter = InMemoryRateLimiter(
-        limit or config.security.rate_limit_requests, 
-        window_seconds or config.security.rate_limit_window
+        limit or config.security.rate_limit_requests,
+        window_seconds or config.security.rate_limit_window,
     )
 
     def decorator(f: Callable):
@@ -68,5 +68,3 @@ def rate_limit(limit: int | None = None, window_seconds: float | None = None):
 
 
 __all__ = ["rate_limit"]
-
-

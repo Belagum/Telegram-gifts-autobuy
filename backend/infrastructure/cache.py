@@ -17,7 +17,6 @@ V = TypeVar("V")
 
 @dataclass(slots=True)
 class CacheEntry(Generic[V]):  # noqa: UP046
-
     value: V
     expires_at: float
 
@@ -26,7 +25,6 @@ class CacheEntry(Generic[V]):  # noqa: UP046
 
 
 class InMemoryTTLCache(Generic[K, V]):  # noqa: UP046
-
     def __init__(self, ttl_seconds: int) -> None:
         self._ttl = ttl_seconds
         self._lock = Lock()

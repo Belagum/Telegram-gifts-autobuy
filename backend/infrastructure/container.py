@@ -20,6 +20,10 @@ from backend.infrastructure.repositories.users.sqlalchemy_user_repository import
     SqlAlchemySessionTokenRepository,
     SqlAlchemyUserRepository,
 )
+from backend.infrastructure.telegram import (
+    TelegramNotificationAdapter,
+    TelegramRpcPort,
+)
 from backend.interfaces.http.controllers.auth_controller import AuthController
 
 

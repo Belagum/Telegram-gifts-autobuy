@@ -5,6 +5,7 @@ export interface ApiErrorDto {
   error?: string;
   detail?: string;
   error_code?: string;
+  context?: Record<string, unknown>;
 }
 
 export interface SessionDto {
@@ -24,10 +25,9 @@ export interface AccountDto {
 
 export interface AccountRefreshEventDto {
   stage?: string;
-  message?: string;
   error?: string;
   error_code?: string;
-  detail?: string;
+  context?: Record<string, unknown>;
   done?: boolean;
   account?: AccountDto;
 }

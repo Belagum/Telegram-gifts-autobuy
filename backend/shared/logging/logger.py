@@ -44,7 +44,6 @@ class _InterceptHandler(logging.Handler):
 
 
 class ContextualLogger:
-
     def __getattr__(self, name):  # pragma: no cover
         bound = _logger.bind(correlation_id=_CORRELATION_ID.get())
         return getattr(bound, name)
@@ -98,7 +97,6 @@ logger = ContextualLogger()
 __all__ = [
     "logger",
     "setup_logging",
-    "bind_flask",
     "set_correlation_id",
     "clear_correlation_id",
     "get_correlation_id",

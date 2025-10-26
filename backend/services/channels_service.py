@@ -165,13 +165,16 @@ def create_channel(
 ) -> dict:
     try:
         ch_id = norm_ch_id(channel_id)
-    except ValueError as e:
-        return {"error": "bad_channel_id", "detail": str(e)}
+    except ValueError:
+        return {"error": "bad_channel_id"}
     try:
         price_min, price_max = _coerce_range("price_min", "price_max", price_min, price_max)
         supply_min, supply_max = _coerce_range("supply_min", "supply_max", supply_min, supply_max)
-    except ValueError as e:
-        return {"error": "bad_range", "detail": str(e)}
+    except ValueError:
+        return {
+            "error": "bad_range",
+            "context": {"fields": ["price_min", "price_max"]},
+        }
     exists = (
         db.query(Channel.id).filter(Channel.user_id == user_id, Channel.channel_id == ch_id).first()
     )
@@ -179,7 +182,7 @@ def create_channel(
         return {"error": "duplicate_channel"}
     probed_title, joined = _probe_any_account(db, user_id, ch_id)
     if not joined:
-        return {"error": "not_joined", "detail": "в канал не войдено ни на каком аккаунте"}
+        return {"error": "channel_not_joined"}
     title = (title_input or "").strip() or (probed_title or None)
     ch = Channel(
         user_id=user_id,
@@ -210,8 +213,11 @@ def update_channel(db: Session, user_id: int, ch_id: int, **f) -> dict:
                 f.get("price_min", ch.price_min),
                 f.get("price_max", ch.price_max),
             )
-        except ValueError as e:
-            return {"error": "bad_range", "detail": str(e)}
+        except ValueError:
+            return {
+                "error": "bad_range",
+                "context": {"fields": ["price_min", "price_max"]},
+            }
         f["price_min"], f["price_max"] = lo, hi
     if "supply_min" in f or "supply_max" in f:
         try:
@@ -221,8 +227,11 @@ def update_channel(db: Session, user_id: int, ch_id: int, **f) -> dict:
                 f.get("supply_min", ch.supply_min),
                 f.get("supply_max", ch.supply_max),
             )
-        except ValueError as e:
-            return {"error": "bad_range", "detail": str(e)}
+        except ValueError:
+            return {
+                "error": "bad_range",
+                "context": {"fields": ["supply_min", "supply_max"]},
+            }
         f["supply_min"], f["supply_max"] = lo, hi
     for k in ("title", "price_min", "price_max", "supply_min", "supply_max"):
         if k in f:

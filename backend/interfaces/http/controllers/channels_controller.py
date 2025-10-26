@@ -27,7 +27,6 @@ from backend.shared.middleware.csrf import csrf_protect
 
 
 class ChannelsController:
-
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("channels", __name__, url_prefix="/api")
         bp.add_url_rule("/channels", view_func=self.list_channels, methods=["GET"])
@@ -55,7 +54,7 @@ class ChannelsController:
             return jsonify({"items": items})
         except Exception as exc:
             logger.exception(f"channels.list: err (user_id={user_id})")
-            raise InfrastructureError(f"Failed to list channels: {exc}") from exc
+            raise InfrastructureError(code="channels_list_failed") from exc
 
     @auth_required
     @csrf_protect
@@ -95,7 +94,7 @@ class ChannelsController:
             raise BadChannelIdError(str(payload.get("channel_id", ""))) from exc
         except Exception as exc:
             logger.exception(f"channel.create: err (user_id={user_id})")
-            raise InfrastructureError(f"Failed to create channel: {exc}") from exc
+            raise InfrastructureError(code="channel_create_failed") from exc
 
     @auth_required
     @csrf_protect
@@ -118,7 +117,7 @@ class ChannelsController:
             raise
         except Exception as exc:
             logger.exception(f"channel.update: err (user_id={user_id}, ch_id={channel_id})")
-            raise InfrastructureError(f"Failed to update channel: {exc}") from exc
+            raise InfrastructureError(code="channel_update_failed") from exc
 
     @auth_required
     @csrf_protect
@@ -140,4 +139,4 @@ class ChannelsController:
             raise
         except Exception as exc:
             logger.exception(f"channel.delete: err (user_id={user_id}, ch_id={channel_id})")
-            raise InfrastructureError(f"Failed to delete channel: {exc}") from exc
+            raise InfrastructureError(code="channel_delete_failed") from exc

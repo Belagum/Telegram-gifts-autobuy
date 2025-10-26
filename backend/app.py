@@ -57,7 +57,9 @@ def create_app() -> Flask:
         SESSION_PERMANENT=True,
     )
 
-    cors_kwargs = {"resources": {r"/api/*": {"origins": _config.security.allowed_origins}}}
+    cors_kwargs: dict[str, object] = {
+        "resources": {r"/api/*": {"origins": _config.security.allowed_origins}}
+    }
     if any(o != "*" for o in _config.security.allowed_origins):
         cors_kwargs["supports_credentials"] = True
     CORS(app, **cors_kwargs)
@@ -67,8 +69,6 @@ def create_app() -> Flask:
     app.register_blueprint(bp_gifts)
     app.register_blueprint(bp_settings)
     app.register_blueprint(bp_channels)
-
-
 
     if _should_boot() and not _BOOTSTRAPPED.is_set():
         _BOOTSTRAPPED.set()

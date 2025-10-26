@@ -94,98 +94,86 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
 
   const onSubmit = handleSubmit(
     async (values) => {
-    console.log("onSubmit called", { values, isEdit, initial });
-    const { channelId, title, priceMin, priceMax, supplyMin, supplyMax } = values;
-    if (!isEdit && !channelId) {
-      showError({ error: "Введите ID канала" });
-      return;
-    }
-    if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
-      showError({ error: "Минимальная цена больше максимальной" });
-      return;
-    }
-    if (supplyMin !== null && supplyMax !== null && supplyMin > supplyMax) {
-      showError({ error: "Минимальный supply больше максимального" });
-      return;
-    }
-    const payload: Partial<Pick<Channel, "title" | "priceMin" | "priceMax" | "supplyMin" | "supplyMax">> = {
-      title: title?.trim() || null,
-      priceMin,
-      priceMax,
-      supplyMin,
-      supplyMax,
-    };
-    try {
-      if (isEdit && initial) {
-        const diff: Partial<Channel> = {};
-        if ((payload.title ?? null) !== (initial.title ?? null)) diff.title = payload.title ?? null;
-        if (payload.priceMin !== initial.priceMin) diff.priceMin = payload.priceMin ?? null;
-        if (payload.priceMax !== initial.priceMax) diff.priceMax = payload.priceMax ?? null;
-        if (payload.supplyMin !== initial.supplyMin) diff.supplyMin = payload.supplyMin ?? null;
-        if (payload.supplyMax !== initial.supplyMax) diff.supplyMax = payload.supplyMax ?? null;
-
-        if (Object.keys(diff).length === 0) {
-          showError({ error: "Нет изменений для сохранения" });
-          return;
-        }
-
-        await showPromise(
-          updateChannel(initial.id, diff),
-          "Сохраняю изменения…",
-          "Сохранено",
-          (err) => extractApiErrorMessage(err, "Не удалось сохранить изменения"),
-        );
-      } else {
-        await showPromise(
-          createChannel({
-            channelId: channelId!,
-            title: payload.title ?? null,
-            priceMin: payload.priceMin,
-            priceMax: payload.priceMax,
-            supplyMin: payload.supplyMin,
-            supplyMax: payload.supplyMax,
-          }),
-          "Добавляю канал…",
-          "Канал добавлен",
-          (err) => extractApiErrorMessage(err, "Не удалось добавить канал"),
-        );
+      const { channelId, title, priceMin, priceMax, supplyMin, supplyMax } = values;
+      if (!isEdit && !channelId) {
+        showError("Введите ID канала");
+        return;
       }
-      onSaved();
-      onClose();
-    } catch (error) {
-      console.error("Failed to save channel", error);
-    }
+      if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
+        showError("Минимальная цена больше максимальной");
+        return;
+      }
+      if (supplyMin !== null && supplyMax !== null && supplyMin > supplyMax) {
+        showError("Минимальный supply больше максимального");
+        return;
+      }
+
+      const payload: Partial<Pick<Channel, "title" | "priceMin" | "priceMax" | "supplyMin" | "supplyMax">> = {
+        title: title?.trim() || null,
+        priceMin,
+        priceMax,
+        supplyMin,
+        supplyMax,
+      };
+
+      try {
+        if (isEdit && initial) {
+          const diff: Partial<Channel> = {};
+          if ((payload.title ?? null) !== (initial.title ?? null)) diff.title = payload.title ?? null;
+          if (payload.priceMin !== initial.priceMin) diff.priceMin = payload.priceMin ?? null;
+          if (payload.priceMax !== initial.priceMax) diff.priceMax = payload.priceMax ?? null;
+          if (payload.supplyMin !== initial.supplyMin) diff.supplyMin = payload.supplyMin ?? null;
+          if (payload.supplyMax !== initial.supplyMax) diff.supplyMax = payload.supplyMax ?? null;
+
+          if (Object.keys(diff).length === 0) {
+            showError("Нет изменений для сохранения");
+            return;
+          }
+
+          await showPromise(
+            updateChannel(initial.id, diff),
+            "Сохраняю изменения…",
+            "Сохранено",
+            (err) => extractApiErrorMessage(err, "Не удалось сохранить изменения"),
+          );
+        } else {
+          await showPromise(
+            createChannel({
+              channelId: channelId!,
+              title: payload.title ?? null,
+              priceMin: payload.priceMin,
+              priceMax: payload.priceMax,
+              supplyMin: payload.supplyMin,
+              supplyMax: payload.supplyMax,
+            }),
+            "Добавляю канал…",
+            "Канал добавлен",
+            (err) => extractApiErrorMessage(err, "Не удалось добавить канал"),
+          );
+        }
+        onSaved();
+        onClose();
+      } catch (error) {
+        showError(error, "Не удалось сохранить изменения");
+      }
     },
-    (invalidErrors) => {
-      console.log("onInvalid called", invalidErrors);
-      showError({ error: "Исправьте ошибки в форме" });
+    () => {
+      showError("Исправьте ошибки в форме");
     },
   );
 
   const handleSaveClick = () => {
-    const currentForm = formRef.current;
-    console.log("handleSaveClick called, formRef.current:", currentForm);
-    console.log("requestSubmit available?", Boolean(currentForm && (currentForm as any).requestSubmit));
-
-    if (currentForm) {
-      const formEl = currentForm as HTMLFormElement;
-      if (typeof (formEl as any).requestSubmit === 'function') {
-        console.log("calling formEl.requestSubmit()");
-        try {
-          (formEl as any).requestSubmit();
-          console.log("formEl.requestSubmit() completed");
-        } catch (err) {
-          console.error("formEl.requestSubmit() error:", err);
-        }
-      } else {
-        console.log("requestSubmit not supported, trying dispatchEvent");
-        const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-        const dispatched = formEl.dispatchEvent(submitEvent);
-        console.log("formEl.dispatchEvent('submit') returned:", dispatched);
-      }
-    } else {
-      console.error("formRef.current is null!");
+    const formEl = formRef.current;
+    if (!formEl) {
+      showError("Форма недоступна");
+      return;
     }
+    if (typeof formEl.requestSubmit === "function") {
+      formEl.requestSubmit();
+      return;
+    }
+    const submitEvent = new Event("submit", { bubbles: true, cancelable: true });
+    formEl.dispatchEvent(submitEvent);
   };
 
   return (
@@ -207,12 +195,7 @@ export const EditChannelModal: React.FC<EditChannelModalProps> = ({ open, initia
       <form 
         ref={formRef}
         id="edit-channel-form" 
-        onSubmit={(e) => {
-          console.log("form onSubmit handler called", e);
-          const result = onSubmit(e);
-          console.log("onSubmit returned:", result);
-          return result;
-        }}
+        onSubmit={onSubmit}
         className="modal-form" 
         noValidate
       >

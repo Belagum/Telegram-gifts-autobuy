@@ -14,7 +14,6 @@ INF_SUPPLY = 10**12
 
 @dataclass(slots=True, frozen=True)
 class ChannelFilter:
-
     id: int
     user_id: int
     channel_id: int
@@ -60,7 +59,6 @@ class ChannelFilter:
 
 @dataclass(slots=True, frozen=True)
 class GiftCandidate:
-
     gift_id: int
     price: int
     total_supply: int
@@ -89,7 +87,6 @@ class GiftCandidate:
 
 @dataclass(slots=True)
 class AccountSnapshot:
-
     id: int
     user_id: int
     session_path: str
@@ -125,7 +122,6 @@ class AccountSnapshot:
 
 @dataclass(slots=True, frozen=True)
 class PurchaseOperation:
-
     account_id: int
     channel_id: int
     gift_id: int
@@ -139,7 +135,6 @@ class PurchaseOperation:
 
 @dataclass(slots=True)
 class PurchasePlan:
-
     operations: list[PurchaseOperation] = field(default_factory=list)
 
     def add(self, op: PurchaseOperation) -> None:

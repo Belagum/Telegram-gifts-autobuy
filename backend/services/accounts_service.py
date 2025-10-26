@@ -333,7 +333,7 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
     )
     logger.info(stream_start_msg)
     with lk:
-        yield {"stage": "connect", "message": "Соединяюсь…"}
+        yield {"stage": "connect"}
         time.sleep(0.5)
         try:
             stream_fetch_begin_msg = (
@@ -359,26 +359,22 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
             )
             logger.warning(stream_auth_warning_msg)
             _delete_account_and_session(db, acc, reason="AUTH_KEY_UNREGISTERED(stream)")
-            yield {
-                "error": "session_invalid",
-                "error_code": "AUTH_KEY_UNREGISTERED",
-                "detail": "Сессия невалидна. Авторизуйтесь заново.",
-            }
+            yield {"error": "session_invalid", "error_code": "AUTH_KEY_UNREGISTERED"}
             return
-        except Exception as e:
+        except Exception:
             stream_error_msg = (
                 "accounts.stream: unexpected error "
                 f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
             )
             logger.exception(stream_error_msg)
-            yield {"error": "internal_error", "detail": str(e)}
+            yield {"error": "account_refresh_failed"}
             return
 
-        yield {"stage": "profile", "message": "Проверяю профиль…"}
+        yield {"stage": "profile"}
         time.sleep(0.5)
-        yield {"stage": "stars", "message": "Проверяю звёзды…"}
+        yield {"stage": "stars"}
         time.sleep(0.5)
-        yield {"stage": "premium", "message": "Проверяю премиум…"}
+        yield {"stage": "premium"}
         time.sleep(0.5)
 
         prev_first = acc.first_name
@@ -418,12 +414,12 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
         )
         logger.debug(stream_commit_msg)
 
-        yield {"stage": "save", "message": "Сохраняю…"}
+        yield {"stage": "save"}
         time.sleep(0.5)
 
         yield {
             "done": True,
-            "message": "Готово",
+            "stage": "done",
             "account": {
                 "id": acc.id,
                 "phone": acc.phone,

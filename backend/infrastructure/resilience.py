@@ -25,7 +25,6 @@ T = TypeVar("T")
 
 @dataclass
 class CircuitBreaker:
-
     failure_threshold: int
     reset_timeout: float
 
@@ -62,7 +61,6 @@ async def resilient_call(  # noqa: UP047
     timeout: float | None = None,
     **kwargs: Any,
 ) -> T:
-
     breaker = breaker or CircuitBreaker(
         failure_threshold=_config.resilience.circuit_fail_threshold,
         reset_timeout=_config.resilience.circuit_reset_timeout,

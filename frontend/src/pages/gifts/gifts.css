@@ -8,6 +8,7 @@
   align-items: stretch;
   gap: var(--spacing-lg);
   width: 100%;
+  max-width: none;
 }
 
 .gifts-page.is-popup {
@@ -42,12 +43,14 @@
   align-items: center;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .gifts-grid {
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(auto-fill, minmax(var(--gift-min-col-width), 1fr));
+  max-width: none;
+  grid-template-columns: repeat(auto-fit, minmax(var(--gift-min-col-width), 1fr));
   gap: var(--spacing-md);
   justify-content: stretch;
 }
@@ -115,7 +118,7 @@
   cursor: pointer;
   transition: transform 0.15s ease;
   will-change: transform;
-  transform: translateZ(0); 
+  transform: translateZ(0);
 }
 
 .gift-thumb:hover {

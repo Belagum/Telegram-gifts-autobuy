@@ -37,7 +37,6 @@ export const showPromise = <T,>(
         typeof success === "function"
           ? {
               render({ data }) {
-                // data is the resolved value of the promise
                 return success(data as T);
               },
             }

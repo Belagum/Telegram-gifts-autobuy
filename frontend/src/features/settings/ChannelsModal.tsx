@@ -7,8 +7,7 @@ import { Button } from "../../shared/ui/button/Button";
 import { ConfirmDialog } from "../../shared/ui/modal/ConfirmDialog";
 import { listChannels, deleteChannel } from "../../entities/settings/api";
 import type { Channel } from "../../entities/settings/channel";
-import { extractApiErrorMessage } from "../../shared/api/errorMessages";
-import { showError, showPromise } from "../../shared/ui/feedback/toast";
+import { showError, showSuccess } from "../../shared/ui/feedback/toast";
 import { EditChannelModal } from "./EditChannelModal";
 import "./channels-modal.css";
 
@@ -43,17 +42,12 @@ export const ChannelsModal: React.FC<ChannelsModalProps> = ({ open, onClose }) =
 
   const handleDelete = async () => {
     if (!confirm) return;
-    const channel = confirm;
     try {
-      await showPromise(
-        deleteChannel(channel.id),
-        "Удаляю канал…",
-        "Канал удалён",
-        (err) => extractApiErrorMessage(err, "Не удалось удалить канал"),
-      );
-      setChannels((current) => current.filter((item) => item.id !== channel.id));
+      await deleteChannel(confirm.id);
+      setChannels((current) => current.filter((channel) => channel.id !== confirm.id));
+      showSuccess("Канал удалён");
     } catch (error) {
-      console.error("Failed to delete channel", error);
+      showError(error, "Не удалось удалить канал");
     } finally {
       setConfirm(null);
     }
@@ -62,10 +56,9 @@ export const ChannelsModal: React.FC<ChannelsModalProps> = ({ open, onClose }) =
   const describeChannel = (channel: Channel) => {
     const priceRange = [channel.priceMin, channel.priceMax].filter((value) => value != null).join(" – ");
     const supplyRange = [channel.supplyMin, channel.supplyMax].filter((value) => value != null).join(" – ");
-    const title = (channel.title && channel.title.trim() !== "") ? channel.title : null;
     return (
       <>
-        <div className="channel-title">{title || channel.channelId}</div>
+        <div className="channel-title">{channel.title ?? channel.channelId}</div>
         <div className="channel-meta">ID: {channel.channelId}</div>
         {priceRange && <div className="channel-meta">Цена: {priceRange}</div>}
         {supplyRange && <div className="channel-meta">Supply: {supplyRange}</div>}
@@ -98,6 +91,9 @@ export const ChannelsModal: React.FC<ChannelsModalProps> = ({ open, onClose }) =
                 {describeChannel(channel)}
               </button>
               <div className="channel-actions">
+                <Button size="sm" variant="ghost" onClick={() => setEditor(channel)}>
+                  Редактировать
+                </Button>
                 <Button size="sm" variant="danger" onClick={() => setConfirm(channel)}>
                   Удалить
                 </Button>

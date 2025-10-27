@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 Vova Orig
+# Copyright 2025 Vova orig
 
 import asyncio
 import concurrent.futures
@@ -11,15 +11,12 @@ from typing import Any, TypeVar
 
 from pyrogram import Client
 
-from backend.services.session_locks_service import session_lock_for
-from backend.shared.logging import logger
+from .session_locks_service import session_lock_for
+from ..shared.logging import logger
 
 _START_ATTEMPTS = 4
 _START_TIMEOUT = 20.0
 _DBLOCK_MAX_BACKOFF = 2.0
-
-_STAR_WARNED_PATHS: set[str] = set()
-_STAR_WARN_GUARD = threading.Lock()
 
 
 class _Box:
@@ -53,36 +50,6 @@ _IO_THREAD: threading.Thread | None = None
 _IO_LOCK = threading.Lock()
 
 
-def _warn_stars_unsupported(path: str) -> None:
-    key = os.path.abspath(path)
-    with _STAR_WARN_GUARD:
-        if key in _STAR_WARNED_PATHS:
-            return
-        _STAR_WARNED_PATHS.add(key)
-    logger.warning(f"tg_clients: get_stars_balance unsupported, defaulting to zero path={key}")
-
-
-def _normalize_stars(value: Any) -> int:
-    if value is None:
-        return 0
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int | float):
-        return int(value)
-    if isinstance(value, dict):
-        for key in ("balance", "amount", "stars", "value"):
-            if key in value:
-                return _normalize_stars(value[key])
-        return 0
-    for attr in ("balance", "amount", "stars", "value"):
-        if hasattr(value, attr):
-            return _normalize_stars(getattr(value, attr))
-    try:
-        return int(value)
-    except Exception:
-        return 0
-
-
 def _ensure_io_loop() -> asyncio.AbstractEventLoop:
     global _IO_LOOP, _IO_THREAD
     with _IO_LOCK:
@@ -106,49 +73,6 @@ def _ensure_io_loop() -> asyncio.AbstractEventLoop:
         t.start()
         logger.info(f"tg_clients: started io loop thread={t.name}")
         return loop
-
-
-async def get_stars_balance(
-    path: str,
-    api_id: int,
-    api_hash: str,
-    *,
-    min_interval: float = 0.0,
-) -> int:
-    supported = True
-
-    async def _zero() -> int:
-        return 0
-
-    def _op(client: Client):
-        nonlocal supported
-        getter = getattr(client, "get_stars_balance", None)
-        if getter is None:
-            supported = False
-            return _zero()
-        try:
-            return getter()
-        except AttributeError:
-            supported = False
-            return _zero()
-
-    try:
-        raw = await tg_call(
-            path,
-            api_id,
-            api_hash,
-            _op,
-            min_interval=min_interval,
-        )
-    except AttributeError:
-        supported = False
-        raw = 0
-
-    if not supported:
-        _warn_stars_unsupported(path)
-        return 0
-
-    return _normalize_stars(raw)
 
 
 def _loop_alive(loop: asyncio.AbstractEventLoop | None) -> bool:

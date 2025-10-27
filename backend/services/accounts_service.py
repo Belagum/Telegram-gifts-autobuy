@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account
 from backend.services.session_locks_service import session_lock_for
-from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.services.tg_clients_service import tg_call
 from backend.shared.logging import logger
 
 STALE_MINUTES = 60
@@ -132,7 +132,11 @@ def _delete_account_and_session(db: Session, acc: Account, *, reason: str | None
 
 async def fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str):
     me = await tg_call(session_path, api_id, api_hash, lambda c: c.get_me())
-    stars = await get_stars_balance(session_path, api_id, api_hash)
+    
+    async def _get_stars(client):
+        return await client.get_stars_balance()
+    
+    stars = await tg_call(session_path, api_id, api_hash, _get_stars)
     premium = bool(getattr(me, "is_premium", False))
     status_text = None
     if premium:
@@ -333,7 +337,7 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
     )
     logger.info(stream_start_msg)
     with lk:
-        yield {"stage": "connect"}
+        yield {"stage": "connect", "message": "Соединяюсь…"}
         time.sleep(0.5)
         try:
             stream_fetch_begin_msg = (
@@ -359,22 +363,26 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
             )
             logger.warning(stream_auth_warning_msg)
             _delete_account_and_session(db, acc, reason="AUTH_KEY_UNREGISTERED(stream)")
-            yield {"error": "session_invalid", "error_code": "AUTH_KEY_UNREGISTERED"}
+            yield {
+                "error": "session_invalid",
+                "error_code": "AUTH_KEY_UNREGISTERED",
+                "detail": "Сессия невалидна. Авторизуйтесь заново.",
+            }
             return
-        except Exception:
+        except Exception as e:
             stream_error_msg = (
                 "accounts.stream: unexpected error "
                 f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
             )
             logger.exception(stream_error_msg)
-            yield {"error": "account_refresh_failed"}
+            yield {"error": "internal_error", "detail": str(e)}
             return
 
-        yield {"stage": "profile"}
+        yield {"stage": "profile", "message": "Проверяю профиль…"}
         time.sleep(0.5)
-        yield {"stage": "stars"}
+        yield {"stage": "stars", "message": "Проверяю звёзды…"}
         time.sleep(0.5)
-        yield {"stage": "premium"}
+        yield {"stage": "premium", "message": "Проверяю премиум…"}
         time.sleep(0.5)
 
         prev_first = acc.first_name
@@ -414,12 +422,12 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
         )
         logger.debug(stream_commit_msg)
 
-        yield {"stage": "save"}
+        yield {"stage": "save", "message": "Сохраняю…"}
         time.sleep(0.5)
 
         yield {
             "done": True,
-            "stage": "done",
+            "message": "Готово",
             "account": {
                 "id": acc.id,
                 "phone": acc.phone,

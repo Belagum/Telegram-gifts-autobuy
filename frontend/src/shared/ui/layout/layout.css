@@ -1,10 +1,18 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright 2025 Vova Orig */
 
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  min-height: 100vh;
   transition: grid-template-columns 0.3s ease;
 }
 
@@ -12,19 +20,29 @@
   grid-template-columns: 70px 1fr;
 }
 
+.layout__main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow-x: hidden;
+}
+
 .layout__sidebar {
   background: var(--color-surface);
   border-right: 1px solid rgba(148, 163, 184, 0.15);
   padding: var(--spacing-lg);
+  padding-bottom: 140px;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
   transition: padding 0.3s ease, width 0.3s ease;
   overflow: hidden;
+  min-height: 100vh;
 }
 
 .layout__sidebar--collapsed {
   padding: var(--spacing-lg) var(--spacing-sm);
+  padding-bottom: 140px;
 }
 
 .layout__logo {
@@ -102,10 +120,23 @@
 }
 
 .layout__sidebar-footer {
-  margin-top: auto;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 240px;
+  background: var(--color-surface);
+  padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  z-index: 10;
+  transition: width 0.3s ease, padding 0.3s ease;
+}
+
+.layout__sidebar--collapsed .layout__sidebar-footer {
+  width: 70px;
+  padding: var(--spacing-lg) var(--spacing-sm);
 }
 
 .layout__footer-btn {
@@ -185,6 +216,10 @@
 .layout__content {
   padding: var(--spacing-xl);
   background: var(--color-bg);
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 150vh;
 }
 
 @media (max-width: 960px) {
@@ -197,12 +232,19 @@
     justify-content: space-between;
     border-right: none;
     border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    position: relative;
+    min-height: auto;
+    padding-bottom: var(--spacing-lg);
   }
   .layout__nav {
     flex-direction: row;
     gap: var(--spacing-md);
   }
   .layout__sidebar-footer {
+    position: relative;
     flex-direction: row;
+    width: auto;
+    padding: 0;
+    border: none;
   }
 }

@@ -17,6 +17,7 @@ body {
   background-color: var(--color-bg);
   color: var(--color-text);
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 /* smooth theme transition*/

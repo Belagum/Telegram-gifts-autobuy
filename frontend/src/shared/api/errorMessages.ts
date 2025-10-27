@@ -44,16 +44,17 @@ export const extractApiErrorMessage = (error: unknown, fallback: string): string
   }
 
   if (isRecord(error)) {
-    const direct = resolveFromSource(error, fallback);
-    if (direct) {
-      return direct;
-    }
     const payloadCandidate = (error as Record<string, unknown> & { payload?: unknown }).payload;
     if (isRecord(payloadCandidate)) {
       const fromPayload = resolveFromSource(payloadCandidate, fallback);
       if (fromPayload) {
         return fromPayload;
       }
+    }
+    
+    const direct = resolveFromSource(error, fallback);
+    if (direct) {
+      return direct;
     }
   }
 

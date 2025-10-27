@@ -29,7 +29,7 @@ from backend.services.gifts_service import (
     start_user_gifts,
     stop_user_gifts,
 )
-from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.services.tg_clients_service import tg_call
 from backend.shared.errors import (
     AccountNotFoundError,
     ApiProfileMissingError,
@@ -353,12 +353,16 @@ class GiftsController:
             message = (str(exc) or "").upper()
             if "BALANCE_TOO_LOW" in message:
                 try:
+                    async def _get_balance(client):
+                        return await client.get_stars_balance()
+                    
                     balance = int(
                         _run_async(
-                            get_stars_balance(
+                            tg_call(
                                 account.session_path,
                                 account.api_profile.api_id,
                                 account.api_profile.api_hash,
+                                _get_balance,
                                 min_interval=0.5,
                             )
                         )

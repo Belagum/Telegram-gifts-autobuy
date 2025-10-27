@@ -10,7 +10,7 @@ import httpx
 from backend.application import NotificationPort, TelegramPort
 from backend.domain import AccountSnapshot, PurchaseOperation
 from backend.infrastructure.resilience import CircuitBreaker, resilient_call
-from backend.services.tg_clients_service import get_stars_balance, tg_call
+from backend.services.tg_clients_service import tg_call
 from backend.shared.config import load_config
 from backend.shared.logging import logger
 
@@ -23,10 +23,14 @@ class TelegramRpcPort(TelegramPort):
         self._send_interval = send_interval
 
     async def fetch_balance(self, account: AccountSnapshot) -> int:
-        balance = await get_stars_balance(
+        async def _get_balance(client):
+            return await client.get_stars_balance()
+        
+        balance = await tg_call(
             account.session_path,
             account.api_id,
             account.api_hash,
+            _get_balance,
             min_interval=self._balance_interval,
         )
         return int(balance or 0)

@@ -6,6 +6,8 @@
   flex-direction: column;
   gap: var(--spacing-lg);
   padding-bottom: var(--spacing-xl);
+  width: 100%;
+  max-width: none;
 }
 
 /* Popup-specific appearance (no layout wrapper) */

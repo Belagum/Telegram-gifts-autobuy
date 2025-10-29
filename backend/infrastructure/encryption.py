@@ -39,10 +39,11 @@ class EncryptionService:
                 sys.exit(1)
             else:
                 logger.warning(
-                    "ENCRYPTION_KEY not set, using auto-generated key for development. "
+                    "ENCRYPTION_KEY not set, using fixed development key. "
                     "DO NOT use this in production!"
                 )
-                return Fernet.generate_key()
+                dev_key = b"dev-key-for-local-development-only=="
+                return base64.urlsafe_b64encode(dev_key.ljust(32, b'='))
         
         try:
             return key_str.encode("utf-8")

@@ -25,6 +25,7 @@ export const DashboardPage: React.FC = () => {
   const [accountModalOpen, setAccountModalOpen] = React.useState(false);
   const [channelsOpen, setChannelsOpen] = React.useState(false);
   const [selectedApiProfile, setSelectedApiProfile] = React.useState<number | null>(null);
+  const [pendingAccountModal, setPendingAccountModal] = React.useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = React.useState(false);
   const { isAdmin } = useIsAdmin();
 
@@ -59,6 +60,13 @@ export const DashboardPage: React.FC = () => {
     };
   }, [loadAccounts]);
 
+  React.useEffect(() => {
+    if (pendingAccountModal && selectedApiProfile !== null) {
+      setAccountModalOpen(true);
+      setPendingAccountModal(false);
+    }
+  }, [selectedApiProfile, pendingAccountModal]);
+
   const handleAddAccount = async () => {
     await refreshApiProfiles();
     setSelectModalOpen(true);
@@ -67,7 +75,7 @@ export const DashboardPage: React.FC = () => {
   const handleChooseApiProfile = (id: number) => {
     setSelectedApiProfile(id);
     setSelectModalOpen(false);
-    setAccountModalOpen(true);
+    setPendingAccountModal(true);
   };
 
   const handleApiSaved = (id: number) => {

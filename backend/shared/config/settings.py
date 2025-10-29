@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -114,9 +115,12 @@ def _security_config_factory() -> SecurityConfig:
 
 
 class AppConfig(BaseSettings):
+    app_env: str = Field("development", alias="APP_ENV")
     secret_key: str = Field("dev", alias="SECRET_KEY")
+    admin_username: str | None = Field(None, alias="ADMIN_USERNAME")
     gifts_dir: Path = Field(Path("gifts_data"), alias="GIFTS_DIR")
     gifts_accs_ttl: int = Field(60, alias="GIFTS_ACCS_TTL", ge=1)
+    debug_logging: bool = Field(False, alias="DEBUG_LOGGING")
 
     database: DatabaseConfig = Field(default_factory=_database_config_factory)
     cache: CacheConfig = Field(default_factory=_cache_config_factory)
@@ -132,18 +136,61 @@ class AppConfig(BaseSettings):
         arbitrary_types_allowed=True,
     )
 
-    @field_validator("gifts_dir", "cache", mode="after")
+    @field_validator("gifts_dir", mode="after")
     def _ensure_paths(cls, value: Any) -> Any:  # noqa: N805
         if isinstance(value, Path):
             value.mkdir(parents=True, exist_ok=True)
-        elif isinstance(value, CacheConfig):
-            value.directory.mkdir(parents=True, exist_ok=True)
         return value
+
+    @field_validator("debug_logging", mode="before")
+    @classmethod
+    def _parse_debug_logging(cls, value: str | bool) -> bool:
+        if isinstance(value, str):
+            return value.lower() in ("1", "true", "yes")
+        return bool(value)
+
+    @model_validator(mode="after")
+    def _validate_production_settings(self) -> "AppConfig":
+        if not self.is_production():
+            return self
+
+        if self.secret_key in ("dev", "development", "test", ""):
+            print(
+                "\n❌ CRITICAL SECURITY ERROR: Insecure SECRET_KEY detected in production!\n"
+                "   SECRET_KEY must be a strong random value in production.\n"
+                "   Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        warnings = []
+        if not self.security.enable_csrf:
+            warnings.append("⚠️  CSRF protection is DISABLED")
+        if not self.security.cookie_secure:
+            warnings.append("⚠️  Cookie Secure flag is DISABLED (use HTTPS!)")
+        if "*" in self.security.allowed_origins:
+            warnings.append("⚠️  CORS allows wildcard (*) origins")
+        if not self.security.enable_hsts:
+            warnings.append("⚠️  HSTS is DISABLED (recommended for HTTPS)")
+
+        if warnings:
+            print("\n⚠️  PRODUCTION SECURITY WARNINGS:", file=sys.stderr)
+            for warning in warnings:
+                print(f"   {warning}", file=sys.stderr)
+            print(
+                "   Consider enabling these security features in production.\n",
+                file=sys.stderr,
+            )
+
+        return self
+
+    def is_production(self) -> bool:
+        return self.app_env.lower() in ("production", "prod")
 
 
 @lru_cache(maxsize=1)
 def load_config() -> AppConfig:
-    return AppConfig()  # type: ignore[call-arg]
+    return AppConfig()  
 
 
 __all__ = ["AppConfig", "load_config"]

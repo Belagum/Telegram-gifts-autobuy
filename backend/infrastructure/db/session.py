@@ -16,7 +16,7 @@ _config = load_config()
 
 
 class Base(DeclarativeBase):
-    """Declarative base for ORM models."""
+    pass
 
 
 connect_args: dict[str, object] = {}
@@ -45,8 +45,6 @@ SessionLocal = scoped_session(
 
 @contextmanager
 def session_scope() -> Iterator:
-    """Provide a transactional scope for imperative consumers."""
-
     session = SessionLocal()
     logger.debug("db.session: opened scoped session")
     try:
@@ -64,14 +62,10 @@ def session_scope() -> Iterator:
 
 
 def get_db():
-    """Yield DB session for FastAPI/Flask dependency injection."""
-
     with session_scope() as session:
         yield session
 
 
 def init_db() -> None:
-    """Ensure database schema exists."""
-
     Base.metadata.create_all(bind=ENGINE)
     logger.info("Database schema ensured")

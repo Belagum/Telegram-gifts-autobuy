@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -39,8 +38,6 @@ class ChannelFilter:
             raise InvariantViolation(f"{name} min must be <= {name} max", field=f"{name}_min")
 
     def matches(self, gift: GiftCandidate) -> bool:
-        """Return whether the gift satisfies the configured constraints."""
-
         return all(
             [
                 self._within(gift.price, self.price_min, self.price_max),
@@ -79,8 +76,6 @@ class GiftCandidate:
             raise InvariantViolation("per user cap must be >= 0", field="per_user_cap")
 
     def priority_key(self) -> tuple[int, int, int]:
-        """Lower key means higher priority."""
-
         supply = self.total_supply if self.total_supply > 0 else INF_SUPPLY
         return (supply, -self.price, self.gift_id)
 
@@ -144,8 +139,8 @@ class PurchasePlan:
         for op in ops:
             self.add(op)
 
-    def __iter__(self):  # pragma: no cover - delegation
+    def __iter__(self):
         return iter(self.operations)
 
-    def __len__(self) -> int:  # pragma: no cover - delegation
+    def __len__(self) -> int:
         return len(self.operations)

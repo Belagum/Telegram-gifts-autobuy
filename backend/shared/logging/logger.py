@@ -10,6 +10,8 @@ from contextvars import ContextVar
 
 from loguru import logger as _logger
 
+from .sensitive_filter import sanitize_record
+
 _FMT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
     "<lvl>{level:<8}</lvl> | "
@@ -61,31 +63,67 @@ def clear_correlation_id() -> None:
     _CORRELATION_ID.set("-")
 
 
-def setup_logging(level: str | None = None) -> None:
+def setup_logging(level: str | None = None, debug_mode: bool = False) -> None:
     level = (level or os.getenv("LOG_LEVEL") or "INFO").upper()
     log_file = _log_file_path()
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
     _logger.remove()
-    _logger.add(
-        sys.stderr,
-        level=level,
-        format=_FMT,
-        colorize=True,
-        backtrace=False,
-        diagnose=False,
-    )
-    _logger.add(
-        log_file,
-        level=level,
-        format=_FMT,
-        colorize=False,
-        backtrace=False,
-        diagnose=False,
-        enqueue=True,
-        mode="w",
-        encoding="utf-8",
-    )
+    
+    if debug_mode:
+        console_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+            "<lvl>{level:<8}</lvl> | "
+            "<magenta>{extra[correlation_id]}</magenta> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+            "<lvl>{message}</lvl>"
+        )
+        
+        _logger.add(
+            sys.stderr,
+            level=level,
+            format=console_format,
+            colorize=True,
+            backtrace=True,
+            diagnose=True,
+            filter=sanitize_record,
+        )
+        
+        _logger.add(
+            log_file,
+            level=level,
+            format=_FMT,
+            colorize=False,
+            backtrace=True,
+            diagnose=True,
+            enqueue=True,
+            mode="w",
+            encoding="utf-8",
+            filter=sanitize_record,
+        )
+    else:
+        _logger.add(
+            sys.stderr,
+            level=level,
+            format=_FMT,
+            colorize=True,
+            backtrace=False,
+            diagnose=False,
+            filter=sanitize_record,
+        )
+        
+        _logger.add(
+            log_file,
+            level=level,
+            format=_FMT,
+            colorize=False,
+            backtrace=False,
+            diagnose=False,
+            enqueue=True,
+            mode="w",
+            encoding="utf-8",
+            filter=sanitize_record,
+        )
 
     logging.basicConfig(handlers=[_InterceptHandler()], level=0, force=True)
     logging.getLogger("werkzeug").setLevel(logging.INFO)

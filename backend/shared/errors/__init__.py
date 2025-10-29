@@ -28,6 +28,8 @@ from .base import (
     ValidationError,
 )
 from .http import handle_app_error, register_error_handler
+from .validation import format_pydantic_errors, raise_validation_error
+from .validation_types import ValidationErrorType
 
 __all__ = [
     "AppError",
@@ -56,4 +58,7 @@ __all__ = [
     "BadTgsError",
     "handle_app_error",
     "register_error_handler",
+    "format_pydantic_errors",
+    "raise_validation_error",
+    "ValidationErrorType",
 ]

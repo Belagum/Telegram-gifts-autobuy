@@ -27,7 +27,6 @@ class InMemoryRateLimiter:
     def allow(self, key: str) -> bool:
         now = time.monotonic()
         bucket = self._buckets[key]
-        # Drop old
         while bucket.timestamps and (now - bucket.timestamps[0]) > self._window:
             bucket.timestamps.popleft()
         if len(bucket.timestamps) >= self._limit:
@@ -59,7 +58,6 @@ def rate_limit(limit: int | None = None, window_seconds: float | None = None):
                 return jsonify({"error": "rate_limited"}), 429
             return f(*args, **kwargs)
 
-        # Preserve attributes for Flask
         wrapper.__name__ = getattr(f, "__name__", "wrapped")
         wrapper.__doc__ = f.__doc__
         return wrapper

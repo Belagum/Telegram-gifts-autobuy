@@ -174,8 +174,6 @@ def _convert_gift_ids_to_strings(gifts: list[dict[str, Any]]) -> list[dict[str, 
 
 
 class GiftsController:
-    """Controller exposing gifts endpoints."""
-
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("gifts", __name__, url_prefix="/api")
         bp.add_url_rule("/gifts", view_func=self.list_gifts, methods=["GET"], endpoint="gifts_list")
@@ -412,7 +410,6 @@ class GiftsController:
             with lock:
                 path = _find_cached_tgs(cache_key)
                 if not path:
-                    _shard_dir(cache_key).mkdir(parents=True, exist_ok=True)
                     settings = db.get(UserSettings, authed_request().user_id)
                     token = (getattr(settings, "bot_token", "") or "").strip()
                     if not token:

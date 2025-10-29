@@ -22,6 +22,7 @@ import type { GiftsSettings, Settings } from "../../../entities/settings/model";
 export const mapSession = (dto: SessionDto): SessionUser => ({
   id: dto.id,
   username: dto.username,
+  isAdmin: dto.is_admin,
 });
 
 export const mapAccount = (dto: AccountDto): Account => ({

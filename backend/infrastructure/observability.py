@@ -27,8 +27,6 @@ WORKER_GAUGE = Gauge("giftbuyer_workers", "Active background workers")
 
 @contextmanager
 def track_latency(endpoint: str, status_getter: Callable[[], str]):
-    """Measure request latency and emit metrics."""
-
     if not _config.observability.metrics_enabled:
         yield
         return

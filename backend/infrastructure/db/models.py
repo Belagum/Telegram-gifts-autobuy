@@ -3,6 +3,7 @@
 
 from datetime import UTC, datetime, timedelta
 
+from backend.infrastructure.db.encrypted_types import EncryptedString
 from backend.infrastructure.db.session import Base
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,6 +37,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(256))
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     accounts: Mapped[list["Account"]] = relationship(
         "Account", back_populates="user", cascade="all,delete"
     )
@@ -52,7 +56,8 @@ class UserSettings(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
     )
-    bot_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Encrypted: bot token is sensitive data
+    bot_token: Mapped[str | None] = mapped_column(EncryptedString(512), nullable=True)
     notify_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     buy_target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)  # NEW
     buy_target_on_fail_only: Mapped[bool] = mapped_column(
@@ -78,12 +83,13 @@ class ApiProfile(Base):
     __tablename__ = "api_profiles"
     __table_args__ = (
         UniqueConstraint("user_id", "api_id", name="u_user_api_id"),
-        UniqueConstraint("user_id", "api_hash", name="u_user_api_hash"),
+        # Note: api_hash uniqueness constraint removed as encrypted values won't match
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     api_id: Mapped[int] = mapped_column(Integer)
-    api_hash: Mapped[str] = mapped_column(String(128))
+    # Encrypted: API hash is sensitive credential
+    api_hash: Mapped[str] = mapped_column(EncryptedString(512))
     name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
@@ -94,13 +100,16 @@ class ApiProfile(Base):
 
 class Account(Base):
     __tablename__ = "accounts"
-    __table_args__ = (UniqueConstraint("user_id", "phone", name="u_user_phone"),)
+    __table_args__ = (
+        # Note: phone uniqueness constraint removed as encrypted values won't match
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     api_profile_id: Mapped[int] = mapped_column(
         ForeignKey("api_profiles.id", ondelete="CASCADE"), index=True
     )
-    phone: Mapped[str] = mapped_column(String(32))
+    # Encrypted: phone number is PII (Personal Identifiable Information)
+    phone: Mapped[str] = mapped_column(EncryptedString(256))
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     stars_amount: Mapped[int] = mapped_column(
@@ -110,7 +119,8 @@ class Account(Base):
         Boolean, nullable=False, default=False, server_default="0"
     )
     premium_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    session_path: Mapped[str] = mapped_column(String(256))
+    # Encrypted: session path may contain sensitive info
+    session_path: Mapped[str] = mapped_column(EncryptedString(512))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
     )
@@ -119,6 +129,19 @@ class Account(Base):
     )
     user: Mapped["User"] = relationship("User", back_populates="accounts")
     api_profile: Mapped["ApiProfile"] = relationship("ApiProfile", back_populates="accounts")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
+    )
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    success: Mapped[bool] = mapped_column(Boolean, index=True)
+    details_json: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
 
 def token_default_exp(days: int = 7) -> datetime:

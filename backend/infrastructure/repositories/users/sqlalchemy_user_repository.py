@@ -26,6 +26,18 @@ class SqlAlchemyUserRepository(UserRepository):
                 created_at=datetime.now(UTC),
             )
 
+    def find_by_id(self, user_id: int) -> DomainUser | None:
+        with session_scope() as session:
+            row = session.query(User).filter(User.id == user_id).first()
+            if not row:
+                return None
+            return DomainUser(
+                id=row.id,
+                username=row.username,
+                password_hash=row.password_hash,
+                created_at=datetime.now(UTC),
+            )
+
     def add(self, user: DomainUser) -> DomainUser:
         with session_scope() as session:
             row = User(username=user.username, password_hash=user.password_hash)

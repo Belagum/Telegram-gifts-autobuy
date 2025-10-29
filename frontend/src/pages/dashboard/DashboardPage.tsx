@@ -14,6 +14,7 @@ import { SelectApiProfileModal } from "../../features/accounts/SelectApiProfileM
 import { ChannelsModal } from "../../features/settings/ChannelsModal";
 import { showError } from "../../shared/ui/feedback/toast";
 import { openCentered } from "../../shared/lib/utils/openCentered";
+import { useIsAdmin } from "../../features/auth/hooks/useIsAdmin";
 import "./dashboard.css";
 
 export const DashboardPage: React.FC = () => {
@@ -25,6 +26,7 @@ export const DashboardPage: React.FC = () => {
   const [channelsOpen, setChannelsOpen] = React.useState(false);
   const [selectedApiProfile, setSelectedApiProfile] = React.useState<number | null>(null);
   const [isLoadingAccounts, setIsLoadingAccounts] = React.useState(false);
+  const { isAdmin } = useIsAdmin();
 
   const loadAccounts = React.useCallback(async () => {
     try {
@@ -81,12 +83,18 @@ export const DashboardPage: React.FC = () => {
 
   const openGifts = () => openCentered("/gifts?popup=1", "gifts", 520, 700);
   const openSettings = () => openCentered("/settings?popup=1", "settings", 520, 600);
+  const openAdmin = () => openCentered("/admin?popup=1", "admin", 1200, 800);
 
   return (
     <div className="dashboard">
       <header className="dashboard__header">
         <h1>TG Gifts</h1>
         <div className="dashboard__actions">
+          {isAdmin && (
+            <Button variant="secondary" onClick={openAdmin}>
+              Админ-панель
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setChannelsOpen(true)}>
             Каналы
           </Button>

@@ -6,11 +6,22 @@ from __future__ import annotations
 from functools import cached_property
 
 from backend.application.services.password_hashing import WerkzeugPasswordHasher
+from backend.application.use_cases.admin.get_audit_logs import GetAuditLogsUseCase
+from backend.application.use_cases.admin.get_dashboard_stats import GetDashboardStatsUseCase
+from backend.application.use_cases.admin.get_error_stats import GetErrorStatsUseCase
+from backend.application.use_cases.admin.get_suspicious_activity import GetSuspiciousActivityUseCase
+from backend.application.use_cases.admin.get_user_audit import GetUserAuditUseCase
+from backend.application.use_cases.admin.list_users import ListUsersUseCase
+from backend.application.use_cases.admin.unlock_user import UnlockUserUseCase
 from backend.application.use_cases.autobuy import AutobuyUseCase
 from backend.application.use_cases.users.login_user import LoginUserUseCase
 from backend.application.use_cases.users.logout_user import LogoutUserUseCase
 from backend.application.use_cases.users.register_user import RegisterUserUseCase
 from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.repositories.admin_repository import (
+    SQLAlchemyAdminRepository,
+    SQLAlchemyAuditLogRepository,
+)
 from backend.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyAccountRepository,
     SqlAlchemyChannelRepository,
@@ -24,6 +35,7 @@ from backend.infrastructure.telegram import (
     TelegramNotificationAdapter,
     TelegramRpcPort,
 )
+from backend.interfaces.http.controllers.admin_controller import AdminController
 from backend.interfaces.http.controllers.auth_controller import AuthController
 
 
@@ -99,6 +111,60 @@ class Container:
             telegram=self.telegram_port,
             notifications=self.notification_port,
             settings=self.user_settings_repository,
+        )
+    
+    # Admin repositories
+    
+    @cached_property
+    def audit_log_repository(self) -> SQLAlchemyAuditLogRepository:
+        return SQLAlchemyAuditLogRepository(SessionLocal())
+    
+    @cached_property
+    def admin_repository(self) -> SQLAlchemyAdminRepository:
+        return SQLAlchemyAdminRepository(SessionLocal())
+    
+    # Admin use cases
+    
+    @cached_property
+    def get_audit_logs_use_case(self) -> GetAuditLogsUseCase:
+        return GetAuditLogsUseCase(audit_log_repo=self.audit_log_repository)
+    
+    @cached_property
+    def get_user_audit_use_case(self) -> GetUserAuditUseCase:
+        return GetUserAuditUseCase(audit_log_repo=self.audit_log_repository)
+    
+    @cached_property
+    def get_suspicious_activity_use_case(self) -> GetSuspiciousActivityUseCase:
+        return GetSuspiciousActivityUseCase(admin_repo=self.admin_repository)
+    
+    @cached_property
+    def get_error_stats_use_case(self) -> GetErrorStatsUseCase:
+        return GetErrorStatsUseCase(admin_repo=self.admin_repository)
+    
+    @cached_property
+    def list_users_use_case(self) -> ListUsersUseCase:
+        return ListUsersUseCase(admin_repo=self.admin_repository)
+    
+    @cached_property
+    def unlock_user_use_case(self) -> UnlockUserUseCase:
+        return UnlockUserUseCase(user_repo=self.user_repository)
+    
+    @cached_property
+    def get_dashboard_stats_use_case(self) -> GetDashboardStatsUseCase:
+        return GetDashboardStatsUseCase(admin_repo=self.admin_repository)
+    
+    # Admin controller
+    
+    @cached_property
+    def admin_controller(self) -> AdminController:
+        return AdminController(
+            get_audit_logs=self.get_audit_logs_use_case,
+            get_user_audit=self.get_user_audit_use_case,
+            get_suspicious_activity=self.get_suspicious_activity_use_case,
+            get_error_stats=self.get_error_stats_use_case,
+            list_users=self.list_users_use_case,
+            unlock_user=self.unlock_user_use_case,
+            get_dashboard_stats=self.get_dashboard_stats_use_case,
         )
 
 

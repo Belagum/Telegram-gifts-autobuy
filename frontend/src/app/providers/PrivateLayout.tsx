@@ -10,10 +10,11 @@ export const PrivateLayout: React.FC = () => {
 
   const isSettingsRoute = location.pathname.endsWith("/settings");
   const isGiftsRoute = location.pathname.endsWith("/gifts");
+  const isAdminRoute = location.pathname.endsWith("/admin");
   const searchParams = new URLSearchParams(location.search);
   const isPopup = Boolean((typeof window !== "undefined" && (window as Window).opener) || searchParams.get("popup"));
 
-  if ((isSettingsRoute || isGiftsRoute) && isPopup) {
+  if ((isSettingsRoute || isGiftsRoute || isAdminRoute) && isPopup) {
     return <Outlet />;
   }
 

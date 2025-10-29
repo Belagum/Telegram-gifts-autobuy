@@ -12,3 +12,7 @@ class UserAlreadyExistsError(DomainError):
 
 class InvalidCredentialsError(DomainError):
     code = "invalid_credentials"
+
+
+class UserNotFoundError(DomainError):
+    code = "user_not_found"

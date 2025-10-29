@@ -10,6 +10,7 @@ import { RegisterPage } from "../../pages/auth/RegisterPage";
 import { DashboardPage } from "../../pages/dashboard/DashboardPage";
 import { GiftsPage } from "../../pages/gifts/GiftsPage";
 import { SettingsPage } from "../../pages/settings/SettingsPage";
+import { AdminPage } from "../../pages/admin/AdminPage";
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
           { index: true, element: <DashboardPage /> },
           { path: "gifts", element: <GiftsPage /> },
           { path: "settings", element: <SettingsPage /> },
+          { path: "admin", element: <AdminPage /> },
         ],
       },
       { path: "login", element: <LoginPage /> },

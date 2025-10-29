@@ -22,8 +22,7 @@ class GiftPayload:
 
 
 class AccountRepository(Protocol):
-    def list_for_user(self, user_id: int) -> Sequence[AccountSnapshot]:
-        """Return all accounts for the user sorted by id."""
+    def list_for_user(self, user_id: int) -> Sequence[AccountSnapshot]: ...
 
 
 class ChannelRepository(Protocol):

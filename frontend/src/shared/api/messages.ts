@@ -52,10 +52,48 @@ const formatFields = (fields: unknown): string | null => {
 };
 
 const TELEGRAM_RPC_MESSAGES: Record<string, string> = {
-  PHONE_CODE_INVALID: "Неверный код подтверждения из Telegram.",
+  API_ID_INVALID: "Неверная комбинация API ID и API Hash. Проверьте правильность данных.",
+  API_ID_PUBLISHED_FLOOD: "API ID использовался слишком часто. Попробуйте позже.",
+  PHONE_NUMBER_INVALID: "Некорректный номер телефона.",
+  PHONE_NUMBER_BANNED: "Номер телефона заблокирован в Telegram.",
+  PHONE_NUMBER_FLOOD: "Слишком много попыток отправки кода. Попробуйте позже.",
+  PHONE_NUMBER_OCCUPIED: "Этот номер телефона уже зарегистрирован.",
+  PHONE_NUMBER_UNOCCUPIED: "Этот номер телефона не зарегистрирован в Telegram.",
+  PHONE_CODE_EMPTY: "Введите код подтверждения.",
   PHONE_CODE_EXPIRED: "Срок действия кода истёк. Запросите новый код.",
+  PHONE_CODE_HASH_EMPTY: "Отсутствует хеш кода подтверждения.",
+  PHONE_CODE_INVALID: "Неверный код подтверждения из Telegram.",
   SESSION_PASSWORD_NEEDED: "Требуется пароль двухфакторной авторизации.",
+  PASSWORD_HASH_INVALID: "Неверный пароль двухфакторной авторизации.",
+  PASSWORD_EMPTY: "Введите пароль двухфакторной авторизации.",
   FLOOD_WAIT: "Телеграм временно ограничил отправку запросов. Попробуйте позже.",
+  SLOWMODE_WAIT: "Включён медленный режим. Подождите перед следующим действием.",
+  AUTH_KEY_UNREGISTERED: "Ключ авторизации не зарегистрирован. Авторизуйтесь заново.",
+  AUTH_KEY_INVALID: "Ключ авторизации недействителен. Авторизуйтесь заново.",
+  SESSION_REVOKED: "Сессия была отозвана. Авторизуйтесь заново.",
+  USER_DEACTIVATED: "Аккаунт деактивирован.",
+  USER_DEACTIVATED_BAN: "Аккаунт заблокирован.",
+  PEER_ID_INVALID: "Некорректный ID получателя.",
+  USERNAME_INVALID: "Некорректное имя пользователя.",
+  USERNAME_NOT_OCCUPIED: "Имя пользователя не занято.",
+  USERNAME_OCCUPIED: "Имя пользователя уже занято.",
+  USER_ID_INVALID: "Некорректный ID пользователя.",
+  USER_NOT_MUTUAL_CONTACT: "Пользователь не является взаимным контактом.",
+  USER_IS_BLOCKED: "Пользователь заблокирован.",
+  USER_IS_BOT: "Указан бот вместо пользователя.",
+  CHANNEL_INVALID: "Некорректный канал.",
+  CHANNEL_PRIVATE: "Канал является приватным.",
+  CHAT_ADMIN_REQUIRED: "Требуются права администратора в чате.",
+  CHAT_WRITE_FORBIDDEN: "Запись в чат запрещена.",
+  PREMIUM_ACCOUNT_REQUIRED: "Требуется Telegram Premium.",
+  STICKER_ID_INVALID: "Некорректный ID стикера.",
+  TAKEOUT_INVALID: "Некорректный запрос выгрузки данных.",
+  TIMEOUT: "Превышено время ожидания ответа от Telegram.",
+  BAD_REQUEST: "Некорректный запрос к Telegram.",
+  UNAUTHORIZED: "Требуется авторизация в Telegram.",
+  FORBIDDEN: "Действие запрещено.",
+  NOT_FOUND: "Ресурс не найден в Telegram.",
+  INTERNAL_SERVER_ERROR: "Внутренняя ошибка сервера Telegram.",
 };
 
 const ERROR_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
@@ -100,9 +138,18 @@ const ERROR_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
     }
     return "Некорректные данные. Проверьте форму и повторите попытку.";
   },
-  telegram_rpc: ({ errorCode }) => {
+  telegram_rpc: ({ errorCode, context }) => {
     if (errorCode && TELEGRAM_RPC_MESSAGES[errorCode]) {
-      return TELEGRAM_RPC_MESSAGES[errorCode];
+      const baseMessage = TELEGRAM_RPC_MESSAGES[errorCode];
+      
+      if ((errorCode === "FLOOD_WAIT" || errorCode === "SLOWMODE_WAIT") && context?.wait_seconds) {
+        const remaining = formatRemainingSeconds(context.wait_seconds);
+        if (remaining) {
+          return `${baseMessage} Подождите ${remaining}.`;
+        }
+      }
+      
+      return baseMessage;
     }
     return errorCode ? `Ошибка Telegram (${errorCode}).` : "Ошибка Telegram. Попробуйте позже.";
   },
@@ -180,6 +227,13 @@ const ERROR_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
   channel_create_failed: () => "Не удалось добавить канал. Попробуйте ещё раз.",
   channel_update_failed: () => "Не удалось обновить канал. Попробуйте ещё раз.",
   channel_delete_failed: () => "Не удалось удалить канал. Попробуйте ещё раз.",
+  account_locked: ({ context }) => {
+    const remaining = formatRemainingSeconds(context?.lockout_remaining_seconds);
+    if (remaining) {
+      return `Аккаунт временно заблокирован из-за множественных неудачных попыток входа. Попробуйте через ${remaining}.`;
+    }
+    return "Аккаунт временно заблокирован из-за множественных неудачных попыток входа. Попробуйте позже.";
+  },
 };
 
 const ERROR_CODE_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {

@@ -9,11 +9,13 @@ from .logger import (
     set_correlation_id,
     setup_logging,
 )
+from .sensitive_filter import sanitize_message
 
 __all__ = [
     "clear_correlation_id",
     "get_correlation_id",
     "logger",
+    "sanitize_message",
     "set_correlation_id",
     "setup_logging",
 ]

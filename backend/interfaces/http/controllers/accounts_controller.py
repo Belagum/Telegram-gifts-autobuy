@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account, ApiProfile, User
-from backend.infrastructure.telegram_adapters.pyro_login import PyroLoginManager
+from backend.infrastructure.telegram_auth import PyroLoginManager
+from backend.infrastructure.telegram_auth.factory import create_login_manager
 from backend.services.accounts_service import (
     any_stale,
     begin_user_refresh,
@@ -31,7 +32,8 @@ from backend.shared.middleware.csrf import csrf_protect
 
 class AccountsController:
     def __init__(self, *, login_manager: PyroLoginManager | None = None) -> None:
-        self._login_manager = login_manager or PyroLoginManager()
+        self._login_manager = login_manager
+        self._login_manager_factory = create_login_manager if login_manager is None else None
 
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("accounts", __name__, url_prefix="/api")
@@ -149,8 +151,8 @@ class AccountsController:
                 logger.warning(f"me: user_not_found (user_id={user_id})")
                 return jsonify({"error": "not_found"}), 404
             dt = (perf_counter() - t0) * 1000
-            logger.info(f"me: ok (user_id={user_id}, username='{user.username}', dt_ms={dt:.0f})")
-            return jsonify({"username": user.username})
+            logger.info(f"me: ok (user_id={user_id}, username='{user.username}', is_admin={user.is_admin}, dt_ms={dt:.0f})")
+            return jsonify({"id": user.id, "username": user.username, "is_admin": user.is_admin})
         except Exception:
             logger.exception(f"me: error (user_id={user_id})")
             return jsonify({"error": "internal_error"}), 500
@@ -332,6 +334,11 @@ class AccountsController:
             )
             return jsonify({"error": "internal_error"}), 500
 
+    def _get_login_manager(self, db: Session) -> PyroLoginManager:
+        if self._login_manager is None and self._login_manager_factory is not None:
+            self._login_manager = self._login_manager_factory(db)
+        return self._login_manager  # type: ignore
+
     @auth_required
     @csrf_protect
     def send_code(self, db: Session):
@@ -376,21 +383,23 @@ class AccountsController:
                     409,
                 )
 
-            result = self._login_manager.start_login(
-                db,
+            login_manager = self._get_login_manager(db)
+            result = login_manager.start_login(
                 user_id=user_id,
                 api_profile_id=int(api_profile_id),
                 phone=normalized_phone,
             )
-            if "error" in result:
+            
+            result_dict = result.to_dict()
+            if "error" in result_dict:
                 logger.warning(
-                    f"auth.send_code: fail (user_id={user_id}, error='{result.get('error')}')"
+                    f"auth.send_code: fail (user_id={user_id}, error='{result_dict.get('error')}')"
                 )
-                return jsonify(result), int(result.get("http", 400))
+                return jsonify(result_dict), int(result_dict.get("http", 400))
 
             dt = (perf_counter() - t0) * 1000
             logger.info(f"auth.send_code: ok (user_id={user_id}, dt_ms={dt:.0f})")
-            return jsonify(result)
+            return jsonify(result_dict)
         except Exception:
             logger.exception(f"auth.send_code: error (user_id={user_id})")
             return jsonify({"error": "internal_error"}), 500
@@ -407,15 +416,19 @@ class AccountsController:
             if not login_id or not code:
                 logger.warning(f"auth.confirm_code: missing fields (user_id={user_id})")
                 return jsonify({"error": "login_id_and_code_required"}), 400
-            result = self._login_manager.confirm_code(db, login_id, code)
-            if "error" in result:
+            
+            login_manager = self._get_login_manager(db)
+            result = login_manager.confirm_code(login_id, code)
+            result_dict = result.to_dict()
+            
+            if "error" in result_dict:
                 logger.warning(
-                    f"auth.confirm_code: fail (user_id={user_id}, error='{result.get('error')}')"
+                    f"auth.confirm_code: fail (user_id={user_id}, error='{result_dict.get('error')}')"
                 )
-                return jsonify(result), int(result.get("http", 400))
+                return jsonify(result_dict), int(result_dict.get("http", 400))
             dt = (perf_counter() - t0) * 1000
             logger.info(f"auth.confirm_code: ok (user_id={user_id}, dt_ms={dt:.0f})")
-            return jsonify(result)
+            return jsonify(result_dict)
         except Exception:
             logger.exception(f"auth.confirm_code: error (user_id={user_id})")
             return jsonify({"error": "internal_error"}), 500
@@ -432,16 +445,20 @@ class AccountsController:
             if not login_id or not password:
                 logger.warning(f"auth.confirm_password: missing fields (user_id={user_id})")
                 return jsonify({"error": "login_id_and_password_required"}), 400
-            result = self._login_manager.confirm_password(db, login_id, password)
-            if "error" in result:
+            
+            login_manager = self._get_login_manager(db)
+            result = login_manager.confirm_password(login_id, password)
+            result_dict = result.to_dict()
+            
+            if "error" in result_dict:
                 logger.warning(
                     f"auth.confirm_password: fail (user_id={user_id}, "
-                    f"error='{result.get('error')}')"
+                    f"error='{result_dict.get('error')}')"
                 )
-                return jsonify(result), int(result.get("http", 400))
+                return jsonify(result_dict), int(result_dict.get("http", 400))
             dt = (perf_counter() - t0) * 1000
             logger.info(f"auth.confirm_password: ok (user_id={user_id}, dt_ms={dt:.0f})")
-            return jsonify(result)
+            return jsonify(result_dict)
         except Exception:
             logger.exception(f"auth.confirm_password: error (user_id={user_id})")
             return jsonify({"error": "internal_error"}), 500
@@ -458,10 +475,14 @@ class AccountsController:
             if not login_id:
                 logger.warning(f"auth.cancel: missing log_id (user_id={user_id})")
                 return jsonify({"error": "log_id_required"}), 400
-            result = self._login_manager.cancel(login_id)
+            
+            login_manager = self._get_login_manager(db)
+            result = login_manager.cancel(login_id)
+            result_dict = result.to_dict()
+            
             dt = (perf_counter() - t0) * 1000
             logger.info(f"auth.cancel: ok (user_id={user_id}, dt_ms={dt:.0f})")
-            return jsonify(result)
+            return jsonify(result_dict)
         except Exception:
             logger.exception(f"auth.cancel: error (user_id={user_id})")
             return jsonify({"error": "internal_error"}), 500

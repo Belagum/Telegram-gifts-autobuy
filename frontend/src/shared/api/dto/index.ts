@@ -11,6 +11,7 @@ export interface ApiErrorDto {
 export interface SessionDto {
   id: number;
   username: string;
+  is_admin: boolean;
 }
 
 export interface AccountDto {

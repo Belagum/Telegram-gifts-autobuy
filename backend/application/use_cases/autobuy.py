@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
-
+from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.db.models import User, UserSettings
 from backend.domain import (
     AccountSnapshot,
     ChannelFilter,
@@ -47,8 +48,6 @@ class AutobuyOutput:
 
 
 class AutobuyStats:
-    """Mutable aggregate of autobuy execution metrics."""
-
     def __init__(self, channels: Sequence[ChannelFilter], accounts: Sequence[AccountSnapshot]):
         self._channels: dict[int, dict[str, Any]] = {
             c.channel_id: {
@@ -226,8 +225,6 @@ class AutobuyStats:
 
 
 class GiftValidator:
-    """Boundary validation for raw gift payloads."""
-
     def __init__(self, *, require_limited: bool = True):
         self.require_limited = require_limited
 
@@ -288,8 +285,6 @@ class GiftValidator:
 
 
 class GiftRejectedError(Exception):
-    """Represents a validation failure that should be reported as a skip."""
-
     def __init__(self, reason: str, details: Sequence[str] | None = None):
         super().__init__(reason)
         self.reason = reason
@@ -297,8 +292,6 @@ class GiftRejectedError(Exception):
 
 
 class ChannelSelector:
-    """Strategy object that finds a best matching channel for a gift."""
-
     def __init__(self, channels: Sequence[ChannelFilter]):
         self._channels = list(channels)
 
@@ -321,8 +314,6 @@ class ChannelSelector:
 
 
 class PurchasePlanner:
-    """Generates a purchase plan using available balances and channel constraints."""
-
     def __init__(self, selector: ChannelSelector, stats: AutobuyStats):
         self._selector = selector
         self._stats = stats
@@ -393,10 +384,6 @@ class PurchasePlanner:
                             details=[f"acc={account.id} bal={budget} need={price}"],
                         )
                     continue
-                # ``forced_channel_id`` is used to emulate legacy behaviour when the
-                # user directs all purchases into a single channel. In this mode we
-                # still record statistics under that synthetic channel even if it is
-                # absent from the configured list.
                 for _ in range(int(max_qty)):
                     op = PurchaseOperation(
                         account_id=account.id,
@@ -441,8 +428,6 @@ class PurchasePlanner:
 
 
 class ReportBuilder:
-    """Renders human readable reports that mirror legacy behaviour."""
-
     HEADER = "🧾"
     OK = "✅"
     SKIP = "⏭️"
@@ -592,8 +577,6 @@ class ReportBuilder:
 
 
 class AutobuyUseCase:
-    """Coordinates the autobuy process end-to-end."""
-
     def __init__(
         self,
         *,
@@ -612,9 +595,6 @@ class AutobuyUseCase:
         self._report = ReportBuilder()
 
     async def execute_with_user_check(self, user_id: int, gifts: list[dict]) -> AutobuyOutput:
-        from backend.infrastructure.db import SessionLocal
-        from backend.infrastructure.db.models import User, UserSettings
-
         session = SessionLocal()
         try:
             user = session.get(User, user_id)
@@ -736,7 +716,7 @@ class AutobuyUseCase:
         for account in accounts:
             try:
                 balance = await self._telegram.fetch_balance(account)
-            except Exception as exc:  # pragma: no cover - network failure branch
+            except Exception as exc:
                 logger.opt(exception=exc).debug(f"autobuy:balance_fail account_id={account.id}")
                 balance = 0
             enriched.append(account.with_balance(balance))
@@ -763,7 +743,7 @@ class AutobuyUseCase:
                 await self._telegram.send_gift(op, account)
                 account.balance -= op.price
                 stats.record_purchase(op, balance_after=account.balance, supply=op.supply)
-            except Exception as exc:  # pragma: no cover - network failure branch
+            except Exception as exc:
                 reason = {"code": type(exc).__name__}
                 stats.record_failure(op, reason="send_gift_failed", rpc=reason)
                 logger.opt(exception=exc).warning(

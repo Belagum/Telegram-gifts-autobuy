@@ -94,6 +94,14 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
         onClose();
       } else {
         showError(result, "Ошибка подтверждения");
+        if (result?.should_close_modal) {
+          onClose();
+        }
+      }
+    } catch (error) {
+      const httpError = error as { payload?: ConfirmCodeResponse };
+      if (httpError?.payload?.should_close_modal) {
+        onClose();
       }
     } finally {
       setBusy(null);
@@ -120,6 +128,14 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ apiProfileId, 
         onClose();
       } else {
         showError(result, "Ошибка пароля");
+        if (result?.should_close_modal) {
+          onClose();
+        }
+      }
+    } catch (error) {
+      const httpError = error as { payload?: ConfirmPasswordResponse };
+      if (httpError?.payload?.should_close_modal) {
+        onClose();
       }
     } finally {
       setBusy(null);

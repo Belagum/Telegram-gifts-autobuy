@@ -108,7 +108,8 @@ class PyroLoginManager:
                 error="telegram_rpc" if is_telegram_error else "unexpected",
                 error_code=e.error_code,
                 data=e.context,
-                http_status=400
+                http_status=400,
+                should_close_modal=True
             )
         except Exception as e:
             logger.exception(f"PyroLoginManager: start_login unexpected error user_id={user_id}")
@@ -116,7 +117,8 @@ class PyroLoginManager:
             return LoginResult.fail(
                 error="unexpected",
                 error_code="start_login_failed",
-                http_status=500
+                http_status=500,
+                should_close_modal=True
             )
 
     def confirm_code(self, login_id: str, code: str) -> LoginResult:
@@ -166,15 +168,22 @@ class PyroLoginManager:
                 http_status=400
             )
         except LoginError as e:
-            session = self._session_manager.remove_session(login_id)
-            if session:
-                self._cleanup_on_error(session, session.session_path)
             is_telegram_error = e.error_code and e.error_code == e.error_code.upper()
+            
+            non_critical_codes = {"PHONE_CODE_INVALID"}
+            is_non_critical = e.error_code in non_critical_codes
+            
+            if not is_non_critical:
+                session = self._session_manager.remove_session(login_id)
+                if session:
+                    self._cleanup_on_error(session, session.session_path)
+            
             return LoginResult.fail(
                 error="telegram_rpc" if is_telegram_error else "unexpected",
                 error_code=e.error_code,
                 data=e.context,
-                http_status=400
+                http_status=400,
+                should_close_modal=not is_non_critical
             )
         except Exception as e:
             logger.exception(f"PyroLoginManager: confirm_code unexpected error login_id={login_id}")
@@ -184,7 +193,8 @@ class PyroLoginManager:
             return LoginResult.fail(
                 error="unexpected",
                 error_code="confirm_code_failed",
-                http_status=500
+                http_status=500,
+                should_close_modal=True
             )
 
     def confirm_password(self, login_id: str, password: str) -> LoginResult:
@@ -225,15 +235,22 @@ class PyroLoginManager:
                 http_status=400
             )
         except LoginError as e:
-            session = self._session_manager.remove_session(login_id)
-            if session:
-                self._cleanup_on_error(session, session.session_path)
             is_telegram_error = e.error_code and e.error_code == e.error_code.upper()
+            
+            non_critical_codes = {"PASSWORD_HASH_INVALID"}
+            is_non_critical = e.error_code in non_critical_codes
+            
+            if not is_non_critical:
+                session = self._session_manager.remove_session(login_id)
+                if session:
+                    self._cleanup_on_error(session, session.session_path)
+            
             return LoginResult.fail(
                 error="telegram_rpc" if is_telegram_error else "unexpected",
                 error_code=e.error_code,
                 data=e.context,
-                http_status=400
+                http_status=400,
+                should_close_modal=not is_non_critical
             )
         except Exception as e:
             logger.exception(f"PyroLoginManager: confirm_password unexpected error login_id={login_id}")
@@ -243,7 +260,8 @@ class PyroLoginManager:
             return LoginResult.fail(
                 error="unexpected",
                 error_code="confirm_password_failed",
-                http_status=500
+                http_status=500,
+                should_close_modal=True
             )
 
     def cancel(self, login_id: str) -> LoginResult:
@@ -303,6 +321,17 @@ class PyroLoginManager:
         session: LoginSession | None,
         session_path: str | None
     ) -> None:
+        if session:
+            client = getattr(session, "_client", None)
+            wrapper: PyrogramClientWrapper | None = getattr(session, "_wrapper", None)
+            
+            if wrapper and client:
+                try:
+                    wrapper.disconnect(client)
+                    logger.debug("PyroLoginManager: client disconnected during cleanup_on_error")
+                except Exception:
+                    logger.debug("PyroLoginManager: failed to disconnect client during cleanup_on_error")
+        
         if session_path:
             try:
                 self._session_storage.purge_session(session_path)

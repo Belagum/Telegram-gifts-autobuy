@@ -46,6 +46,7 @@ class LoginResult:
     error_code: str | None = None
     http_status: int = 200
     data: dict[str, Any] | None = None
+    should_close_modal: bool = False
 
     @classmethod
     def ok(cls, data: dict[str, Any] | None = None) -> "LoginResult":
@@ -57,14 +58,16 @@ class LoginResult:
         error: str,
         error_code: str | None = None,
         http_status: int = 400,
-        data: dict[str, Any] | None = None
+        data: dict[str, Any] | None = None,
+        should_close_modal: bool = False
     ) -> "LoginResult":
         return cls(
             success=False,
             error=error,
             error_code=error_code,
             http_status=http_status,
-            data=data
+            data=data,
+            should_close_modal=should_close_modal
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -82,6 +85,8 @@ class LoginResult:
             if self.data:
                 result["context"] = self.data
             result["http"] = self.http_status
+            if self.should_close_modal:
+                result["should_close_modal"] = True
         
         return result
 

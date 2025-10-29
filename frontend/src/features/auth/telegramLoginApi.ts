@@ -22,6 +22,7 @@ export interface ConfirmCodeResponse {
   error_code?: string;
   detail?: string;
   context?: Record<string, unknown>;
+  should_close_modal?: boolean;
 }
 
 export interface ConfirmPasswordResponse {
@@ -30,6 +31,7 @@ export interface ConfirmPasswordResponse {
   error_code?: string;
   detail?: string;
   context?: Record<string, unknown>;
+  should_close_modal?: boolean;
 }
 
 export const sendCode = async (payload: LoginPayload): Promise<SendCodeResponse> => {

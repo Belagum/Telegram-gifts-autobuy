@@ -34,7 +34,14 @@ SENSITIVE_PATTERNS = [
     # Email addresses (partial masking)
     (r"([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", r"***@\2"),
     
-    # Phone numbers (partial masking)
+    # Phone numbers (context-aware masking for phone= patterns)
+    (r"(phone\s*=\s*['\"]?)(\+?\d{7,15})(['\"]?)", r"\1+***-***-****\3"),
+    
+    # Phone numbers in file paths (sessions)
+    (r"(sessions[/\\]user_)(\d+)([/\\]\+?\d{7,15})", r"\1X\3"),
+    (r"([/\\]sessions[/\\][^/\\]+[/\\])(\+?\d{7,15})(\.session[^/\\]*)", r"\1+***-***-****\3"),
+    
+    # Generic phone numbers (fallback, partial masking)
     (r"\+?(\d{1,3})[- ]?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}", r"+***-***-****"),
     
     # Credit card numbers

@@ -118,7 +118,8 @@ class AppConfig(BaseSettings):
     app_env: str = Field("development", alias="APP_ENV")
     secret_key: str = Field("dev", alias="SECRET_KEY")
     admin_username: str | None = Field(None, alias="ADMIN_USERNAME")
-    gifts_dir: Path = Field(Path("gifts_data"), alias="GIFTS_DIR")
+    gifts_dir: Path = Field(Path("backend/instance/gifts_data"), alias="GIFTS_DIR")
+    sessions_dir: Path = Field(Path("backend/instance/sessions"), alias="SESSIONS_DIR")
     gifts_accs_ttl: int = Field(60, alias="GIFTS_ACCS_TTL", ge=1)
     debug_logging: bool = Field(False, alias="DEBUG_LOGGING")
 
@@ -136,7 +137,7 @@ class AppConfig(BaseSettings):
         arbitrary_types_allowed=True,
     )
 
-    @field_validator("gifts_dir", mode="after")
+    @field_validator("gifts_dir", "sessions_dir", mode="after")
     def _ensure_paths(cls, value: Any) -> Any:  # noqa: N805
         if isinstance(value, Path):
             value.mkdir(parents=True, exist_ok=True)

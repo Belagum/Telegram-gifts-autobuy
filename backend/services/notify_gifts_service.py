@@ -14,11 +14,13 @@ from sqlalchemy.orm import Session
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account, User, UserSettings
 from backend.services.tg_clients_service import tg_call
+from backend.shared.config import load_config
 from backend.shared.logging import logger
 from backend.shared.utils.fs import ensure_dir
 from backend.shared.utils.stickers import sticker_ext
 
-_STICKERS_DIR = os.path.join(os.getenv("GIFTS_DIR", "gifts_data"), "stickers")
+_config = load_config()
+_STICKERS_DIR = os.path.join(str(_config.gifts_dir), "stickers")
 
 
 def _collect_targets() -> list[tuple[int, str, int]]:

@@ -8,15 +8,15 @@ from pathlib import Path
 
 from backend.infrastructure.telegram_auth.exceptions import StorageError
 from backend.shared.logging import logger
-
+from backend.shared.config import load_config
 
 class FileSessionStorage:
-    def __init__(self, base_directory: str | None = None) -> None:
+    def __init__(self, base_directory: str | Path | None = None) -> None:
         if base_directory is None:
-            package_dir = Path(__file__).parent.parent.parent
-            base_directory = str(package_dir / "telegram_adapters" / "sessions")
+            config = load_config()
+            base_directory = config.sessions_dir
         
-        self._base_directory = base_directory
+        self._base_directory = str(base_directory)
         self._ensure_base_directory()
         
         logger.debug(f"FileSessionStorage: initialized base_dir={self._base_directory}")

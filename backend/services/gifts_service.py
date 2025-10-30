@@ -22,7 +22,7 @@ from ..shared.utils.gifts_utils import hash_items, merge_new
 from ..shared.utils.jsonio import read_json_list_of_dicts, write_json_list
 from .notify_gifts_service import broadcast_new_gifts
 from .tg_clients_service import tg_call, tg_shutdown
-
+from backend.shared.config import load_config
 
 @dataclass
 class _WorkerState:
@@ -30,9 +30,11 @@ class _WorkerState:
     thread: threading.Thread | None = None
 
 
+_config = load_config()
+
 GIFTS_THREADS: dict[int, _WorkerState] = {}
-_GIFTS_DIR = os.getenv("GIFTS_DIR", "gifts_data")
-ACC_TTL = float(os.getenv("GIFTS_ACCS_TTL", "60.0"))
+_GIFTS_DIR = str(_config.gifts_dir)
+ACC_TTL = float(_config.gifts_accs_ttl)
 
 
 class NoAccountsError(Exception):

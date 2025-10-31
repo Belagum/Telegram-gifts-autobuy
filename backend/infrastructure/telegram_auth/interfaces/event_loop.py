@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-from typing import Any, Coroutine, Protocol
+from collections.abc import Coroutine
+from typing import Any, Protocol
 
 
 class IEventLoop(Protocol):

@@ -3,10 +3,12 @@
 
 import asyncio
 import threading
-from typing import Any, Coroutine
+from collections.abc import Coroutine
+from typing import Any
 
 from backend.infrastructure.telegram_auth.exceptions import EventLoopError, TelegramAuthError
 from backend.shared.logging import logger
+from pyrogram.errors import SessionPasswordNeeded
 
 
 class EventLoopManager:
@@ -46,6 +48,8 @@ class EventLoopManager:
             future = asyncio.run_coroutine_threadsafe(coro, self._loop)
             return future.result()
         except TelegramAuthError:
+            raise
+        except SessionPasswordNeeded:
             raise
         except Exception as e:
             logger.exception(f"EventLoopManager: execution failed thread={self._thread.name}")

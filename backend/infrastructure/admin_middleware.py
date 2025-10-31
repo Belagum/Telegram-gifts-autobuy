@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
-
-from flask import request
+from typing import Any
 
 from backend.infrastructure.db.models import SessionToken, User
 from backend.infrastructure.db.session import SessionLocal
+from backend.shared.config import load_config
 from backend.shared.errors.base import AppError
+from backend.shared.logging import logger
+from flask import request
 
 
 class AdminAccessDeniedError(AppError):
@@ -32,9 +34,6 @@ class AdminAuthenticationError(AppError):
 
 
 def _get_current_user() -> User | None:
-    from backend.shared.config import load_config
-    from backend.shared.logging import logger
-    
     config = load_config()
     debug_mode = config.debug_logging
     
@@ -81,7 +80,11 @@ def _get_current_user() -> User | None:
         user = db.query(User).filter(User.id == token.user_id).first()
         
         if debug_mode:
-            logger.debug(f"Token valid, user found: user_id={user.id if user else None}, is_admin={user.is_admin if user else None}")
+            user_id = user.id if user else None
+            is_admin = user.is_admin if user else None
+            logger.debug(
+                f"Token valid, user found: user_id={user_id}, is_admin={is_admin}"
+            )
         
         return user
         
@@ -102,18 +105,32 @@ def require_admin(func: Callable[..., Any]) -> Callable[..., Any]:
         
         if not user:
             if debug_mode:
-                logger.warning(f"Admin access denied: no authentication on {request.method} {request.path}")
+                method = request.method
+                path = request.path
+                logger.warning(
+                    f"Admin access denied: no authentication on {method} {path}"
+                )
             raise AdminAuthenticationError()
         
         if not user.is_admin:
             if debug_mode:
-                logger.warning(f"Admin access denied: user {user.id} ({user.username}) is not admin on {request.method} {request.path}")
+                method = request.method
+                path = request.path
+                logger.warning(
+                    f"Admin access denied: user {user.id} ({user.username}) is not admin on {method} {path}"
+                )
             else:
-                logger.warning(f"Admin access denied: user {user.id} is not admin")
+                logger.warning(
+                    f"Admin access denied: user {user.id} is not admin"
+                )
             raise AdminAccessDeniedError()
         
         if debug_mode:
-            logger.debug(f"Admin access granted: user {user.id} ({user.username}) on {request.method} {request.path}")
+            method = request.method
+            path = request.path
+            logger.debug(
+                f"Admin access granted: user {user.id} ({user.username}) on {method} {path}"
+            )
         
         return func(*args, **kwargs)
     

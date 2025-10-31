@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from sqlalchemy import String, TypeDecorator
-
 from backend.infrastructure.encryption import decrypt_value, encrypt_value
+from sqlalchemy import String, TypeDecorator
 
 
 class EncryptedString(TypeDecorator):

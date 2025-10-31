@@ -1,13 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-from typing import Dict, Optional
 
 from pyrogram.errors import RPCError
 
-
 # Мапинг классов ошибок Pyrogram на коды для фронтенда
-TELEGRAM_ERROR_CODES: Dict[str, str] = {
+TELEGRAM_ERROR_CODES: dict[str, str] = {
     # Auth errors (400)
     "ApiIdInvalid": "API_ID_INVALID",
     "ApiIdPublishedFlood": "API_ID_PUBLISHED_FLOOD",
@@ -102,7 +100,7 @@ ERROR_CATEGORIES = {
 }
 
 
-def map_telegram_error(error: RPCError) -> tuple[str, Optional[dict]]:
+def map_telegram_error(error: RPCError) -> tuple[str, dict | None]:
     error_class_name = error.__class__.__name__
     error_code = TELEGRAM_ERROR_CODES.get(error_class_name, error_class_name)
     

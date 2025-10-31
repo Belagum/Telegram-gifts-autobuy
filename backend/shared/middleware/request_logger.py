@@ -7,10 +7,10 @@ import hashlib
 import time
 from typing import Any
 
-from flask import Flask, request, g
+from flask import Flask, g, request
 
 from backend.shared.config import load_config
-from backend.shared.logging import logger, set_correlation_id, clear_correlation_id
+from backend.shared.logging import clear_correlation_id, logger, set_correlation_id
 
 
 def _get_client_ip() -> str:

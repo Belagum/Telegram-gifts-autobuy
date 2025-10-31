@@ -8,9 +8,8 @@ import os
 import sys
 from functools import lru_cache
 
-from cryptography.fernet import Fernet, InvalidToken
-
 from backend.shared.logging import logger
+from cryptography.fernet import Fernet, InvalidToken
 
 _DEV_KEY_RAW = b"dev-key-for-local-dev-32-bytes!!"
 
@@ -29,9 +28,12 @@ class EncryptionService:
         if not key_str:
             if is_production:
                 print(
-                    "\n❌ CRITICAL: ENCRYPTION_KEY not set in production!\n"
-                    "   Sensitive data cannot be encrypted without a key.\n"
-                    "   Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"\n",
+                    (
+                        "\n❌ CRITICAL: ENCRYPTION_KEY not set in production!\n"
+                        "   Sensitive data cannot be encrypted without a key.\n"
+                        "   Generate one with: python -c \"from cryptography.fernet import Fernet; "
+                        "print(Fernet.generate_key().decode())\"\n"
+                    ),
                     file=sys.stderr,
                 )
                 sys.exit(1)

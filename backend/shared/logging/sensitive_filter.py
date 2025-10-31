@@ -6,7 +6,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 SENSITIVE_PATTERNS = [
     # API keys and secrets
     (r"(api[_-]?key\s*[:=]\s*['\"]?)([a-zA-Z0-9_\-]{20,})(['\"]?)", r"\1***REDACTED***\3"),

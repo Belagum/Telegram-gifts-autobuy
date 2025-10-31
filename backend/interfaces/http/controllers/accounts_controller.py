@@ -151,7 +151,12 @@ class AccountsController:
                 logger.warning(f"me: user_not_found (user_id={user_id})")
                 return jsonify({"error": "not_found"}), 404
             dt = (perf_counter() - t0) * 1000
-            logger.info(f"me: ok (user_id={user_id}, username='{user.username}', is_admin={user.is_admin}, dt_ms={dt:.0f})")
+            uname = user.username
+            is_admin = user.is_admin
+            dt_ms = f"{dt:.0f}"
+            logger.info(
+                f"me: ok (user_id={user_id}, username='{uname}', is_admin={is_admin}, dt_ms={dt_ms})"
+            )
             return jsonify({"id": user.id, "username": user.username, "is_admin": user.is_admin})
         except Exception:
             logger.exception(f"me: error (user_id={user_id})")

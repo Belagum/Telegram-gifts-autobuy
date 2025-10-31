@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.application.use_cases.autobuy import AutobuyOutput
 from backend.infrastructure.container import container
+from backend.shared.config import load_config
 
 from ..infrastructure.db import SessionLocal
 from ..infrastructure.db.models import Account
@@ -22,7 +23,7 @@ from ..shared.utils.gifts_utils import hash_items, merge_new
 from ..shared.utils.jsonio import read_json_list_of_dicts, write_json_list
 from .notify_gifts_service import broadcast_new_gifts
 from .tg_clients_service import tg_call, tg_shutdown
-from backend.shared.config import load_config
+
 
 @dataclass
 class _WorkerState:

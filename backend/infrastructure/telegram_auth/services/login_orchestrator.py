@@ -26,7 +26,6 @@ from backend.infrastructure.telegram_auth.services.session_manager import (
     SessionManager,
 )
 from backend.shared.logging import logger
-from pyrogram.errors import RPCError
 
 
 class PyroLoginManager:
@@ -84,8 +83,8 @@ class PyroLoginManager:
                 phone_code_hash=phone_code_hash
             )
             
-            setattr(login_session, "_client", client)
-            setattr(login_session, "_wrapper", wrapper)
+            login_session._client = client
+            login_session._wrapper = wrapper
             
             login_id = self._session_manager.create_session(login_session)
             
@@ -111,7 +110,7 @@ class PyroLoginManager:
                 http_status=400,
                 should_close_modal=True
             )
-        except Exception as e:
+        except Exception:
             logger.exception(f"PyroLoginManager: start_login unexpected error user_id={user_id}")
             self._cleanup_on_error(None, session_path if 'session_path' in locals() else None)
             return LoginResult.fail(
@@ -185,8 +184,10 @@ class PyroLoginManager:
                 http_status=400,
                 should_close_modal=not is_non_critical
             )
-        except Exception as e:
-            logger.exception(f"PyroLoginManager: confirm_code unexpected error login_id={login_id}")
+        except Exception:
+            logger.exception(
+                f"PyroLoginManager: confirm_code unexpected error login_id={login_id}"
+            )
             session = self._session_manager.remove_session(login_id)
             if session:
                 self._cleanup_on_error(session, session.session_path)
@@ -252,8 +253,10 @@ class PyroLoginManager:
                 http_status=400,
                 should_close_modal=not is_non_critical
             )
-        except Exception as e:
-            logger.exception(f"PyroLoginManager: confirm_password unexpected error login_id={login_id}")
+        except Exception:
+            logger.exception(
+                f"PyroLoginManager: confirm_password unexpected error login_id={login_id}"
+            )
             session = self._session_manager.remove_session(login_id)
             if session:
                 self._cleanup_on_error(session, session.session_path)
@@ -330,7 +333,9 @@ class PyroLoginManager:
                     wrapper.disconnect(client)
                     logger.debug("PyroLoginManager: client disconnected during cleanup_on_error")
                 except Exception:
-                    logger.debug("PyroLoginManager: failed to disconnect client during cleanup_on_error")
+                    logger.debug(
+                        "PyroLoginManager: failed to disconnect client during cleanup_on_error"
+                    )
         
         if session_path:
             try:

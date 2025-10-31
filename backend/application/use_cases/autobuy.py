@@ -8,8 +8,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
-from backend.infrastructure.db import SessionLocal
-from backend.infrastructure.db.models import User, UserSettings
+
 from backend.domain import (
     AccountSnapshot,
     ChannelFilter,
@@ -17,6 +16,8 @@ from backend.domain import (
     PurchaseOperation,
     PurchasePlan,
 )
+from backend.infrastructure.db import SessionLocal
+from backend.infrastructure.db.models import User, UserSettings
 from backend.shared.logging import logger
 
 from ..interfaces import (

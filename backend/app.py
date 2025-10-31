@@ -8,6 +8,7 @@ import threading
 from flask import Flask
 from flask_cors import CORS
 
+from backend.infrastructure.admin_setup import setup_admin_user
 from backend.infrastructure.container import container
 from backend.infrastructure.db import SessionLocal, init_db
 from backend.infrastructure.db.models import User
@@ -22,7 +23,6 @@ from backend.shared.logging import logger, setup_logging
 from backend.shared.middleware.csrf import configure_csrf
 from backend.shared.middleware.error_handler import configure_error_handling
 from backend.shared.middleware.request_logger import configure_request_logging
-from backend.infrastructure.admin_setup import setup_admin_user
 
 _config = load_config()
 _BOOTSTRAPPED = threading.Event()

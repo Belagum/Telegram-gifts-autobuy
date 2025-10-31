@@ -7,9 +7,6 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import desc, func
-from sqlalchemy.orm import Session
-
 from backend.domain.admin.repositories import (
     AdminRepository,
     AuditLogEntry,
@@ -20,6 +17,8 @@ from backend.domain.admin.repositories import (
 )
 from backend.infrastructure.auth.login_attempts import _tracker
 from backend.infrastructure.db.models import AuditLog, SessionToken, User
+from sqlalchemy import desc, func
+from sqlalchemy.orm import Session
 
 
 class SQLAlchemyAuditLogRepository(AuditLogRepository):
@@ -182,7 +181,7 @@ class SQLAlchemyAdminRepository(AdminRepository):
                 SuspiciousActivity(
                     severity="medium",
                     activity_type="account_locked",
-                    description=f"Account locked due to failed attempts",
+                    description="Account locked due to failed attempts",
                     user_id=user_id,
                     username=username,
                     ip_address=None,

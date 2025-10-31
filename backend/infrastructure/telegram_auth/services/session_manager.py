@@ -2,7 +2,6 @@
 # Copyright 2025 Vova Orig
 
 import secrets
-from typing import Any
 
 from backend.infrastructure.telegram_auth.exceptions import LoginNotFoundError
 from backend.infrastructure.telegram_auth.models.dto import LoginSession

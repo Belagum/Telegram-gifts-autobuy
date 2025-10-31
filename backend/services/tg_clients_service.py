@@ -11,8 +11,8 @@ from typing import Any, TypeVar
 
 from pyrogram import Client
 
-from .session_locks_service import session_lock_for
 from ..shared.logging import logger
+from .session_locks_service import session_lock_for
 
 _START_ATTEMPTS = 4
 _START_TIMEOUT = 20.0

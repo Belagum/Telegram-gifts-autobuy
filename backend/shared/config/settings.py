@@ -157,9 +157,11 @@ class AppConfig(BaseSettings):
 
         if self.secret_key in ("dev", "development", "test", ""):
             print(
-                "\n❌ CRITICAL SECURITY ERROR: Insecure SECRET_KEY detected in production!\n"
-                "   SECRET_KEY must be a strong random value in production.\n"
-                "   Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"\n",
+                (
+                    "\n❌ CRITICAL SECURITY ERROR: Insecure SECRET_KEY detected in production!\n"
+                    "   SECRET_KEY must be a strong random value in production.\n"
+                    "   Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"\n"
+                ),
                 file=sys.stderr,
             )
             sys.exit(1)

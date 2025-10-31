@@ -52,8 +52,9 @@ class AdminController:
     
     @require_admin
     def audit_logs(self) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
@@ -112,7 +113,10 @@ class AdminController:
             )
             
             if debug_mode:
-                logger.info(f"admin.audit_logs completed successfully for user={user_id}: returned {len(logs)} logs, total={total}")
+                count = len(logs)
+                logger.info(
+                    f"admin.audit_logs completed successfully for user={user_id}: returned {count} logs, total={total}"
+                )
             else:
                 logger.info(f"admin.audit_logs: returned {len(logs)} logs, total={total}")
             
@@ -126,8 +130,9 @@ class AdminController:
     
     @require_admin
     def action_categories(self) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
@@ -138,7 +143,10 @@ class AdminController:
             result = ActionCategoriesDTO(actions=actions)
             
             if debug_mode:
-                logger.info(f"admin.action_categories completed successfully for user={user_id}: returned {len(actions)} categories")
+                count = len(actions)
+                logger.info(
+                    f"admin.action_categories completed successfully for user={user_id}: returned {count} categories"
+                )
             else:
                 logger.info(f"admin.action_categories: returned {len(actions)} categories")
             
@@ -152,15 +160,18 @@ class AdminController:
     
     @require_admin
     def user_audit(self, user_id: int) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
         admin_user_id = getattr(g, "user_id", None)
         
         if debug_mode:
-            logger.info(f"admin.user_audit called by user={admin_user_id} for target_user={user_id}")
+            logger.info(
+                f"admin.user_audit called by user={admin_user_id} for target_user={user_id}"
+            )
         
         try:
             limit = request.args.get("limit", 100, type=int)
@@ -169,22 +180,28 @@ class AdminController:
             log_dtos = [AuditLogDTO.model_validate(log) for log in logs]
             
             if debug_mode:
-                logger.info(f"admin.user_audit completed successfully for user={admin_user_id}: target_user={user_id}, returned {len(logs)} logs")
+                logger.info(
+                    f"admin.user_audit completed successfully for user={admin_user_id}: "
+                    f"target_user={user_id}, returned {len(logs)} logs"
+                )
             else:
                 logger.info(f"admin.user_audit: user_id={user_id} returned {len(logs)} logs")
             
             return jsonify({"logs": [dto.model_dump() for dto in log_dtos]}), 200
         except Exception as exc:
             if debug_mode:
-                logger.exception(f"admin.user_audit failed for user={admin_user_id}, target_user={user_id}: {exc}")
+                logger.exception(
+                    f"admin.user_audit failed for user={admin_user_id}, target_user={user_id}: {exc}"
+                )
             else:
                 logger.error(f"admin.user_audit failed: {type(exc).__name__}")
             raise
     
     @require_admin
     def suspicious_activity(self) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
@@ -200,7 +217,10 @@ class AdminController:
             activity_dtos = [SuspiciousActivityDTO.model_validate(act) for act in activities]
             
             if debug_mode:
-                logger.info(f"admin.suspicious_activity completed successfully for user={user_id}: returned {len(activities)} activities")
+                count = len(activities)
+                logger.info(
+                    f"admin.suspicious_activity completed successfully for user={user_id}: returned {count} activities"
+                )
             else:
                 logger.info(f"admin.suspicious_activity: returned {len(activities)} activities")
             
@@ -214,8 +234,9 @@ class AdminController:
     
     @require_admin
     def error_stats(self) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
@@ -231,7 +252,10 @@ class AdminController:
             stats_dtos = [ErrorStatsDTO.model_validate(stat) for stat in stats]
             
             if debug_mode:
-                logger.info(f"admin.error_stats completed successfully for user={user_id}: returned {len(stats)} stat entries")
+                count = len(stats)
+                logger.info(
+                    f"admin.error_stats completed successfully for user={user_id}: returned {count} stat entries"
+                )
             else:
                 logger.info(f"admin.error_stats: returned {len(stats)} stat entries")
             
@@ -245,8 +269,9 @@ class AdminController:
     
     @require_admin
     def users(self) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
@@ -261,7 +286,10 @@ class AdminController:
             user_dtos = [UserInfoDTO.model_validate(user) for user in users]
             
             if debug_mode:
-                logger.info(f"admin.users completed successfully for user={user_id}: returned {len(users)} users")
+                count = len(users)
+                logger.info(
+                    f"admin.users completed successfully for user={user_id}: returned {count} users"
+                )
             else:
                 logger.info(f"admin.users: returned {len(users)} users")
             
@@ -275,36 +303,44 @@ class AdminController:
     
     @require_admin
     def unlock_user(self, user_id: int) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
         admin_user_id = getattr(g, "user_id", None)
         
         if debug_mode:
-            logger.info(f"admin.unlock_user called by user={admin_user_id} for target_user={user_id}")
+            logger.info(
+                f"admin.unlock_user called by user={admin_user_id} for target_user={user_id}"
+            )
         
         try:
             self._unlock_user.execute(user_id=user_id)
             
             if debug_mode:
-                logger.info(f"admin.unlock_user completed successfully for user={admin_user_id}: unlocked user_id={user_id}")
+                logger.info(
+                    f"admin.unlock_user completed successfully for user={admin_user_id}: unlocked user_id={user_id}"
+                )
             else:
                 logger.info(f"admin.unlock_user: unlocked user_id={user_id}")
             
             return jsonify({"success": True}), 200
         except Exception as exc:
             if debug_mode:
-                logger.exception(f"admin.unlock_user failed for user={admin_user_id}, target_user={user_id}: {exc}")
+                logger.exception(
+                    f"admin.unlock_user failed for user={admin_user_id}, target_user={user_id}: {exc}"
+                )
             else:
                 logger.error(f"admin.unlock_user failed: {type(exc).__name__}")
             raise
     
     @require_admin
     def dashboard_stats(self) -> tuple[Response, int]:
-        from backend.shared.config import load_config
         from flask import g
+
+        from backend.shared.config import load_config
         
         config = load_config()
         debug_mode = config.debug_logging
@@ -336,7 +372,11 @@ class AdminController:
         
         bp.add_url_rule("/audit-logs", view_func=self.audit_logs, methods=["GET"])
         bp.add_url_rule("/audit-logs/categories", view_func=self.action_categories, methods=["GET"])
-        bp.add_url_rule("/audit-logs/user/<int:user_id>", view_func=self.user_audit, methods=["GET"])
+        bp.add_url_rule(
+            "/audit-logs/user/<int:user_id>",
+            view_func=self.user_audit,
+            methods=["GET"],
+        )
         bp.add_url_rule("/suspicious-activity", view_func=self.suspicious_activity, methods=["GET"])
         bp.add_url_rule("/error-stats", view_func=self.error_stats, methods=["GET"])
         bp.add_url_rule("/users", view_func=self.users, methods=["GET"])

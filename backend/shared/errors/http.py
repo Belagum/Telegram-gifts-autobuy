@@ -6,12 +6,13 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from flask import Response, jsonify
+from werkzeug.exceptions import HTTPException
+
+from backend.shared.config import load_config
+from backend.shared.logging import logger
 
 from .base import AppError
 
-from werkzeug.exceptions import HTTPException
-from backend.shared.config import load_config
-from backend.shared.logging import logger
 
 def handle_app_error(error: AppError) -> tuple[Response, HTTPStatus]:
     response = jsonify(error.to_dict())
@@ -36,9 +37,14 @@ def register_error_handler(
 
     @app.errorhandler(Exception)
     def _handle_unexpected(exc: Exception):
-        from flask import request, g
+        from flask import g, request
         
-        ip_address = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() if request.headers.get("X-Forwarded-For") else (request.remote_addr or "unknown")
+        x_forwarded_for = request.headers.get("X-Forwarded-For")
+        ip_address = (
+            x_forwarded_for.split(",")[0].strip()
+            if x_forwarded_for
+            else (request.remote_addr or "unknown")
+        )
         user_id = getattr(g, "user_id", None)
         
         if debug_mode:

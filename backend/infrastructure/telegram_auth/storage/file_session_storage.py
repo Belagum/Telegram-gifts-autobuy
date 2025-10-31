@@ -7,8 +7,9 @@ import time
 from pathlib import Path
 
 from backend.infrastructure.telegram_auth.exceptions import StorageError
-from backend.shared.logging import logger
 from backend.shared.config import load_config
+from backend.shared.logging import logger
+
 
 class FileSessionStorage:
     def __init__(self, base_directory: str | Path | None = None) -> None:

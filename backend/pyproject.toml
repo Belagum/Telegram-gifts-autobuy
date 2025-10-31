@@ -1,9 +1,9 @@
 [tool.black]
-line-length = 100
+line-length = 120
 target-version = ["py313"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py313"
 extend-exclude = ["migrations", ".venv", "env", "build", "dist"]
 
@@ -14,7 +14,7 @@ ignore = ["E402"]
 
 [tool.isort]
 profile = "black"
-line_length = 100
+line_length = 120
 
 [tool.pytest.ini_options]
 pythonpath = [".."]

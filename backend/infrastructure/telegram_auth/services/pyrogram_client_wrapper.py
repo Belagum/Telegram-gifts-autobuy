@@ -39,12 +39,16 @@ class PyrogramClientWrapper:
         client = Client(
             self._session_path,
             api_id=self._credentials.api_id,
-            api_hash=self._credentials.api_hash
+            api_hash=self._credentials.api_hash,
+            no_updates=True
         )
         
         try:
             await client.connect()
             logger.debug(f"PyrogramClientWrapper: connected session={self._session_path}")
+            
+            await client.initialize()
+            logger.debug(f"PyrogramClientWrapper: initialized session={self._session_path}")
             
             sent = await client.send_code(phone)
             phone_code_hash = getattr(sent, "phone_code_hash", None)

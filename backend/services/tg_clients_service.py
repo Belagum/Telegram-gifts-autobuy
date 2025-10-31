@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar
 
 from pyrogram import Client
+from pyrogram.errors import AuthKeyUnregistered, Unauthorized
 
 from ..shared.logging import logger
 from .session_locks_service import session_lock_for
@@ -126,16 +127,34 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
             _ensure_session_directory(box.path)
             c = Client(box.path, api_id=box.api_id, api_hash=box.api_hash, no_updates=True)
             try:
-                await asyncio.wait_for(c.start(), timeout=_START_TIMEOUT)
+                await asyncio.wait_for(c.connect(), timeout=_START_TIMEOUT)
+                logger.debug(f"tg_clients: client connected path={box.path}")
+                
+                await asyncio.wait_for(c.initialize(), timeout=_START_TIMEOUT)
+                logger.debug(f"tg_clients: client initialized path={box.path}")
+                
+                try:
+                    await asyncio.wait_for(c.get_me(), timeout=5.0)
+                    logger.debug(f"tg_clients: session authorized path={box.path}")
+                except (AuthKeyUnregistered, Unauthorized) as e:
+                    logger.warning(
+                        f"tg_clients: session not authorized path={box.path} "
+                        f"error={type(e).__name__}"
+                    )
+                    try:
+                        await c.terminate()
+                    except Exception:
+                        pass
+                    raise AuthKeyUnregistered("Session is not authorized") from e
             except TimeoutError as e:
                 logger.warning(
-                    f"tg_clients: pyrogram start timeout path={box.path} timeout={_START_TIMEOUT}"
+                    f"tg_clients: pyrogram init timeout path={box.path} timeout={_START_TIMEOUT}"
                 )
                 try:
-                    await c.stop()
+                    await c.terminate()
                 except Exception:
-                    logger.debug(f"tg_clients: stop after timeout failed path={box.path}")
-                raise RuntimeError("pyrogram.start timeout") from e
+                    logger.debug(f"tg_clients: terminate after timeout failed path={box.path}")
+                raise RuntimeError("pyrogram.initialize timeout") from e
             box.client = c
             box.call_lock = asyncio.Lock()
             logger.info(f"tg_clients: pyrogram client ready path={box.path}")
@@ -165,6 +184,12 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
                         backoff = min(backoff * 2, _DBLOCK_MAX_BACKOFF)
                         continue
                     break
+                except AuthKeyUnregistered as e:
+                    logger.warning(
+                        f"tg_clients: session invalid (AuthKeyUnregistered) path={box.path} "
+                        f"attempt={attempt} - stopping retries"
+                    )
+                    raise e
                 except Exception as e:
                     last_err = e
                     logger.exception(

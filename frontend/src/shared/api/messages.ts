@@ -165,7 +165,20 @@ const ERROR_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
         return "Произошла неожиданная ошибка. Попробуйте позже.";
     }
   },
-  session_invalid: () => "Сессия аккаунта недействительна. Авторизуйтесь заново.",
+  session_invalid: ({ context }) => {
+    const accountId = formatNumber(context?.account_id);
+    const phone = typeof context?.phone === "string" ? context.phone : null;
+    if (accountId && phone) {
+      return `Сессия аккаунта ${phone} (№${accountId}) недействительна. Авторизуйтесь заново.`;
+    }
+    if (accountId) {
+      return `Сессия аккаунта №${accountId} недействительна. Авторизуйтесь заново.`;
+    }
+    if (phone) {
+      return `Сессия аккаунта ${phone} недействительна. Авторизуйтесь заново.`;
+    }
+    return "Сессия аккаунта недействительна. Авторизуйтесь заново.";
+  },
   account_refresh_failed: () => "Не удалось обновить аккаунт. Попробуйте ещё раз позднее.",
   bad_channel_id: () => "Некорректный ID канала.",
   bad_range: ({ context }) => {
@@ -239,7 +252,20 @@ const ERROR_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
 };
 
 const ERROR_CODE_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
-  AUTH_KEY_UNREGISTERED: () => "Сессия аккаунта недействительна. Авторизуйтесь заново.",
+  AUTH_KEY_UNREGISTERED: ({ context }) => {
+    const accountId = formatNumber(context?.account_id);
+    const phone = typeof context?.phone === "string" ? context.phone : null;
+    if (accountId && phone) {
+      return `Сессия аккаунта ${phone} (№${accountId}) недействительна. Авторизуйтесь заново.`;
+    }
+    if (accountId) {
+      return `Сессия аккаунта №${accountId} недействительна. Авторизуйтесь заново.`;
+    }
+    if (phone) {
+      return `Сессия аккаунта ${phone} недействительна. Авторизуйтесь заново.`;
+    }
+    return "Сессия аккаунта недействительна. Авторизуйтесь заново.";
+  },
   start_login_failed: ERROR_MESSAGE_RESOLVERS.start_login_failed,
   complete_login_failed: ERROR_MESSAGE_RESOLVERS.complete_login_failed,
   confirm_password_failed: ERROR_MESSAGE_RESOLVERS.confirm_password_failed,

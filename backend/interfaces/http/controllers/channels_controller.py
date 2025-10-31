@@ -9,6 +9,7 @@ from time import perf_counter
 from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
+from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.services.channels_service import (
     create_channel,
@@ -86,6 +87,20 @@ class ChannelsController:
                 f"channel.create: ok (user_id={user_id}, channel_row_id={result['channel_id']}, "
                 f"dt_ms={dt:.0f})"
             )
+            
+            audit_log(
+                AuditAction.CHANNEL_ADDED,
+                user_id=user_id,
+                ip_address=request.remote_addr,
+                details={
+                    "channel_id": payload.get("channel_id"),
+                    "title": payload.get("title"),
+                    "price_min": payload.get("price_min"),
+                    "price_max": payload.get("price_max"),
+                },
+                success=True,
+            )
+            
             return jsonify(result)
         except (DuplicateChannelError, BadChannelIdError):
             raise
@@ -112,6 +127,18 @@ class ChannelsController:
             logger.info(
                 f"channel.update: ok (user_id={user_id}, ch_id={channel_id}, dt_ms={dt:.0f})"
             )
+            
+            audit_log(
+                AuditAction.CHANNEL_UPDATED,
+                user_id=user_id,
+                ip_address=request.remote_addr,
+                details={
+                    "channel_id": channel_id,
+                    "updated_fields": payload,
+                },
+                success=True,
+            )
+            
             return jsonify(result)
         except ChannelNotFoundError:
             raise
@@ -134,6 +161,15 @@ class ChannelsController:
             logger.info(
                 f"channel.delete: ok (user_id={user_id}, ch_id={channel_id}, dt_ms={dt:.0f})"
             )
+            
+            audit_log(
+                AuditAction.CHANNEL_REMOVED,
+                user_id=user_id,
+                ip_address=request.remote_addr,
+                details={"channel_id": channel_id},
+                success=True,
+            )
+            
             return jsonify(result)
         except ChannelNotFoundError:
             raise

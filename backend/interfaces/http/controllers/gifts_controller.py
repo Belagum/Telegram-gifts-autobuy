@@ -19,6 +19,7 @@ import httpx
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from sqlalchemy.orm import Session, joinedload
 
+from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db.models import Account, User, UserSettings
 from backend.services.gifts_service import (
@@ -228,7 +229,17 @@ class GiftsController:
         )
         if not want_stream:
             try:
-                items = refresh_once(authed_request().user_id)
+                user_id = authed_request().user_id
+                items = refresh_once(user_id)
+                
+                audit_log(
+                    AuditAction.GIFTS_REFRESH,
+                    user_id=user_id,
+                    ip_address=request.remote_addr,
+                    details={"items_count": len(items)},
+                    success=True,
+                )
+                
                 return jsonify({"items": _convert_gift_ids_to_strings(items)})
             except NoAccountsError:
                 return jsonify({"error": "no_accounts"}), 409
@@ -348,6 +359,20 @@ class GiftsController:
                 f"gifts.buy failed user_id={user_id} gift_id={gift_id} account_id={account_id} "
                 f"target_id={target_id}"
             )
+            
+            audit_log(
+                AuditAction.GIFT_SEND_FAILED,
+                user_id=user_id,
+                ip_address=request.remote_addr,
+                details={
+                    "gift_id": gift_id,
+                    "account_id": account_id,
+                    "target_id": target_id,
+                    "error": str(exc),
+                },
+                success=False,
+            )
+            
             message = (str(exc) or "").upper()
             if "BALANCE_TOO_LOW" in message:
                 try:
@@ -381,6 +406,19 @@ class GiftsController:
         logger.info(
             f"gifts.buy success user_id={user_id} gift_id={gift_id} account_id={account_id} "
             f"target_id={target_id}"
+        )
+        
+        audit_log(
+            AuditAction.GIFT_SENT,
+            user_id=user_id,
+            ip_address=request.remote_addr,
+            details={
+                "gift_id": gift_id,
+                "account_id": account_id,
+                "target_id": target_id,
+                "price": gift.get("price"),
+            },
+            success=True,
         )
 
         return jsonify(
@@ -446,6 +484,16 @@ class GiftsController:
             return jsonify({"error": "not_found"}), 404
         user.gifts_autorefresh = enabled
         db.commit()
+        
+        action = AuditAction.GIFTS_AUTO_REFRESH_ENABLED if enabled else AuditAction.GIFTS_AUTO_REFRESH_DISABLED
+        audit_log(
+            action,
+            user_id=user_id,
+            ip_address=request.remote_addr,
+            details={"auto_refresh": enabled},
+            success=True,
+        )
+        
         if enabled:
             start_user_gifts(user_id)
         else:

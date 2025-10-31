@@ -366,7 +366,10 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
             yield {
                 "error": "session_invalid",
                 "error_code": "AUTH_KEY_UNREGISTERED",
-                "detail": "Сессия невалидна. Авторизуйтесь заново.",
+                "context": {
+                    "account_id": acc.id,
+                    "phone": phone,
+                },
             }
             return
         except Exception as e:

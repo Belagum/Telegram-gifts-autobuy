@@ -25,6 +25,7 @@ class AuditAction(str, Enum):
     # API profiles
     API_PROFILE_CREATED = "api_profile_created"
     API_PROFILE_DELETED = "api_profile_deleted"
+    API_PROFILE_RENAMED = "api_profile_renamed"
     
     # Settings
     SETTINGS_UPDATED = "settings_updated"
@@ -39,10 +40,22 @@ class AuditAction(str, Enum):
     CHANNEL_CREATED = "channel_created"
     CHANNEL_UPDATED = "channel_updated"
     CHANNEL_DELETED = "channel_deleted"
+    CHANNEL_ADDED = "channel_added"
+    CHANNEL_REMOVED = "channel_removed"
     
     # Gifts
     GIFT_PURCHASED = "gift_purchased"
     GIFT_PURCHASE_FAILED = "gift_purchase_failed"
+    GIFT_SENT = "gift_sent"
+    GIFT_SEND_FAILED = "gift_send_failed"
+    GIFTS_REFRESH = "gifts_refresh"
+    GIFTS_AUTO_REFRESH_ENABLED = "gifts_auto_refresh_enabled"
+    GIFTS_AUTO_REFRESH_DISABLED = "gifts_auto_refresh_disabled"
+    GIFTS_AUTOBUY_COMPLETED = "gifts_autobuy_completed"
+    
+    # Accounts
+    ACCOUNT_ADDED = "account_added"
+    ACCOUNT_REFRESH = "account_refresh"
 
 
 class AuditLogger:    

@@ -6,6 +6,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
+from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.services.settings_service import read_user_settings, set_user_settings
 from backend.shared.errors import (
@@ -61,6 +62,24 @@ class SettingsController:
             user_id = authed_request().user_id
             settings = set_user_settings(
                 user_id, (token or "").strip() or None, chat, target, fallback
+            )
+            
+            changed_fields = {}
+            if token is not None:
+                changed_fields["bot_token"] = "***" if token else "removed"
+            if chat is not None:
+                changed_fields["notify_chat_id"] = chat
+            if target is not None:
+                changed_fields["buy_target_id"] = target
+            if fallback is not None:
+                changed_fields["buy_target_on_fail_only"] = fallback
+            
+            audit_log(
+                AuditAction.SETTINGS_UPDATED,
+                user_id=user_id,
+                ip_address=request.remote_addr,
+                details=changed_fields,
+                success=True,
             )
         except ValueError as exc:
             message = str(exc)

@@ -12,6 +12,7 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account, ApiProfile, User
@@ -278,6 +279,18 @@ class AccountsController:
                 return jsonify({"error": "not_found"}), 404
             api_profile.name = name or None
             db.commit()
+            
+            audit_log(
+                AuditAction.API_PROFILE_RENAMED,
+                user_id=user_id,
+                ip_address=request.remote_addr,
+                details={
+                    "api_profile_id": api_profile_id,
+                    "new_name": name,
+                },
+                success=True,
+            )
+            
             dt = (perf_counter() - t0) * 1000
             logger.info(
                 f"apiprofile.rename: ok (user_id={user_id}, ap_id={api_profile_id}, dt_ms={dt:.0f})"
@@ -461,6 +474,19 @@ class AccountsController:
                     f"error='{result_dict.get('error')}')"
                 )
                 return jsonify(result_dict), int(result_dict.get("http", 400))
+            
+            if "account_id" in result_dict:
+                audit_log(
+                    AuditAction.ACCOUNT_ADDED,
+                    user_id=user_id,
+                    ip_address=request.remote_addr,
+                    details={
+                        "account_id": result_dict.get("account_id"),
+                        "phone": "***",  
+                    },
+                    success=True,
+                )
+            
             dt = (perf_counter() - t0) * 1000
             logger.info(f"auth.confirm_password: ok (user_id={user_id}, dt_ms={dt:.0f})")
             return jsonify(result_dict)
@@ -546,15 +572,20 @@ class AccountsController:
                         )
                     if event.get("error"):
                         logger.warning(
-                            "account.refresh.stream: error='%s' code='%s' user_id=%s acc_id=%s",
-                            event.get("error"),
-                            event.get("error_code"),
-                            user_id,
-                            account_id,
+                            f"account.refresh.stream: error='{event.get('error')}' "
+                            f"code='{event.get('error_code')}' user_id={user_id} acc_id={account_id}"
                         )
                     yield json.dumps(event, ensure_ascii=False) + "\n"
                 logger.debug(
                     f"account.refresh.stream: end (user_id={user_id}, acc_id={account_id})"
+                )
+                
+                audit_log(
+                    AuditAction.ACCOUNT_REFRESH,
+                    user_id=user_id,
+                    ip_address=request.remote_addr,
+                    details={"account_id": account_id},
+                    success=True,
                 )
             except Exception:
                 logger.exception(

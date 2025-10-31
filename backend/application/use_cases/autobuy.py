@@ -16,6 +16,7 @@ from backend.domain import (
     PurchaseOperation,
     PurchasePlan,
 )
+from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import User, UserSettings
 from backend.shared.logging import logger
@@ -693,6 +694,26 @@ class AutobuyUseCase:
                 )
         skipped = len(data.gifts) - len(purchased)
         deferred = list(stats_dict.get("deferred") or [])
+        
+        purchased_count = len(purchased)
+        total_spent = sum(p.get("price", 0) for p in purchased)
+        channels_used = list(set(p.get("channel_id") for p in purchased if p.get("channel_id")))
+        
+        audit_log(
+            AuditAction.GIFTS_AUTOBUY_COMPLETED,
+            user_id=data.user_id,
+            ip_address=None,  # автоматическое действие
+            details={
+                "gifts_total": len(data.gifts),
+                "purchased": purchased_count,
+                "skipped": skipped,
+                "total_spent_stars": total_spent,
+                "channels_used": channels_used,
+                "accounts_used": list(stats_dict.get("accounts", {}).keys()),
+            },
+            success=True,
+        )
+        
         await self._send_reports(data.user_id, stats_dict, list(data.gifts))
         logger.bind(user_id=data.user_id).info(
             f"autobuy:summary purchased={len(purchased)} skipped={skipped} plan={len(plan)} "

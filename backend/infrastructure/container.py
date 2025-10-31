@@ -117,11 +117,11 @@ class Container:
     
     @cached_property
     def audit_log_repository(self) -> SQLAlchemyAuditLogRepository:
-        return SQLAlchemyAuditLogRepository(SessionLocal())
+        return SQLAlchemyAuditLogRepository(SessionLocal)
     
     @cached_property
     def admin_repository(self) -> SQLAlchemyAdminRepository:
-        return SQLAlchemyAdminRepository(SessionLocal())
+        return SQLAlchemyAdminRepository(SessionLocal)
     
     # Admin use cases
     

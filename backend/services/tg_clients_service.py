@@ -89,6 +89,19 @@ def _run_in_loop(  # noqa: UP047
     return asyncio.wrap_future(fut)
 
 
+def _ensure_session_directory(path: str) -> None:
+    try:
+        session_dir = os.path.dirname(os.path.abspath(path))
+        if session_dir:
+            os.makedirs(session_dir, exist_ok=True)
+            logger.debug(f"tg_clients: ensured session directory exists path={session_dir}")
+    except OSError as e:
+        logger.exception(
+            f"tg_clients: failed to create session directory path={path} error={type(e).__name__}"
+        )
+        raise
+
+
 async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
     key = os.path.abspath(path)
     logger.debug(f"tg_clients: ensure_started path={key}")
@@ -110,6 +123,7 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
 
         async def _start_once() -> None:
             logger.debug(f"tg_clients: starting pyrogram client path={box.path}")
+            _ensure_session_directory(box.path)
             c = Client(box.path, api_id=box.api_id, api_hash=box.api_hash, no_updates=True)
             try:
                 await asyncio.wait_for(c.start(), timeout=_START_TIMEOUT)

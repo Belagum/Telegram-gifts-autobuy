@@ -234,6 +234,8 @@ const ERROR_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {
     }
     return "Аккаунт временно заблокирован из-за множественных неудачных попыток входа. Попробуйте позже.";
   },
+  admin_access_denied: () => "Требуются права администратора.",
+  admin_authentication_required: () => "Требуется авторизация для доступа к админ-панели.",
 };
 
 const ERROR_CODE_MESSAGE_RESOLVERS: Record<string, ErrorResolver> = {

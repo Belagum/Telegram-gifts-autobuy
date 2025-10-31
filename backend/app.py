@@ -4,6 +4,7 @@
 import atexit
 import os
 import threading
+from datetime import timedelta
 
 from flask import Flask
 from flask_cors import CORS
@@ -67,6 +68,7 @@ def create_app() -> Flask:
     app.config.update(
         SECRET_KEY=_config.secret_key,
         SESSION_PERMANENT=True,
+        PERMANENT_SESSION_LIFETIME=timedelta(seconds=_config.security.session_lifetime),
     )
 
     cors_kwargs: dict[str, object] = {

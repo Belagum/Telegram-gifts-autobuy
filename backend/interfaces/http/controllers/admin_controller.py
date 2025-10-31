@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, g, jsonify, request
 from pydantic import ValidationError
 
 from backend.application.use_cases.admin.get_audit_logs import GetAuditLogsUseCase
@@ -53,11 +53,8 @@ class AdminController:
     @require_admin
     def audit_logs(self) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
         
         if debug_mode:
@@ -131,11 +128,8 @@ class AdminController:
     @require_admin
     def action_categories(self) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
         
         try:
@@ -161,11 +155,8 @@ class AdminController:
     @require_admin
     def user_audit(self, user_id: int) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         admin_user_id = getattr(g, "user_id", None)
         
         if debug_mode:
@@ -200,11 +191,8 @@ class AdminController:
     @require_admin
     def suspicious_activity(self) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
         
         if debug_mode:
@@ -235,11 +223,8 @@ class AdminController:
     @require_admin
     def error_stats(self) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
         
         if debug_mode:
@@ -270,11 +255,8 @@ class AdminController:
     @require_admin
     def users(self) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
         
         if debug_mode:
@@ -304,11 +286,8 @@ class AdminController:
     @require_admin
     def unlock_user(self, user_id: int) -> tuple[Response, int]:
         from flask import g
-
-        from backend.shared.config import load_config
         
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         admin_user_id = getattr(g, "user_id", None)
         
         if debug_mode:
@@ -338,12 +317,7 @@ class AdminController:
     
     @require_admin
     def dashboard_stats(self) -> tuple[Response, int]:
-        from flask import g
-
-        from backend.shared.config import load_config
-        
-        config = load_config()
-        debug_mode = config.debug_logging
+        debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
         
         if debug_mode:

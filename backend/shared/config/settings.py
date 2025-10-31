@@ -71,6 +71,9 @@ class SecurityConfig(BaseModel):
     # HSTS
     enable_hsts: bool = Field(False, alias="ENABLE_HSTS")
 
+    # Session lifetime (in seconds, default 7 days)
+    session_lifetime: int = Field(604800, alias="SESSION_LIFETIME", ge=60)
+
     model_config = ConfigDict(validate_by_name=True)
 
     @field_validator("allowed_origins", mode="before")

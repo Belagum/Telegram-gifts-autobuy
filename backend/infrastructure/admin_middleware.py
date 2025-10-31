@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
+from http import HTTPStatus
 from typing import Any
 
 from backend.infrastructure.db.models import SessionToken, User
@@ -12,15 +13,14 @@ from backend.infrastructure.db.session import SessionLocal
 from backend.shared.config import load_config
 from backend.shared.errors.base import AppError
 from backend.shared.logging import logger
-from flask import request
+from flask import g, request
 
 
 class AdminAccessDeniedError(AppError):
     def __init__(self) -> None:
         super().__init__(
             code="admin_access_denied",
-            message="Admin privileges required",
-            status=403,
+            status=HTTPStatus.FORBIDDEN,
         )
 
 
@@ -28,8 +28,7 @@ class AdminAuthenticationError(AppError):
     def __init__(self) -> None:
         super().__init__(
             code="admin_authentication_required",
-            message="Authentication required for admin access",
-            status=401,
+            status=HTTPStatus.UNAUTHORIZED,
         )
 
 
@@ -95,9 +94,6 @@ def _get_current_user() -> User | None:
 def require_admin(func: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        from backend.shared.config import load_config
-        from backend.shared.logging import logger
-        
         config = load_config()
         debug_mode = config.debug_logging
         
@@ -131,6 +127,9 @@ def require_admin(func: Callable[..., Any]) -> Callable[..., Any]:
             logger.debug(
                 f"Admin access granted: user {user.id} ({user.username}) on {method} {path}"
             )
+        
+        g.user_id = user.id
+        g.debug_mode = debug_mode
         
         return func(*args, **kwargs)
     

@@ -59,8 +59,9 @@ export const httpClient = async <TResponse>(
   path: string,
   { method = "GET", body, headers = {}, signal, parseJson = true }: HttpClientOptions = {},
 ): Promise<TResponse> => {
-  const controller = new AbortController();
-  const mergedSignal = signal;
+  const localController = signal ? undefined : new AbortController();
+  const abortSignal = signal ?? localController?.signal;
+
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
     ...headers,
@@ -87,7 +88,7 @@ export const httpClient = async <TResponse>(
       method,
       headers: finalHeaders,
       body: requestBody,
-      signal: mergedSignal ?? controller.signal,
+      signal: abortSignal,
       mode: "cors",
     });
 
@@ -119,11 +120,15 @@ export const httpClient = async <TResponse>(
     const text = await response.text();
     return sanitizeBody(text) as TResponse;
   } catch (error) {
-    if ((error as Error)?.name !== "AbortError") {
-      console.error("HTTP error", error);
+    if ((error as Error)?.name === "AbortError") {
+      throw error;
     }
+    console.error("HTTP error", error);
     throw error;
   } finally {
+    if (localController) {
+      localController.abort();
+    }
     useUiStore.getState().setGlobalLoading(false);
   }
 };

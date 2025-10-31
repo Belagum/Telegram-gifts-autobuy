@@ -42,7 +42,7 @@ class SqlAlchemyUserRepository(UserRepository):
         with session_scope() as session:
             row = User(username=user.username, password_hash=user.password_hash)
             session.add(row)
-            session.commit()
+            session.flush() 
             session.refresh(row)
             return DomainUser(
                 id=row.id,
@@ -60,10 +60,8 @@ class SqlAlchemySessionTokenRepository(SessionTokenRepository):
             expires_at = datetime.now(UTC) + timedelta(days=7)
             row = SessionToken(user_id=user_id, token=token_value, expires_at=expires_at)
             session.add(row)
-            session.commit()
             return DomainSessionToken(user_id=user_id, token=token_value, expires_at=expires_at)
 
     def revoke(self, token: str) -> None:
         with session_scope() as session:
             session.query(SessionToken).filter(SessionToken.token == token).delete()
-            session.commit()

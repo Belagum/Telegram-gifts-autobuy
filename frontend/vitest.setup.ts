@@ -2,5 +2,9 @@
 // Copyright 2025 Vova Orig
 
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
 
-// Дополнительные глобальные настройки тестов можно вынести сюда при необходимости.
+afterEach(() => {
+  cleanup();
+});

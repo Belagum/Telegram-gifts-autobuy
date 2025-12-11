@@ -184,14 +184,18 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
           } catch (err) {
             console.warn("Lottie destroy failed (re-init)", err);
             try {
-              containerElement.innerHTML = "";
+              while (containerElement.firstChild) {
+                containerElement.removeChild(containerElement.firstChild);
+              }
             } catch (clearError) {
               console.warn("[Gifts] Failed to reset container after destroy", clearError);
             }
           }
         }
         try {
-          containerElement.innerHTML = "";
+          while (containerElement.firstChild) {
+            containerElement.removeChild(containerElement.firstChild);
+          }
         } catch (clearError) {
           console.warn("[Gifts] Failed to reset container", clearError);
         }
@@ -229,7 +233,9 @@ const TgsThumb: React.FC<TgsThumbProps> = ({ gift, onMissingToken }) => {
         } catch (err) {
           console.warn("[Gifts] Lottie destroy failed (cleanup)", err);
           try {
-            containerElement.innerHTML = "";
+            while (containerElement.firstChild) {
+              containerElement.removeChild(containerElement.firstChild);
+            }
           } catch (clearError) {
             console.warn("[Gifts] Failed to clear container during cleanup", clearError);
           }

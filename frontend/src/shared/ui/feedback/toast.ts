@@ -11,7 +11,7 @@ export const showInfo = (message: string) => toast.info(message);
 
 const activeToastIds = new Set<string>();
 
-export const showError = (error: unknown, fallback = "Что-то пошло не так, попробуйте ещё раз") => {
+export const showError = (error: unknown, fallback = "Something went wrong. Please try again.") => {
   const message = extractApiErrorMessage(error, fallback);
   const id = `err-${message}`;
   if (activeToastIds.has(id)) return;

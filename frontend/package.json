@@ -1,14 +1,12 @@
 {
-  "// SPDX-License-Identifier": "Apache-2.0",
-  "// Copyright": "2025 Vova Orig",
   "name": "tg-gifts-dashboard",
   "private": true,
   "version": "0.3.0",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=18",
-    "npm": ">=9"
+    "node": ">=20.19.0",
+    "npm": ">=10"
   },
   "scripts": {
     "dev": "vite",
@@ -21,54 +19,57 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "prepare": "husky",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "audit": "npm audit --audit-level=moderate",
+    "audit:fix": "npm audit fix"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.9.0",
+    "@hookform/resolvers": "^3.10.0",
     "clsx": "^2.1.1",
-    "dompurify": "^3.1.6",
+    "dompurify": "^3.3.1",
     "lottie-web": "^5.13.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-hook-form": "^7.53.0",
-    "react-router-dom": "^6.26.1",
+    "react-hook-form": "^7.56.4",
+    "react-router-dom": "^6.30.2",
     "react-toastify": "^11.0.5",
-    "zod": "^3.23.8",
-    "zustand": "^4.5.5"
+    "zod": "^3.25.76",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "@storybook/addon-a11y": "^8.2.1",
-    "@storybook/addon-essentials": "^8.2.1",
-    "@storybook/addon-interactions": "^8.2.1",
-    "@storybook/react": "^8.2.1",
-    "@storybook/react-vite": "^8.2.1",
-    "@storybook/test": "^8.2.1",
-    "@storybook/test-runner": "^0.19.1",
-    "@testing-library/jest-dom": "^6.4.6",
-    "@testing-library/react": "^14.3.1",
+    "@storybook/addon-a11y": "^8.6.14",
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/addon-interactions": "^8.6.14",
+    "@storybook/react": "^8.6.14",
+    "@storybook/react-vite": "^8.6.14",
+    "@storybook/test": "^8.6.14",
+    "@storybook/test-runner": "^0.22.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
-    "@types/dompurify": "^3.0.5",
-    "@types/node": "^20.12.12",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.16.1",
-    "@typescript-eslint/parser": "^7.16.1",
-    "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-import-resolver-typescript": "^3.5.5",
-    "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-jsx-a11y": "^6.8.0",
-    "eslint-plugin-react": "^7.34.4",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "husky": "^9.0.11",
-    "jsdom": "^24.1.0",
-    "lint-staged": "^15.2.7",
-    "prettier": "^3.3.3",
-    "storybook": "^8.2.1",
-    "typescript": "^5.4.5",
-    "vite": "^5.4.0",
-    "vitest": "^1.6.0"
+    "@types/node": "^22.15.21",
+    "@types/react": "^18.3.27",
+    "@types/react-dom": "^18.3.7",
+    "@eslint/js": "^9.27.0",
+    "typescript-eslint": "^8.32.1",
+    "@vitejs/plugin-react": "^4.5.1",
+    "eslint": "^9.27.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.3.4",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.2.0",
+    "husky": "^9.1.7",
+    "jsdom": "^26.1.0",
+    "lint-staged": "^16.1.0",
+    "prettier": "^3.5.3",
+    "storybook": "^8.6.14",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.4"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
@@ -78,5 +79,8 @@
     "src/**/*.{css,md,json}": [
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
   }
 }

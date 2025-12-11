@@ -1,7 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2025 Vova Orig
 
+/**
+ * Validates URL to prevent javascript: and other dangerous protocols.
+ * Only allows http:, https:, and relative URLs starting with '/'.
+ */
+const isValidUrl = (url: string): boolean => {
+  // Allow relative URLs starting with '/'
+  if (url.startsWith("/")) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    // Only allow http and https protocols
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    // Invalid URL format
+    return false;
+  }
+};
+
 export const openCentered = (url: string, name = "_blank", width = 520, height = 700) => {
+  // Security: validate URL to prevent javascript: injection
+  if (!isValidUrl(url)) {
+    console.warn("openCentered: blocked potentially unsafe URL");
+    return;
+  }
+
   const bx = window.screenX ?? window.screenLeft ?? 0;
   const by = window.screenY ?? window.screenTop ?? 0;
   const bw = window.outerWidth ?? window.innerWidth;

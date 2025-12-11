@@ -158,6 +158,29 @@ export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
     </div>
   );
 
+  const handleTargetIdChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+
+    if (value === "") {
+      setTargetId("");
+      setInputError(null);
+      return;
+    }
+
+    if (!/^-?\d*$/.test(value)) {
+      setInputError("ID должен содержать только цифры");
+      return;
+    }
+
+    if (value.replace("-", "").length > 20) {
+      setInputError("ID слишком длинный");
+      return;
+    }
+
+    setTargetId(value);
+    setInputError(null);
+  };
+
   const renderTargetInput = () => (
     <div className="buy-modal__section">
       <p className="buy-modal__hint">
@@ -166,7 +189,7 @@ export const BuyGiftModal: React.FC<BuyGiftModalProps> = ({
       <Input
         ref={inputRef}
         value={targetId}
-        onChange={(event) => setTargetId(event.target.value)}
+        onChange={handleTargetIdChange}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();

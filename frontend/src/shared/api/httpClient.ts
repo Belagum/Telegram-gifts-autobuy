@@ -19,7 +19,11 @@ export interface HttpClientOptions {
   signal?: AbortSignal;
   parseJson?: boolean;
   asNdjson?: boolean;
+  timeout?: number;
 }
+
+/** default timeout*/
+const DEFAULT_TIMEOUT_MS = 30000;
 
 const unauthorizedEvent = new EventTarget();
 
@@ -57,10 +61,16 @@ const baseUrl = "/api";
 
 export const httpClient = async <TResponse>(
   path: string,
-  { method = "GET", body, headers = {}, signal, parseJson = true }: HttpClientOptions = {},
+  { method = "GET", body, headers = {}, signal, parseJson = true, timeout = DEFAULT_TIMEOUT_MS }: HttpClientOptions = {},
 ): Promise<TResponse> => {
-  const localController = signal ? undefined : new AbortController();
-  const abortSignal = signal ?? localController?.signal;
+  const localController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  if (!signal && timeout > 0) {
+    timeoutId = setTimeout(() => localController.abort(), timeout);
+  }
+
+  const abortSignal = signal ?? localController.signal;
 
   const finalHeaders: Record<string, string> = {
     Accept: "application/json",
@@ -123,11 +133,13 @@ export const httpClient = async <TResponse>(
     if ((error as Error)?.name === "AbortError") {
       throw error;
     }
-    console.error("HTTP error", error);
+    if (import.meta.env.DEV) {
+      console.error("HTTP error", error);
+    }
     throw error;
   } finally {
-    if (localController) {
-      localController.abort();
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
     }
     useUiStore.getState().setGlobalLoading(false);
   }
@@ -138,9 +150,10 @@ export interface NdjsonStreamOptions<T> {
   method?: HttpMethod;
   body?: unknown;
   onEvent: (data: T) => void;
+  onError?: (error: Error) => void;
 }
 
-export const streamNdjson = async <T>({ path, method = "POST", body, onEvent }: NdjsonStreamOptions<T>) => {
+export const streamNdjson = async <T>({ path, method = "POST", body, onEvent, onError }: NdjsonStreamOptions<T>) => {
   const headers: Record<string, string> = {
     Accept: "application/x-ndjson",
   };
@@ -148,12 +161,24 @@ export const streamNdjson = async <T>({ path, method = "POST", body, onEvent }: 
   if (csrfToken) {
     headers["X-CSRF-Token"] = csrfToken;
   }
+
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     credentials: "include",
-    body: body ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+
+  if (!response.ok) {
+    const error = new Error(`Stream request failed with status ${response.status}`);
+    onError?.(error);
+    throw error;
+  }
+
   if (!response.body) {
     return;
   }
@@ -161,7 +186,6 @@ export const streamNdjson = async <T>({ path, method = "POST", body, onEvent }: 
   const decoder = new TextDecoder();
   let buffer = "";
   try {
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
@@ -175,8 +199,10 @@ export const streamNdjson = async <T>({ path, method = "POST", body, onEvent }: 
         if (chunk) {
           try {
             onEvent(JSON.parse(chunk) as T);
-          } catch (error) {
-            console.warn("Failed to parse NDJSON chunk", error);
+          } catch (parseError) {
+            if (import.meta.env.DEV) {
+              console.warn("Failed to parse NDJSON chunk", parseError);
+            }
           }
         }
         index = buffer.indexOf("\n");

@@ -16,11 +16,32 @@ interface UiState {
   toggleSidebar: () => void;
 }
 
+const safeGetItem = (key: string): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeSetItem = (key: string, value: string): void => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+  }
+};
+
 const detectInitialTheme = (): ThemeName => {
   if (typeof window === "undefined") {
     return "light";
   }
-  const saved = window.localStorage.getItem("ui.theme") as ThemeName | null;
+  const saved = safeGetItem("ui.theme");
   if (saved === "light" || saved === "dark") {
     return saved;
   }
@@ -32,8 +53,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   theme: detectInitialTheme(),
   setTheme: (theme) => {
     set({ theme });
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("ui.theme", theme);
+    safeSetItem("ui.theme", theme);
+    if (typeof document !== "undefined") {
       const root = document.documentElement;
       root.classList.add("theme-transition");
       requestAnimationFrame(() => {
@@ -50,14 +71,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   globalLoading: false,
   setGlobalLoading: (value) => set({ globalLoading: value }),
-  sidebarCollapsed: typeof window !== "undefined" 
-    ? window.localStorage.getItem("ui.sidebarCollapsed") === "true" 
-    : false,
+  sidebarCollapsed: safeGetItem("ui.sidebarCollapsed") === "true",
   setSidebarCollapsed: (value) => {
     set({ sidebarCollapsed: value });
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("ui.sidebarCollapsed", String(value));
-    }
+    safeSetItem("ui.sidebarCollapsed", String(value));
   },
   toggleSidebar: () => {
     const next = !get().sidebarCollapsed;

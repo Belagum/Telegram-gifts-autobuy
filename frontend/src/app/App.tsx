@@ -57,16 +57,16 @@ export const App: React.FC = () => {
 
         if (shouldRedirectToLogin) {
           const fallbackMessage = isUnauthorized
-            ? "Требуется авторизация"
+            ? "Session expired. Please sign in again."
             : isEndpointMissing
-              ? "Сервер авторизации недоступен"
-              : "Не удалось связаться с сервером";
+              ? "Service unavailable. Please sign in again."
+              : "Network error. Please sign in again.";
           showError(error, fallbackMessage);
           navigate("/login", { replace: true });
         } else if (!isPublic) {
-          showError(error, "Не удалось загрузить профиль");
+          showError(error, "Request failed. Please retry.");
         } else if (isPublic && (isEndpointMissing || isNetworkError)) {
-          showError(error, "Сервер авторизации недоступен");
+          showError(error, "Service temporarily unavailable. Please try again.");
         }
 
         setReady(true);

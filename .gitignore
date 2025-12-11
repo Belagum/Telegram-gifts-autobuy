@@ -114,3 +114,5 @@ docker-compose.override.yml
 
 gifts_data/
 instance/
+*.MD
+!README.md

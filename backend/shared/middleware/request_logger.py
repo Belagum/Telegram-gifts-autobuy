@@ -7,17 +7,18 @@ import hashlib
 import time
 from typing import Any
 
-from flask import Flask, g, request
+from flask import Flask, Response, g, request
 
 from backend.shared.config import load_config
-from backend.shared.logging import clear_correlation_id, logger, set_correlation_id
+from backend.shared.logging import (clear_correlation_id, logger,
+                                    set_correlation_id)
 
 
 def _get_client_ip() -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
-    
+
     return request.remote_addr or "unknown"
 
 
@@ -27,24 +28,30 @@ def _get_user_id() -> int | None:
 
 def _sanitize_headers(headers: dict[str, str]) -> dict[str, str]:
     sensitive_headers = {
-        "authorization", "cookie", "x-api-key", "x-auth-token",
-        "x-csrf-token", "x-session-id"
+        "authorization",
+        "cookie",
+        "x-api-key",
+        "x-auth-token",
+        "x-csrf-token",
+        "x-session-id",
     }
-    
+
     sanitized = {}
     for key, value in headers.items():
         key_lower = key.lower()
         if key_lower in sensitive_headers:
-            sanitized[key] = f"<hashed:{hashlib.sha256(value.encode()).hexdigest()[:8]}>"
+            sanitized[key] = (
+                f"<hashed:{hashlib.sha256(value.encode()).hexdigest()[:8]}>"
+            )
         else:
             sanitized[key] = value
-    
+
     return sanitized
 
 
 def _sanitize_query_params(params: dict[str, Any]) -> dict[str, Any]:
     sensitive_params = {"password", "token", "key", "secret", "auth"}
-    
+
     sanitized = {}
     for key, value in params.items():
         key_lower = key.lower()
@@ -52,18 +59,18 @@ def _sanitize_query_params(params: dict[str, Any]) -> dict[str, Any]:
             sanitized[key] = "<redacted>"
         else:
             sanitized[key] = value
-    
+
     return sanitized
 
 
 def _log_request_start(debug_mode: bool) -> None:
     ip_address = _get_client_ip()
     user_id = _get_user_id()
-    
+
     if debug_mode:
         headers = _sanitize_headers(dict(request.headers))
         query_params = _sanitize_query_params(dict(request.args))
-        
+
         logger.info(
             f"Request started: {request.method} {request.path} "
             f"from {ip_address}, user={user_id}, "
@@ -80,7 +87,7 @@ def _log_request_end(debug_mode: bool, start_time: float) -> None:
     status_code = getattr(g, "response_status", 200)
     ip_address = _get_client_ip()
     user_id = _get_user_id()
-    
+
     if debug_mode:
         logger.info(
             f"Request completed: {request.method} {request.path} "
@@ -97,34 +104,35 @@ def _log_request_end(debug_mode: bool, start_time: float) -> None:
 def configure_request_logging(app: Flask) -> None:
     config = load_config()
     debug_mode = config.debug_logging
-    
+
     @app.before_request
     def _before_request() -> None:
         import secrets
+
         correlation_id = secrets.token_urlsafe(8)
         set_correlation_id(correlation_id)
-        
+
         g.request_start_time = time.time()
-        
+
         _log_request_start(debug_mode)
-    
+
     @app.after_request
-    def _after_request(response) -> None:
+    def _after_request(response: Response) -> Response:
         g.response_status = response.status_code
-        
+
         start_time = getattr(g, "request_start_time", time.time())
         _log_request_end(debug_mode, start_time)
-        
+
         clear_correlation_id()
-        
+
         return response
-    
+
     @app.teardown_request
-    def _teardown_request(exc: Exception | None) -> None:
+    def _teardown_request(exc: BaseException | None) -> None:
         if exc is not None:
             ip_address = _get_client_ip()
             user_id = _get_user_id()
-            
+
             if debug_mode:
                 logger.exception(
                     f"Request error: {request.method} {request.path} "
@@ -136,7 +144,7 @@ def configure_request_logging(app: Flask) -> None:
                     f"Request error: {type(exc).__name__} on "
                     f"{request.method} {request.path}"
                 )
-        
+
         clear_correlation_id()
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
+
 from backend.app import create_app
 from backend.infrastructure.db import ENGINE, Base, SessionLocal
 from backend.infrastructure.db.models import SessionToken, User
@@ -25,7 +26,9 @@ def test_register_login_logout_flow() -> None:
         )
         assert register.status_code == 200
 
-        login = client.post("/api/auth/login", json={"username": "alice", "password": "secret123"})
+        login = client.post(
+            "/api/auth/login", json={"username": "alice", "password": "secret123"}
+        )
         assert login.status_code == 200
         token_cookie = login.headers.get("Set-Cookie")
         assert token_cookie and "auth_token=" in token_cookie

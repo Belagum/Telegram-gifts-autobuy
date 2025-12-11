@@ -104,14 +104,18 @@ def _purge_session_files(session_path: str) -> None:
         pass
 
 
-def _delete_account_and_session(db: Session, acc: Account, *, reason: str | None = None) -> None:
+def _delete_account_and_session(
+    db: Session, acc: Account, *, reason: str | None = None
+) -> None:
     user_id = getattr(acc, "user_id", None)
     api_profile_id = getattr(acc, "api_profile_id", None)
     phone = getattr(acc, "phone", None)
     last_checked = getattr(acc, "last_checked_at", None)
     if last_checked and getattr(last_checked, "tzinfo", None) is None:
         last_checked = last_checked.replace(tzinfo=UTC)
-    last_checked_str = last_checked.isoformat(timespec="seconds") if last_checked else None
+    last_checked_str = (
+        last_checked.isoformat(timespec="seconds") if last_checked else None
+    )
     session_name = _sess_name(acc.session_path)
     reason_str = reason or "unspecified"
     warning_msg = (
@@ -126,16 +130,18 @@ def _delete_account_and_session(db: Session, acc: Account, *, reason: str | None
         db.delete(acc)
         db.commit()
     except Exception:
-        logger.exception(f"accounts: failed to delete account (acc_id={acc.id}, user_id={user_id})")
+        logger.exception(
+            f"accounts: failed to delete account (acc_id={acc.id}, user_id={user_id})"
+        )
         db.rollback()
 
 
 async def fetch_profile_and_stars(session_path: str, api_id: int, api_hash: str):
     me = await tg_call(session_path, api_id, api_hash, lambda c: c.get_me())
-    
+
     async def _get_stars(client):
         return await client.get_stars_balance()
-    
+
     stars = await tg_call(session_path, api_id, api_hash, _get_stars)
     premium = bool(getattr(me, "is_premium", False))
     status_text = None
@@ -158,7 +164,12 @@ def _should_refresh(now: datetime, lc: datetime | None) -> bool:
 
 
 def read_accounts(db: Session, user_id: int) -> list[dict]:
-    rows = db.query(Account).filter(Account.user_id == user_id).order_by(Account.id.desc()).all()
+    rows = (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.id.desc())
+        .all()
+    )
     out = []
     for r in rows:
         dt = r.last_checked_at
@@ -230,7 +241,9 @@ def refresh_account(db: Session, acc: Account) -> Account | None:
             prev_checked = acc.last_checked_at
             if prev_checked and getattr(prev_checked, "tzinfo", None) is None:
                 prev_checked = prev_checked.replace(tzinfo=UTC)
-            prev_checked_iso = prev_checked.isoformat(timespec="seconds") if prev_checked else None
+            prev_checked_iso = (
+                prev_checked.isoformat(timespec="seconds") if prev_checked else None
+            )
             acc.first_name = getattr(me, "first_name", None)
             acc.username = getattr(me, "username", None)
             acc.is_premium = premium
@@ -275,7 +288,9 @@ def refresh_account(db: Session, acc: Account) -> Account | None:
                 f"(acc_id={acc.id}, user_id={user_id}, session={session_name})"
             )
             logger.warning(auth_warning_msg)
-            _delete_account_and_session(db, acc, reason="AUTH_KEY_UNREGISTERED(refresh)")
+            _delete_account_and_session(
+                db, acc, reason="AUTH_KEY_UNREGISTERED(refresh)"
+            )
             return None
         except Exception:
             refresh_error_msg = (
@@ -297,7 +312,10 @@ def _refresh_user_accounts_worker(user_id: int):
     try:
         now = datetime.now(UTC)
         rows = (
-            db2.query(Account).filter(Account.user_id == user_id).order_by(Account.id.desc()).all()
+            db2.query(Account)
+            .filter(Account.user_id == user_id)
+            .order_by(Account.id.desc())
+            .all()
         )
         for r in rows:
             try:
@@ -309,7 +327,9 @@ def _refresh_user_accounts_worker(user_id: int):
         try:
             db2.close()
         except Exception:
-            logger.exception(f"accounts.bg_refresh: failed to close session (user_id={user_id})")
+            logger.exception(
+                f"accounts.bg_refresh: failed to close session (user_id={user_id})"
+            )
         finally:
             with st.cv:
                 st.refreshing = False
@@ -318,7 +338,9 @@ def _refresh_user_accounts_worker(user_id: int):
 
 
 def schedule_user_refresh(user_id: int) -> None:
-    threading.Thread(target=_refresh_user_accounts_worker, args=(user_id,), daemon=True).start()
+    threading.Thread(
+        target=_refresh_user_accounts_worker, args=(user_id,), daemon=True
+    ).start()
 
 
 def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash: str):
@@ -396,7 +418,9 @@ def iter_refresh_steps_core(db: Session, *, acc: Account, api_id: int, api_hash:
         prev_checked = acc.last_checked_at
         if prev_checked and getattr(prev_checked, "tzinfo", None) is None:
             prev_checked = prev_checked.replace(tzinfo=UTC)
-        prev_checked_iso = prev_checked.isoformat(timespec="seconds") if prev_checked else None
+        prev_checked_iso = (
+            prev_checked.isoformat(timespec="seconds") if prev_checked else None
+        )
 
         acc.first_name = getattr(me, "first_name", None)
         acc.username = getattr(me, "username", None)

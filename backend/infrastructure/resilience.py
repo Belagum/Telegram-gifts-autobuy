@@ -9,15 +9,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
+from tenacity import (AsyncRetrying, RetryError, retry_if_exception_type,
+                      stop_after_attempt, wait_exponential)
+
 from backend.shared.config import load_config
 from backend.shared.logging import logger
-from tenacity import (
-    AsyncRetrying,
-    RetryError,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 _config = load_config()
 T = TypeVar("T")

@@ -11,7 +11,7 @@ from backend.domain.admin.repositories import AuditLogEntry, AuditLogRepository
 class GetAuditLogsUseCase:
     def __init__(self, audit_log_repo: AuditLogRepository) -> None:
         self._repo = audit_log_repo
-    
+
     def execute(
         self,
         *,
@@ -34,10 +34,9 @@ class GetAuditLogsUseCase:
             start_date=start_date,
             end_date=end_date,
         )
-    
+
     def get_all_actions(self) -> list[str]:
         return self._repo.get_all_actions()
 
 
 __all__ = ["GetAuditLogsUseCase"]
-

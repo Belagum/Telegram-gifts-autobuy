@@ -8,7 +8,8 @@ from datetime import UTC, datetime, timedelta
 
 from backend.domain.users.entities import SessionToken as DomainSessionToken
 from backend.domain.users.entities import User as DomainUser
-from backend.domain.users.repositories import SessionTokenRepository, UserRepository
+from backend.domain.users.repositories import (SessionTokenRepository,
+                                               UserRepository)
 from backend.infrastructure.db.models import SessionToken, User
 from backend.infrastructure.db.session import session_scope
 
@@ -42,7 +43,7 @@ class SqlAlchemyUserRepository(UserRepository):
         with session_scope() as session:
             row = User(username=user.username, password_hash=user.password_hash)
             session.add(row)
-            session.flush() 
+            session.flush()
             session.refresh(row)
             return DomainUser(
                 id=row.id,
@@ -58,9 +59,13 @@ class SqlAlchemySessionTokenRepository(SessionTokenRepository):
             session.query(SessionToken).filter(SessionToken.user_id == user_id).delete()
             token_value = secrets.token_urlsafe(48)
             expires_at = datetime.now(UTC) + timedelta(days=7)
-            row = SessionToken(user_id=user_id, token=token_value, expires_at=expires_at)
+            row = SessionToken(
+                user_id=user_id, token=token_value, expires_at=expires_at
+            )
             session.add(row)
-            return DomainSessionToken(user_id=user_id, token=token_value, expires_at=expires_at)
+            return DomainSessionToken(
+                user_id=user_id, token=token_value, expires_at=expires_at
+            )
 
     def revoke(self, token: str) -> None:
         with session_scope() as session:

@@ -5,15 +5,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from backend.application import (
-    AccountRepository,
-    ChannelRepository,
-    UserSettingsRepository,
-)
+from sqlalchemy.orm import Session, joinedload
+
+from backend.application import (AccountRepository, ChannelRepository,
+                                 UserSettingsRepository)
 from backend.domain import AccountSnapshot, ChannelFilter
 from backend.infrastructure.db.models import Account, Channel, UserSettings
 from backend.infrastructure.unit_of_work import unit_of_work_scope
-from sqlalchemy.orm import Session, joinedload
 
 
 class SqlAlchemyAccountRepository(AccountRepository):

@@ -9,26 +9,16 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from backend.domain import (
-    AccountSnapshot,
-    ChannelFilter,
-    GiftCandidate,
-    PurchaseOperation,
-    PurchasePlan,
-)
+from backend.domain import (AccountSnapshot, ChannelFilter, GiftCandidate,
+                            PurchaseOperation, PurchasePlan)
 from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import User, UserSettings
 from backend.shared.logging import logger
 
-from ..interfaces import (
-    AccountRepository,
-    ChannelRepository,
-    GiftPayload,
-    NotificationPort,
-    TelegramPort,
-    UserSettingsRepository,
-)
+from ..interfaces import (AccountRepository, ChannelRepository, GiftPayload,
+                          NotificationPort, TelegramPort,
+                          UserSettingsRepository)
 
 _INF_SUPPLY = 10**12
 
@@ -50,7 +40,9 @@ class AutobuyOutput:
 
 
 class AutobuyStats:
-    def __init__(self, channels: Sequence[ChannelFilter], accounts: Sequence[AccountSnapshot]):
+    def __init__(
+        self, channels: Sequence[ChannelFilter], accounts: Sequence[AccountSnapshot]
+    ):
         self._channels: dict[int, dict[str, Any]] = {
             c.channel_id: {
                 "row_id": c.id,
@@ -116,7 +108,9 @@ class AutobuyStats:
         )
         acc["planned"] += 1
 
-    def record_purchase(self, op: PurchaseOperation, *, balance_after: int, supply: int) -> None:
+    def record_purchase(
+        self, op: PurchaseOperation, *, balance_after: int, supply: int
+    ) -> None:
         purchased = {
             "gift_id": op.gift_id,
             "price": op.price,
@@ -301,7 +295,9 @@ class ChannelSelector:
         self, gift: GiftCandidate, forced_channel_id: int | None = None
     ) -> ChannelFilter | None:
         if forced_channel_id is not None:
-            return next((c for c in self._channels if c.channel_id == forced_channel_id), None)
+            return next(
+                (c for c in self._channels if c.channel_id == forced_channel_id), None
+            )
         matching = [c for c in self._channels if c.matches(gift)]
         if not matching:
             return None
@@ -343,14 +339,18 @@ class PurchasePlanner:
                 price = candidate.price
                 if remain_by_gift.get(gift_id, 0) <= 0:
                     continue
-                selector_forced_id = None if forced_channel_fallback else forced_channel_id
+                selector_forced_id = (
+                    None if forced_channel_fallback else forced_channel_id
+                )
                 channel = self._selector.best_for(candidate, selector_forced_id)
                 if channel is None:
                     if forced_channel_id is None:
                         self._stats.record_plan_skip(
                             gift_id,
                             "no_channel_match",
-                            details=[f"supply={candidate.total_supply} price={candidate.price}"],
+                            details=[
+                                f"supply={candidate.total_supply} price={candidate.price}"
+                            ],
                         )
                         continue
                     target_channel_id = forced_channel_id
@@ -399,7 +399,11 @@ class PurchasePlanner:
                     remain_by_gift[gift_id] -= 1
                     already += 1
                     already_by_account[(account.id, gift_id)] = already
-                    if budget < price or remain_by_gift[gift_id] <= 0 or already >= cap_total:
+                    if (
+                        budget < price
+                        or remain_by_gift[gift_id] <= 0
+                        or already >= cap_total
+                    ):
                         break
         return self._stats.plan
 
@@ -448,9 +452,13 @@ class ReportBuilder:
         total = len(considered)
         bought = sum(len(ch["purchased"]) for ch in stats.get("channels", {}).values())
         skipped = total - bought
-        lines.append(f"{self.CHART} Новых: {total} | Куплено: {bought} | Пропущено: {skipped}")
+        lines.append(
+            f"{self.CHART} Новых: {total} | Куплено: {bought} | Пропущено: {skipped}"
+        )
         if stats.get("plan_skips"):
-            lines.append(f"{self.SKIP} Пропуски на этапе планирования: {len(stats['plan_skips'])}")
+            lines.append(
+                f"{self.SKIP} Пропуски на этапе планирования: {len(stats['plan_skips'])}"
+            )
         lines.append("")
         lines.append(f"{self.BOX} По подаркам:")
         purchased_map: dict[int, list[dict]] = {}
@@ -463,10 +471,16 @@ class ReportBuilder:
         reasons: dict[int, list[dict]] = {}
         for cid, channel in stats.get("channels", {}).items():
             for row in channel.get("failed", []):
-                failures.setdefault(int(row.get("gift_id", 0)), []).append({"cid": int(cid), **row})
+                failures.setdefault(int(row.get("gift_id", 0)), []).append(
+                    {"cid": int(cid), **row}
+                )
             for row in channel.get("reasons", []):
-                reasons.setdefault(int(row.get("gift_id", 0)), []).append({"cid": int(cid), **row})
-        global_skips = {int(row.get("gift_id", 0)): row for row in stats.get("global_skips", [])}
+                reasons.setdefault(int(row.get("gift_id", 0)), []).append(
+                    {"cid": int(cid), **row}
+                )
+        global_skips = {
+            int(row.get("gift_id", 0)): row for row in stats.get("global_skips", [])
+        }
         plan_skips: dict[int, list[dict]] = {}
         for row in stats.get("plan_skips", []):
             plan_skips.setdefault(int(row.get("gift_id", 0)), []).append(row)
@@ -496,7 +510,9 @@ class ReportBuilder:
             printed_header = False
             if gid in reasons:
                 printed_header = True
-                lines.append(f"• {self.FAIL} {gid} | {price}{self.STAR} | supply={supply_str}")
+                lines.append(
+                    f"• {self.FAIL} {gid} | {price}{self.STAR} | supply={supply_str}"
+                )
                 for row in reasons[gid][:5]:
                     reason_line = (
                         f"   — причина ch={row['cid']}: {row.get('reason')} "
@@ -506,7 +522,9 @@ class ReportBuilder:
                     lines.append(reason_line)
             if gid in failures:
                 if not printed_header:
-                    lines.append(f"• {self.FAIL} {gid} | {price}{self.STAR} | supply={supply_str}")
+                    lines.append(
+                        f"• {self.FAIL} {gid} | {price}{self.STAR} | supply={supply_str}"
+                    )
                     printed_header = True
                 for row in failures[gid][:5]:
                     rpc = row.get("rpc")
@@ -521,7 +539,9 @@ class ReportBuilder:
                     )
             if gid in plan_skips:
                 if not printed_header:
-                    lines.append(f"• {self.SKIP} {gid} | {price}{self.STAR} | supply={supply_str}")
+                    lines.append(
+                        f"• {self.SKIP} {gid} | {price}{self.STAR} | supply={supply_str}"
+                    )
                     printed_header = True
                 for row in plan_skips[gid][:5]:
                     details = row.get("details")
@@ -596,7 +616,9 @@ class AutobuyUseCase:
         self._validator = GiftValidator()
         self._report = ReportBuilder()
 
-    async def execute_with_user_check(self, user_id: int, gifts: list[dict]) -> AutobuyOutput:
+    async def execute_with_user_check(
+        self, user_id: int, gifts: list[dict]
+    ) -> AutobuyOutput:
         session = SessionLocal()
         try:
             user = session.get(User, user_id)
@@ -620,7 +642,9 @@ class AutobuyUseCase:
             if settings and settings.buy_target_id is not None:
                 forced_channel_id = int(settings.buy_target_id)
             forced_channel_fallback = (
-                bool(getattr(settings, "buy_target_on_fail_only", False)) if settings else False
+                bool(getattr(settings, "buy_target_on_fail_only", False))
+                if settings
+                else False
             )
             if forced_channel_id is None:
                 forced_channel_fallback = False
@@ -694,11 +718,13 @@ class AutobuyUseCase:
                 )
         skipped = len(data.gifts) - len(purchased)
         deferred = list(stats_dict.get("deferred") or [])
-        
+
         purchased_count = len(purchased)
         total_spent = sum(p.get("price", 0) for p in purchased)
-        channels_used = list(set(p.get("channel_id") for p in purchased if p.get("channel_id")))
-        
+        channels_used = list(
+            set(p.get("channel_id") for p in purchased if p.get("channel_id"))
+        )
+
         audit_log(
             AuditAction.GIFTS_AUTOBUY_COMPLETED,
             user_id=data.user_id,
@@ -713,7 +739,7 @@ class AutobuyUseCase:
             },
             success=True,
         )
-        
+
         await self._send_reports(data.user_id, stats_dict, list(data.gifts))
         logger.bind(user_id=data.user_id).info(
             f"autobuy:summary purchased={len(purchased)} skipped={skipped} plan={len(plan)} "
@@ -733,13 +759,17 @@ class AutobuyUseCase:
             "plan": [],
         }
 
-    async def _load_balances(self, accounts: Sequence[AccountSnapshot]) -> list[AccountSnapshot]:
+    async def _load_balances(
+        self, accounts: Sequence[AccountSnapshot]
+    ) -> list[AccountSnapshot]:
         enriched: list[AccountSnapshot] = []
         for account in accounts:
             try:
                 balance = await self._telegram.fetch_balance(account)
             except Exception as exc:
-                logger.opt(exception=exc).debug(f"autobuy:balance_fail account_id={account.id}")
+                logger.opt(exception=exc).debug(
+                    f"autobuy:balance_fail account_id={account.id}"
+                )
                 balance = 0
             enriched.append(account.with_balance(balance))
         return enriched
@@ -764,7 +794,9 @@ class AutobuyUseCase:
             try:
                 await self._telegram.send_gift(op, account)
                 account.balance -= op.price
-                stats.record_purchase(op, balance_after=account.balance, supply=op.supply)
+                stats.record_purchase(
+                    op, balance_after=account.balance, supply=op.supply
+                )
             except Exception as exc:
                 reason = {"code": type(exc).__name__}
                 stats.record_failure(op, reason="send_gift_failed", rpc=reason)
@@ -774,7 +806,9 @@ class AutobuyUseCase:
                 )
             await asyncio.sleep(0)
 
-    async def _send_reports(self, user_id: int, stats: dict, considered: Sequence[dict]) -> None:
+    async def _send_reports(
+        self, user_id: int, stats: dict, considered: Sequence[dict]
+    ) -> None:
         token = (self._settings.get_bot_token(user_id) or "").strip()
         if not token:
             logger.info(f"autobuy:report_skipped user_id={user_id} reason=no_token")
@@ -785,7 +819,9 @@ class AutobuyUseCase:
             return
         chat_ids = await self._telegram.resolve_self_ids(accounts)
         if not chat_ids:
-            logger.info(f"autobuy:report_skipped user_id={user_id} reason=no_dm_targets")
+            logger.info(
+                f"autobuy:report_skipped user_id={user_id} reason=no_dm_targets"
+            )
             return
         lines = self._report.build(stats, considered)
         messages = self._split_messages(lines)

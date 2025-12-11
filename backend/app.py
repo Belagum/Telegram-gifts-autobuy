@@ -2,28 +2,42 @@
 # Copyright 2025 Vova Orig
 
 import atexit
+import importlib
 import os
 import threading
 from datetime import timedelta
 
 from flask import Flask
-from flask_cors import CORS
+from typing import Any, Protocol, cast
 
 from backend.infrastructure.admin_setup import setup_admin_user
 from backend.infrastructure.container import container
 from backend.infrastructure.db import SessionLocal, init_db
 from backend.infrastructure.db.models import User
-from backend.interfaces.http.controllers.accounts_controller import AccountsController
-from backend.interfaces.http.controllers.channels_controller import ChannelsController
-from backend.interfaces.http.controllers.gifts_controller import GiftsController
+from backend.interfaces.http.controllers.accounts_controller import \
+    AccountsController
+from backend.interfaces.http.controllers.channels_controller import \
+    ChannelsController
+from backend.interfaces.http.controllers.gifts_controller import \
+    GiftsController
 from backend.interfaces.http.controllers.misc_controller import MiscController
-from backend.interfaces.http.controllers.settings_controller import SettingsController
-from backend.services.gifts_service import GIFTS_THREADS, start_user_gifts, stop_user_gifts
+from backend.interfaces.http.controllers.settings_controller import \
+    SettingsController
+from backend.services.gifts_service import (GIFTS_THREADS, start_user_gifts,
+                                            stop_user_gifts)
 from backend.shared.config import load_config
 from backend.shared.logging import logger, setup_logging
 from backend.shared.middleware.csrf import configure_csrf
 from backend.shared.middleware.error_handler import configure_error_handling
 from backend.shared.middleware.request_logger import configure_request_logging
+
+class _CORSCallable(Protocol):
+    def __call__(self, app: Flask, **kwargs: Any) -> Any: ...
+
+
+_flask_cors = importlib.import_module("flask_cors")
+CORS = cast(_CORSCallable, _flask_cors.CORS)
+
 
 _config = load_config()
 _BOOTSTRAPPED = threading.Event()
@@ -32,7 +46,12 @@ _BOOTSTRAPPED = threading.Event()
 def _bootstrap_gifts_workers() -> int:
     db = SessionLocal()
     try:
-        ids = [uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh.is_(True)).all()]
+        ids = [
+            uid
+            for (uid,) in db.query(User.id)
+            .filter(User.gifts_autorefresh.is_(True))
+            .all()
+        ]
         for uid in ids:
             start_user_gifts(uid)
         logger.info(f"gifts.bootstrap: started {len(ids)} workers")
@@ -104,7 +123,7 @@ def create_app() -> Flask:
 
         resp.headers.setdefault(
             "Permissions-Policy",
-            "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()"
+            "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=()",
         )
 
         resp.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")

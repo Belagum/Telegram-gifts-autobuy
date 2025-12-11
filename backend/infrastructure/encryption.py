@@ -8,10 +8,12 @@ import os
 import sys
 from functools import lru_cache
 
-from backend.shared.logging import logger
 from cryptography.fernet import Fernet, InvalidToken
 
+from backend.shared.logging import logger
+
 _DEV_KEY_RAW = b"dev-key-for-local-dev-32-bytes!!"
+
 
 class EncryptionService:
     def __init__(self, key: bytes | None = None) -> None:
@@ -31,8 +33,8 @@ class EncryptionService:
                     (
                         "\n❌ CRITICAL: ENCRYPTION_KEY not set in production!\n"
                         "   Sensitive data cannot be encrypted without a key.\n"
-                        "   Generate one with: python -c \"from cryptography.fernet import Fernet; "
-                        "print(Fernet.generate_key().decode())\"\n"
+                        '   Generate one with: python -c "from cryptography.fernet import Fernet; '
+                        'print(Fernet.generate_key().decode())"\n'
                     ),
                     file=sys.stderr,
                 )
@@ -79,7 +81,9 @@ class EncryptionService:
         try:
             return self._fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
         except InvalidToken as exc:
-            raise ValueError("Failed to decrypt: invalid token or corrupted data") from exc
+            raise ValueError(
+                "Failed to decrypt: invalid token or corrupted data"
+            ) from exc
 
     @staticmethod
     def generate_key() -> str:

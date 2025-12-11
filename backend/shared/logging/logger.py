@@ -69,7 +69,7 @@ def setup_logging(level: str | None = None, debug_mode: bool = False) -> None:
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
     _logger.remove()
-    
+
     if debug_mode:
         console_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
@@ -78,7 +78,7 @@ def setup_logging(level: str | None = None, debug_mode: bool = False) -> None:
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
             "<lvl>{message}</lvl>"
         )
-        
+
         _logger.add(
             sys.stderr,
             level=level,
@@ -88,7 +88,7 @@ def setup_logging(level: str | None = None, debug_mode: bool = False) -> None:
             diagnose=True,
             filter=sanitize_record,
         )
-        
+
         _logger.add(
             log_file,
             level=level,
@@ -111,7 +111,7 @@ def setup_logging(level: str | None = None, debug_mode: bool = False) -> None:
             diagnose=False,
             filter=sanitize_record,
         )
-        
+
         _logger.add(
             log_file,
             level=level,

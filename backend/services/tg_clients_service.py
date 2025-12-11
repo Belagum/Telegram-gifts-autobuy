@@ -54,14 +54,21 @@ _IO_LOCK = threading.Lock()
 def _ensure_io_loop() -> asyncio.AbstractEventLoop:
     global _IO_LOOP, _IO_THREAD
     with _IO_LOCK:
-        if _IO_LOOP and not _IO_LOOP.is_closed() and _IO_THREAD and _IO_THREAD.is_alive():
+        if (
+            _IO_LOOP
+            and not _IO_LOOP.is_closed()
+            and _IO_THREAD
+            and _IO_THREAD.is_alive()
+        ):
             logger.debug(f"tg_clients: reuse io loop thread={_IO_THREAD.name}")
             return _IO_LOOP
         loop = asyncio.new_event_loop()
 
         def _runner() -> None:
             asyncio.set_event_loop(loop)
-            logger.debug(f"tg_clients: io loop running thread={threading.current_thread().name}")
+            logger.debug(
+                f"tg_clients: io loop running thread={threading.current_thread().name}"
+            )
             try:
                 loop.run_forever()
             finally:
@@ -95,7 +102,9 @@ def _ensure_session_directory(path: str) -> None:
         session_dir = os.path.dirname(os.path.abspath(path))
         if session_dir:
             os.makedirs(session_dir, exist_ok=True)
-            logger.debug(f"tg_clients: ensured session directory exists path={session_dir}")
+            logger.debug(
+                f"tg_clients: ensured session directory exists path={session_dir}"
+            )
     except OSError as e:
         logger.exception(
             f"tg_clients: failed to create session directory path={path} error={type(e).__name__}"
@@ -111,12 +120,22 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
         if not box:
             box = _Box(key, api_id, api_hash)
             _CLIENTS[key] = box
-            logger.debug(f"tg_clients: created client box path={box.path} api_id={box.api_id}")
-    if box.client and getattr(box.client, "is_connected", False) and _loop_alive(box.loop):
+            logger.debug(
+                f"tg_clients: created client box path={box.path} api_id={box.api_id}"
+            )
+    if (
+        box.client
+        and getattr(box.client, "is_connected", False)
+        and _loop_alive(box.loop)
+    ):
         logger.debug(f"tg_clients: reuse active client path={box.path}")
         return box
     with box.init_lock:
-        if box.client and getattr(box.client, "is_connected", False) and _loop_alive(box.loop):
+        if (
+            box.client
+            and getattr(box.client, "is_connected", False)
+            and _loop_alive(box.loop)
+        ):
             logger.debug(f"tg_clients: reuse active client after lock path={box.path}")
             return box
         io = _ensure_io_loop()
@@ -125,14 +144,16 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
         async def _start_once() -> None:
             logger.debug(f"tg_clients: starting pyrogram client path={box.path}")
             _ensure_session_directory(box.path)
-            c = Client(box.path, api_id=box.api_id, api_hash=box.api_hash, no_updates=True)
+            c = Client(
+                box.path, api_id=box.api_id, api_hash=box.api_hash, no_updates=True
+            )
             try:
                 await asyncio.wait_for(c.connect(), timeout=_START_TIMEOUT)
                 logger.debug(f"tg_clients: client connected path={box.path}")
-                
+
                 await asyncio.wait_for(c.initialize(), timeout=_START_TIMEOUT)
                 logger.debug(f"tg_clients: client initialized path={box.path}")
-                
+
                 try:
                     await asyncio.wait_for(c.get_me(), timeout=5.0)
                     logger.debug(f"tg_clients: session authorized path={box.path}")
@@ -153,7 +174,9 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
                 try:
                     await c.terminate()
                 except Exception:
-                    logger.debug(f"tg_clients: terminate after timeout failed path={box.path}")
+                    logger.debug(
+                        f"tg_clients: terminate after timeout failed path={box.path}"
+                    )
                 raise RuntimeError("pyrogram.initialize timeout") from e
             box.client = c
             box.call_lock = asyncio.Lock()
@@ -163,10 +186,14 @@ async def _ensure_started(path: str, api_id: int, api_hash: str) -> _Box:
             backoff = 0.2
             last_err: BaseException | None = None
             for attempt in range(1, _START_ATTEMPTS + 1):
-                logger.info(f"tg_clients: start attempt path={box.path} attempt={attempt}")
+                logger.info(
+                    f"tg_clients: start attempt path={box.path} attempt={attempt}"
+                )
                 try:
                     await _start_once()
-                    logger.info(f"tg_clients: start success path={box.path} attempt={attempt}")
+                    logger.info(
+                        f"tg_clients: start success path={box.path} attempt={attempt}"
+                    )
                     return
                 except sqlite3.OperationalError as e:
                     last_err = e
@@ -222,7 +249,9 @@ async def tg_call(
     op_timeout: float | None = None,
 ):
     op_name = (
-        getattr(op, "__qualname__", None) or getattr(op, "__name__", None) or op.__class__.__name__
+        getattr(op, "__qualname__", None)
+        or getattr(op, "__name__", None)
+        or op.__class__.__name__
     )
     logger.debug(
         f"tg_clients: call start path={os.path.abspath(path)} op={op_name} "
@@ -234,7 +263,9 @@ async def tg_call(
         or not box.client
         or not getattr(box.client, "is_connected", False)
     ):
-        logger.warning(f"tg_clients: client unhealthy path={box.path} op={op_name}, restarting")
+        logger.warning(
+            f"tg_clients: client unhealthy path={box.path} op={op_name}, restarting"
+        )
         box = await _ensure_started(path, api_id, api_hash)
 
     async def inner() -> Any:
@@ -257,7 +288,9 @@ async def tg_call(
             try:
                 result = await awaited
             except Exception:
-                logger.exception(f"tg_clients: call failed path={box.path} op={op_name}")
+                logger.exception(
+                    f"tg_clients: call failed path={box.path} op={op_name}"
+                )
                 raise
             box.last_call = asyncio.get_running_loop().time()
             logger.debug(f"tg_clients: call success path={box.path} op={op_name}")
@@ -273,7 +306,9 @@ async def tg_call(
         logger.debug(f"tg_clients: executing directly path={box.path} op={op_name}")
         return await inner()
     if not _loop_alive(box.loop):
-        logger.warning(f"tg_clients: loop not alive path={box.path} op={op_name}, restarting")
+        logger.warning(
+            f"tg_clients: loop not alive path={box.path} op={op_name}, restarting"
+        )
         box = await _ensure_started(path, api_id, api_hash)
     if box.loop is None:
         logger.error(f"tg_clients: loop missing path={box.path} op={op_name}")

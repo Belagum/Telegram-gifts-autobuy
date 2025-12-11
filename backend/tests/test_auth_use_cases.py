@@ -3,12 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+
 from backend.application.use_cases.users.login_user import LoginUserUseCase
 from backend.application.use_cases.users.logout_user import LogoutUserUseCase
-from backend.application.use_cases.users.register_user import RegisterUserUseCase
+from backend.application.use_cases.users.register_user import \
+    RegisterUserUseCase
 from backend.domain.users.entities import SessionToken, User
-from backend.domain.users.exceptions import InvalidCredentialsError, UserAlreadyExistsError
-from backend.domain.users.repositories import PasswordHasher, SessionTokenRepository, UserRepository
+from backend.domain.users.exceptions import (InvalidCredentialsError,
+                                             UserAlreadyExistsError)
+from backend.domain.users.repositories import (PasswordHasher,
+                                               SessionTokenRepository,
+                                               UserRepository)
 
 
 class InMemoryUserRepository(UserRepository):
@@ -18,6 +23,9 @@ class InMemoryUserRepository(UserRepository):
 
     def find_by_username(self, username: str) -> User | None:
         return self._users.get(username)
+
+    def find_by_id(self, user_id: int) -> User | None:
+        return next((user for user in self._users.values() if user.id == user_id), None)
 
     def add(self, user: User) -> User:
         new_user = User(
@@ -100,7 +108,9 @@ def test_login_user_success(
     )
     register.execute("alice", "secret123")
 
-    login = LoginUserUseCase(users=users, tokens=tokens, password_hasher=DeterministicHasher())
+    login = LoginUserUseCase(
+        users=users, tokens=tokens, password_hasher=DeterministicHasher()
+    )
     assert login.execute("alice", "secret123") == "token-1"
 
 
@@ -113,7 +123,9 @@ def test_login_user_invalid_credentials(
     )
     register.execute("alice", "secret123")
 
-    login = LoginUserUseCase(users=users, tokens=tokens, password_hasher=DeterministicHasher())
+    login = LoginUserUseCase(
+        users=users, tokens=tokens, password_hasher=DeterministicHasher()
+    )
     with pytest.raises(InvalidCredentialsError):
         login.execute("alice", "wrong")
 

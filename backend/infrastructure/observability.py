@@ -7,8 +7,9 @@ import time
 from collections.abc import Callable
 from contextlib import contextmanager
 
-from backend.shared.config import load_config
 from prometheus_client import Counter, Gauge, Histogram
+
+from backend.shared.config import load_config
 
 _config = load_config()
 

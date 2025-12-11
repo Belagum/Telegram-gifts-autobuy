@@ -18,7 +18,7 @@ class AuditLogsFilterDTO(BaseModel):
     success: bool | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -30,7 +30,7 @@ class AuditLogDTO(BaseModel):
     ip_address: str | None
     success: bool
     details: dict[str, Any]
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -39,7 +39,7 @@ class AuditLogListDTO(BaseModel):
     total: int
     limit: int
     offset: int
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -54,7 +54,7 @@ class SuspiciousActivityDTO(BaseModel):
     first_seen: datetime
     last_seen: datetime
     details: dict[str, Any]
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -65,7 +65,7 @@ class ErrorStatsDTO(BaseModel):
     first_error: datetime
     last_error: datetime
     sample_errors: list[str]
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -77,7 +77,7 @@ class UserInfoDTO(BaseModel):
     last_login: datetime | None
     is_locked: bool
     failed_attempts: int
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -90,13 +90,13 @@ class DashboardStatsDTO(BaseModel):
     active_sessions: int
     errors_last_7d: int
     most_active_users: list[dict[str, Any]]
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class ActionCategoriesDTO(BaseModel):
     actions: list[str]
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -110,4 +110,3 @@ __all__ = [
     "DashboardStatsDTO",
     "ActionCategoriesDTO",
 ]
-

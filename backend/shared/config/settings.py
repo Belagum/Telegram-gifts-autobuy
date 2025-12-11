@@ -6,7 +6,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, field_validator,
+                      model_validator)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,7 +21,9 @@ class DatabaseConfig(BaseModel):
 
 
 class CacheConfig(BaseModel):
-    directory: Path = Field(Path("backend/instance/gifts_cache"), alias="GIFTS_CACHE_DIR")
+    directory: Path = Field(
+        Path("backend/instance/gifts_cache"), alias="GIFTS_CACHE_DIR"
+    )
     ttl_seconds: int = Field(3600, ge=1, alias="CACHE_TTL")
 
     model_config = ConfigDict(validate_by_name=True)
@@ -84,7 +87,11 @@ class SecurityConfig(BaseModel):
         return value
 
     @field_validator(
-        "cookie_secure", "enable_csrf", "enable_rate_limit", "enable_hsts", mode="before"
+        "cookie_secure",
+        "enable_csrf",
+        "enable_rate_limit",
+        "enable_hsts",
+        mode="before",
     )
     @classmethod
     def _parse_bool(cls, value: str | bool) -> bool:
@@ -130,7 +137,9 @@ class AppConfig(BaseSettings):
     cache: CacheConfig = Field(default_factory=_cache_config_factory)
     queue: QueueConfig = Field(default_factory=_queue_config_factory)
     resilience: ResilienceConfig = Field(default_factory=_resilience_config_factory)
-    observability: ObservabilityConfig = Field(default_factory=_observability_config_factory)
+    observability: ObservabilityConfig = Field(
+        default_factory=_observability_config_factory
+    )
     security: SecurityConfig = Field(default_factory=_security_config_factory)
 
     model_config = SettingsConfigDict(
@@ -163,7 +172,7 @@ class AppConfig(BaseSettings):
                 (
                     "\n❌ CRITICAL SECURITY ERROR: Insecure SECRET_KEY detected in production!\n"
                     "   SECRET_KEY must be a strong random value in production.\n"
-                    "   Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"\n"
+                    '   Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"\n'
                 ),
                 file=sys.stderr,
             )
@@ -196,7 +205,7 @@ class AppConfig(BaseSettings):
 
 @lru_cache(maxsize=1)
 def load_config() -> AppConfig:
-    return AppConfig()  
+    return AppConfig()  # type: ignore[call-arg]
 
 
 __all__ = ["AppConfig", "load_config"]

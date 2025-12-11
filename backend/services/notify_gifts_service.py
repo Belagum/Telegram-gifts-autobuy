@@ -26,7 +26,9 @@ _STICKERS_DIR = os.path.join(str(_config.gifts_dir), "stickers")
 def _collect_targets() -> list[tuple[int, str, int]]:
     db: Session = SessionLocal()
     try:
-        uids = [uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh).all()]
+        uids = [
+            uid for (uid,) in db.query(User.id).filter(User.gifts_autorefresh).all()
+        ]
         out: list[tuple[int, str, int]] = []
         for uid in uids:
             s = db.get(UserSettings, uid)
@@ -66,15 +68,21 @@ async def _ensure_cached(http: httpx.AsyncClient, token: str, g: dict) -> str | 
         get_file_url = f"{base}/getFile"
         payload = {"file_id": fid}
         r = await http.post(get_file_url, json=payload)
-        logger.info(f"notify:req getFile url={get_file_url} json={payload} -> code={r.status_code}")
+        logger.info(
+            f"notify:req getFile url={get_file_url} json={payload} -> code={r.status_code}"
+        )
         if r.status_code != 200 or not r.json().get("ok", False):
-            logger.warning(f"notify:getFile fail code={r.status_code} body={r.text[:200]}")
+            logger.warning(
+                f"notify:getFile fail code={r.status_code} body={r.text[:200]}"
+            )
             return None
         file_path = r.json()["result"]["file_path"]
         url = f"https://api.telegram.org/file/bot{token}/{file_path}"
         got = await http.get(url)
         size = len(got.content) if got.content else 0
-        logger.info(f"notify:req file GET url={url} -> code={got.status_code} size={size}")
+        logger.info(
+            f"notify:req file GET url={url} -> code={got.status_code} size={size}"
+        )
         if got.status_code != 200 or not got.content:
             logger.warning(f"notify:file dl fail code={got.status_code} size={size}")
             return None
@@ -89,7 +97,9 @@ async def _ensure_cached(http: httpx.AsyncClient, token: str, g: dict) -> str | 
         return None
 
 
-async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict) -> bool:
+async def _send_sticker(
+    http: httpx.AsyncClient, token: str, chat: int, g: dict
+) -> bool:
     path = await _ensure_cached(http, token, g)
     if not path:
         logger.warning(f"notify:no cache gift_id={g.get('id')}")
@@ -101,9 +111,7 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
         else (
             "video/webm"
             if path.endswith(".webm")
-            else "image/webp"
-            if path.endswith(".webp")
-            else "application/octet-stream"
+            else "image/webp" if path.endswith(".webp") else "application/octet-stream"
         )
     )
     try:
@@ -119,10 +127,16 @@ async def _send_sticker(http: httpx.AsyncClient, token: str, chat: int, g: dict)
         )
         r = await http.post(send_url, data=data, files=files)
         raw_payload = r.json()
-        ok_flag = bool(raw_payload.get("ok", False)) if isinstance(raw_payload, dict) else False
+        ok_flag = (
+            bool(raw_payload.get("ok", False))
+            if isinstance(raw_payload, dict)
+            else False
+        )
         ok = bool(r.status_code == 200 and ok_flag)
         if not ok:
-            logger.warning(f"notify:sendSticker fail code={r.status_code} body={r.text[:200]}")
+            logger.warning(
+                f"notify:sendSticker fail code={r.status_code} body={r.text[:200]}"
+            )
         else:
             logger.info(f"notify:sticker ok chat={chat} gift_id={g.get('id')}")
         return ok
@@ -144,7 +158,11 @@ def _gift_text(g: dict, chat: int) -> str:
         a = avail_total if isinstance(avail_total, int) else None
         r = pu_rem if isinstance(pu_rem, int) else None
         pu_av = (
-            (min(a, r) if (a is not None and r is not None) else (r if r is not None else a))
+            (
+                min(a, r)
+                if (a is not None and r is not None)
+                else (r if r is not None else a)
+            )
             if lpu
             else (avail_total if lim else None)
         )
@@ -173,7 +191,9 @@ def _gift_text(g: dict, chat: int) -> str:
     return "\n".join(lines)
 
 
-async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, g: dict) -> None:
+async def _notify_one(
+    http: httpx.AsyncClient, uid: int, token: str, chat: int, g: dict
+) -> None:
     base = f"https://api.telegram.org/bot{token}"
     try:
         chat = int(chat)
@@ -186,12 +206,18 @@ async def _notify_one(http: httpx.AsyncClient, uid: int, token: str, chat: int, 
     except Exception:
         logger.exception("notify:sticker pipeline")
     try:
-        payload = {"chat_id": chat, "text": _gift_text(g, chat), "disable_notification": True}
+        payload = {
+            "chat_id": chat,
+            "text": _gift_text(g, chat),
+            "disable_notification": True,
+        }
         send_msg_url = f"{base}/sendMessage"
         logger.info(f"notify:req sendMessage url={send_msg_url} json={payload}")
         r = await http.post(send_msg_url, json=payload)
         if r.status_code != 200 or not r.json().get("ok", False):
-            logger.warning(f"notify:sendMessage fail code={r.status_code} body={r.text[:200]}")
+            logger.warning(
+                f"notify:sendMessage fail code={r.status_code} body={r.text[:200]}"
+            )
         else:
             logger.info(f"notify:text ok chat={chat} gift_id={g.get('id')}")
     except Exception:
@@ -248,7 +274,9 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
         logger.exception("notify:failed to fetch tokens from DB")
 
     uids = sorted({u for u, _, _ in targets} | set(token_by_uid.keys()))
-    logger.info(f"notify:gifts={len(gifts)} targets={len(targets)} uids_for_dm={len(uids)}")
+    logger.info(
+        f"notify:gifts={len(gifts)} targets={len(targets)} uids_for_dm={len(uids)}"
+    )
 
     dm_ids_by_uid: dict[int, list[int]] = {}
     if uids:
@@ -273,7 +301,9 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
 
             for g in gifts:
                 try:
-                    logger.info(f"notify:try (channel) uid={uid} chat={chat} gift_id={g.get('id')}")
+                    logger.info(
+                        f"notify:try (channel) uid={uid} chat={chat} gift_id={g.get('id')}"
+                    )
                     await _notify_one(http, uid, token, chat, g)
                     sent += 1
                 except Exception:
@@ -284,7 +314,8 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
 
         for uid in uids:
             token = (
-                token_by_uid.get(uid) or next((t for (u, t, _) in targets if u == uid and t), "")
+                token_by_uid.get(uid)
+                or next((t for (u, t, _) in targets if u == uid and t), "")
             ).strip()
             if not token:
                 logger.warning(f"notify:no token for uid={uid} (dm stage)")

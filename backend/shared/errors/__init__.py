@@ -1,32 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Vova Orig
 
-from .base import (
-    AccountNotFoundError,
-    ApiProfileMissingError,
-    AppError,
-    BadChannelIdError,
-    BadTgsError,
-    ChannelNotFoundError,
-    DomainError,
-    DuplicateChannelError,
-    GiftNotFoundError,
-    GiftUnavailableError,
-    InfrastructureError,
-    InsufficientBalanceError,
-    InvalidAccountIdError,
-    InvalidBotTokenError,
-    InvalidBuyTargetIdError,
-    InvalidChatIdError,
-    InvalidFallbackError,
-    InvalidGiftIdError,
-    InvalidNotifyChatIdError,
-    InvalidTargetIdError,
-    PeerIdInvalidError,
-    TargetIdInvalidError,
-    TargetIdRequiredError,
-    ValidationError,
-)
+from .base import (AccountNotFoundError, ApiProfileMissingError, AppError,
+                   BadChannelIdError, BadTgsError, ChannelNotFoundError,
+                   DomainError, DuplicateChannelError, GiftNotFoundError,
+                   GiftUnavailableError, InfrastructureError,
+                   InsufficientBalanceError, InvalidAccountIdError,
+                   InvalidBotTokenError, InvalidBuyTargetIdError,
+                   InvalidChatIdError, InvalidFallbackError,
+                   InvalidGiftIdError, InvalidNotifyChatIdError,
+                   InvalidTargetIdError, PeerIdInvalidError,
+                   TargetIdInvalidError, TargetIdRequiredError,
+                   ValidationError)
 from .http import handle_app_error, register_error_handler
 from .validation import format_pydantic_errors, raise_validation_error
 from .validation_types import ValidationErrorType

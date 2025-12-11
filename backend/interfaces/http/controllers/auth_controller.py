@@ -8,15 +8,16 @@ from pydantic import ValidationError
 
 from backend.application.use_cases.users.login_user import LoginUserUseCase
 from backend.application.use_cases.users.logout_user import LogoutUserUseCase
-from backend.application.use_cases.users.register_user import RegisterUserUseCase
+from backend.application.use_cases.users.register_user import \
+    RegisterUserUseCase
 from backend.infrastructure.audit import AuditAction, audit_log
-from backend.interfaces.http.dto.auth import AuthSuccessDTO, LoginRequestDTO, RegisterRequestDTO
+from backend.interfaces.http.dto.auth import (AuthSuccessDTO, LoginRequestDTO,
+                                              RegisterRequestDTO)
 from backend.shared.config import load_config
 from backend.shared.errors.validation import raise_validation_error
 from backend.shared.logging import logger
-from backend.shared.middleware.csrf import (
-    configure_csrf,  # noqa: F401 (import side-effect for type hints)
-)
+from backend.shared.middleware.csrf import \
+    configure_csrf  # noqa: F401 (import side-effect for type hints)
 from backend.shared.middleware.rate_limit import rate_limit
 
 
@@ -45,9 +46,9 @@ class AuthController:
             dto = RegisterRequestDTO.model_validate(request.get_json(silent=True) or {})
         except ValidationError as exc:
             raise_validation_error(exc)
-        
+
         user, token = self._register_use_case.execute(dto.username, dto.password)
-        
+
         audit_log(
             AuditAction.REGISTER,
             user_id=user.id,
@@ -55,7 +56,7 @@ class AuthController:
             details={"username": dto.username},
             success=True,
         )
-        
+
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
         config = load_config()
@@ -91,14 +92,14 @@ class AuthController:
             dto = LoginRequestDTO.model_validate(request.get_json(silent=True) or {})
         except ValidationError as exc:
             raise_validation_error(exc)
-        
+
         ip_address = _get_client_ip()
-        
+
         try:
             token = self._login_use_case.execute(dto.username, dto.password, ip_address)
             audit_log(
                 AuditAction.LOGIN_SUCCESS,
-                user_id=None,  
+                user_id=None,
                 ip_address=ip_address,
                 details={"username": dto.username, "remember_me": dto.remember_me},
                 success=True,
@@ -112,7 +113,7 @@ class AuthController:
                 success=False,
             )
             raise
-        
+
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
 
@@ -141,7 +142,9 @@ class AuthController:
                 secure=config.security.cookie_secure,
                 max_age=60 * 60 * 24 * 7,
             )
-        logger.info(f"auth.login: ok username={dto.username} remember_me={dto.remember_me}")
+        logger.info(
+            f"auth.login: ok username={dto.username} remember_me={dto.remember_me}"
+        )
         return response, 200
 
     def logout(self) -> tuple[Response, int]:
@@ -151,17 +154,17 @@ class AuthController:
             token = auth_header[7:]
         if not token:
             token = request.cookies.get("auth_token", "")
-        
+
         self._logout_use_case.execute(token)
-        
+
         audit_log(
             AuditAction.LOGOUT,
-            user_id=None,  
+            user_id=None,
             ip_address=_get_client_ip(),
             details={},
             success=True,
         )
-        
+
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
         response.delete_cookie("auth_token")

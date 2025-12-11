@@ -35,7 +35,9 @@ class ChannelFilter:
     @staticmethod
     def _validate_range(name: str, low: int | None, high: int | None) -> None:
         if low is not None and high is not None and low > high:
-            raise InvariantViolation(f"{name} min must be <= {name} max", field=f"{name}_min")
+            raise InvariantViolation(
+                f"{name} min must be <= {name} max", field=f"{name}_min"
+            )
 
     def matches(self, gift: GiftCandidate) -> bool:
         return all(
@@ -71,7 +73,9 @@ class GiftCandidate:
         if self.total_supply < 0:
             raise InvariantViolation("total supply must be >= 0", field="total_supply")
         if self.available_amount < 0:
-            raise InvariantViolation("available amount must be >= 0", field="available_amount")
+            raise InvariantViolation(
+                "available amount must be >= 0", field="available_amount"
+            )
         if self.per_user_cap < 0:
             raise InvariantViolation("per user cap must be >= 0", field="per_user_cap")
 

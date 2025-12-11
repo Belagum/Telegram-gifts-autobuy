@@ -8,16 +8,13 @@ from sqlalchemy.orm import Session
 
 from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.auth import auth_required, authed_request
-from backend.services.settings_service import read_user_settings, set_user_settings
-from backend.shared.errors import (
-    InfrastructureError,
-    InvalidBotTokenError,
-    InvalidBuyTargetIdError,
-    InvalidChatIdError,
-    InvalidFallbackError,
-    InvalidNotifyChatIdError,
-    InvalidTargetIdError,
-)
+from backend.services.settings_service import (read_user_settings,
+                                               set_user_settings)
+from backend.shared.errors import (InfrastructureError, InvalidBotTokenError,
+                                   InvalidBuyTargetIdError, InvalidChatIdError,
+                                   InvalidFallbackError,
+                                   InvalidNotifyChatIdError,
+                                   InvalidTargetIdError)
 from backend.shared.logging import logger
 from backend.shared.middleware.csrf import csrf_protect
 
@@ -26,7 +23,10 @@ class SettingsController:
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("settings", __name__, url_prefix="/api")
         bp.add_url_rule(
-            "/settings", view_func=self.get_settings, methods=["GET"], endpoint="settings_get"
+            "/settings",
+            view_func=self.get_settings,
+            methods=["GET"],
+            endpoint="settings_get",
         )
         bp.add_url_rule(
             "/settings",
@@ -63,8 +63,8 @@ class SettingsController:
             settings = set_user_settings(
                 user_id, (token or "").strip() or None, chat, target, fallback
             )
-            
-            changed_fields = {}
+
+            changed_fields: dict[str, str | int | bool | None] = {}
             if token is not None:
                 changed_fields["bot_token"] = "***" if token else "removed"
             if chat is not None:
@@ -73,7 +73,7 @@ class SettingsController:
                 changed_fields["buy_target_id"] = target
             if fallback is not None:
                 changed_fields["buy_target_on_fail_only"] = fallback
-            
+
             audit_log(
                 AuditAction.SETTINGS_UPDATED,
                 user_id=user_id,

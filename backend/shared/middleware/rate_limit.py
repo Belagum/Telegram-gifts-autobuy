@@ -22,7 +22,9 @@ class InMemoryRateLimiter:
     def __init__(self, limit: int, window_seconds: float) -> None:
         self._limit = max(1, int(limit))
         self._window = max(0.1, float(window_seconds))
-        self._buckets: dict[str, Bucket] = defaultdict(lambda: Bucket(deque(maxlen=self._limit)))
+        self._buckets: dict[str, Bucket] = defaultdict(
+            lambda: Bucket(deque(maxlen=self._limit))
+        )
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()

@@ -46,7 +46,7 @@ class LoginNotFoundError(LoginError):
         super().__init__(
             message=f"Login session not found: {login_id}",
             error_code="login_id_not_found",
-            context={"login_id": login_id}
+            context={"login_id": login_id},
         )
 
 
@@ -55,6 +55,5 @@ class ApiProfileNotFoundError(LoginError):
         super().__init__(
             message=f"API Profile {api_profile_id} not found for user {user_id}",
             error_code="api_profile_not_found",
-            context={"user_id": user_id, "api_profile_id": api_profile_id}
+            context={"user_id": user_id, "api_profile_id": api_profile_id},
         )
-

@@ -46,7 +46,7 @@ class SuspiciousActivity:
 
 
 @dataclass
-class ErrorStats:   
+class ErrorStats:
     ip_address: str | None
     error_count: int
     unique_actions: int
@@ -70,35 +70,33 @@ class AuditLogRepository(ABC):
         end_date: datetime | None = None,
     ) -> tuple[list[AuditLogEntry], int]:
         pass
-    
+
     @abstractmethod
     def get_by_user(self, user_id: int, limit: int = 100) -> list[AuditLogEntry]:
         pass
-    
+
     @abstractmethod
     def get_by_action(self, action: str, limit: int = 100) -> list[AuditLogEntry]:
         pass
-    
+
     @abstractmethod
-    def get_all_actions(self) -> list[str]: 
+    def get_all_actions(self) -> list[str]:
         pass
 
 
-class AdminRepository(ABC):    
+class AdminRepository(ABC):
     @abstractmethod
-    def get_suspicious_activities(
-        self, limit: int = 50
-    ) -> list[SuspiciousActivity]:
+    def get_suspicious_activities(self, limit: int = 50) -> list[SuspiciousActivity]:
         pass
-    
+
     @abstractmethod
     def get_error_stats(self, limit: int = 50) -> list[ErrorStats]:
         pass
-    
+
     @abstractmethod
     def list_users(self) -> list[UserInfo]:
         pass
-    
+
     @abstractmethod
     def get_dashboard_stats(self) -> dict[str, Any]:
         pass
@@ -112,4 +110,3 @@ __all__ = [
     "AuditLogRepository",
     "AdminRepository",
 ]
-

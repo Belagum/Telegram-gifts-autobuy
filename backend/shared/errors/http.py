@@ -23,7 +23,6 @@ def register_error_handler(
     app, *, default_status: HTTPStatus = HTTPStatus.INTERNAL_SERVER_ERROR
 ) -> None:
 
-
     config = load_config()
     debug_mode = config.debug_logging
 
@@ -38,7 +37,7 @@ def register_error_handler(
     @app.errorhandler(Exception)
     def _handle_unexpected(exc: Exception):
         from flask import g, request
-        
+
         x_forwarded_for = request.headers.get("X-Forwarded-For")
         ip_address = (
             x_forwarded_for.split(",")[0].strip()
@@ -46,7 +45,7 @@ def register_error_handler(
             else (request.remote_addr or "unknown")
         )
         user_id = getattr(g, "user_id", None)
-        
+
         if debug_mode:
             logger.exception(
                 f"Unhandled exception: {request.method} {request.path} "
@@ -54,7 +53,9 @@ def register_error_handler(
                 f"query={dict(request.args)}, body_size={len(request.data)}"
             )
         else:
-            logger.error(f"Error: {type(exc).__name__} on {request.method} {request.path}")
-        
+            logger.error(
+                f"Error: {type(exc).__name__} on {request.method} {request.path}"
+            )
+
         response = jsonify({"error": "internal_error"})
         return response, default_status

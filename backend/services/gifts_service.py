@@ -91,7 +91,11 @@ async def _list_gifts_for_account_persist(
     gifts = cast(
         list[Any],
         await tg_call(
-            session_path, api_id, api_hash, lambda c: c.get_available_gifts(), min_interval=0.8
+            session_path,
+            api_id,
+            api_hash,
+            lambda c: c.get_available_gifts(),
+            min_interval=0.8,
         ),
     )
     out: list[dict[str, Any]] = []
@@ -106,7 +110,9 @@ def _normalize_gift(gift: Any) -> dict[str, Any]:
     sticker = getattr(gift, "sticker", None)
 
     is_limited = bool(getattr(gift, "is_limited", False))
-    available_amount = _safe_int(getattr(gift, "available_amount", None)) if is_limited else None
+    available_amount = (
+        _safe_int(getattr(gift, "available_amount", None)) if is_limited else None
+    )
 
     limited_per_user = bool(getattr(raw, "limited_per_user", False))
     per_user_remains = (
@@ -170,7 +176,11 @@ def _to_iso_utc(value: Any) -> str | None:
         dt = value if value.tzinfo else value.replace(tzinfo=UTC)
         return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
     if isinstance(value, int | float):
-        return datetime.fromtimestamp(float(value), tz=UTC).isoformat().replace("+00:00", "Z")
+        return (
+            datetime.fromtimestamp(float(value), tz=UTC)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
     if isinstance(value, str):
         cleaned = value.strip()
         return cleaned or None
@@ -231,7 +241,11 @@ async def _worker_async(uid: int) -> None:
             a = accs[i]
             try:
                 disk_items = read_json_list_of_dicts(_gifts_path(uid))
-                prev_ids = {int(x.get("id", 0)) for x in disk_items if isinstance(x.get("id"), int)}
+                prev_ids = {
+                    int(x.get("id", 0))
+                    for x in disk_items
+                    if isinstance(x.get("id"), int)
+                }
                 gifts = await _list_gifts_for_account_persist(
                     a.session_path, a.api_profile.api_id, a.api_profile.api_hash
                 )
@@ -257,11 +271,14 @@ async def _worker_async(uid: int) -> None:
                 last_hash = new_hash
                 write_json_list(_gifts_path(uid), merged_all)
                 gifts_event_bus.publish(
-                    uid, {"items": merged_all, "count": len(merged_all), "hash": new_hash}
+                    uid,
+                    {"items": merged_all, "count": len(merged_all), "hash": new_hash},
                 )
 
                 if added:
-                    logger.info(f"gifts.worker: parallel start buy&notify items={len(added)}")
+                    logger.info(
+                        f"gifts.worker: parallel start buy&notify items={len(added)}"
+                    )
 
                     buy_task = asyncio.create_task(
                         container.autobuy_use_case.execute_with_user_check(uid, added)
@@ -290,7 +307,9 @@ async def _worker_async(uid: int) -> None:
                         }
                         stats = cast(dict[str, Any], res.get("stats") or {})
                     elif isinstance(buy_res, BaseException):
-                        logger.error(f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}")
+                        logger.error(
+                            f"gifts.autobuy failed: {type(buy_res).__name__}: {buy_res}"
+                        )
 
                     if isinstance(notify_res, BaseException):
                         notify_error = (
@@ -385,7 +404,12 @@ def refresh_once(uid: int) -> list[dict[str, Any]]:
     _ensure_dir()
     db: Session = SessionLocal()
     try:
-        acc = db.query(Account).filter(Account.user_id == uid).order_by(Account.id.asc()).first()
+        acc = (
+            db.query(Account)
+            .filter(Account.user_id == uid)
+            .order_by(Account.id.asc())
+            .first()
+        )
         if not acc:
             raise NoAccountsError("no_accounts")
         gifts = asyncio.run(

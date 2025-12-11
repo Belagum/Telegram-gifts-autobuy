@@ -16,35 +16,25 @@ from queue import Queue
 from typing import Any, cast
 
 import httpx
-from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
+from flask import (Blueprint, Response, current_app, jsonify, request,
+                   stream_with_context)
 from sqlalchemy.orm import Session, joinedload
 
 from backend.infrastructure.audit import AuditAction, audit_log
 from backend.infrastructure.auth import auth_required, authed_request
 from backend.infrastructure.db.models import Account, User, UserSettings
-from backend.services.gifts_service import (
-    NoAccountsError,
-    gifts_event_bus,
-    read_user_gifts,
-    refresh_once,
-    start_user_gifts,
-    stop_user_gifts,
-)
+from backend.services.gifts_service import (NoAccountsError, gifts_event_bus,
+                                            read_user_gifts, refresh_once,
+                                            start_user_gifts, stop_user_gifts)
 from backend.services.tg_clients_service import tg_call
-from backend.shared.errors import (
-    AccountNotFoundError,
-    ApiProfileMissingError,
-    BadTgsError,
-    GiftNotFoundError,
-    GiftUnavailableError,
-    InfrastructureError,
-    InsufficientBalanceError,
-    InvalidAccountIdError,
-    InvalidGiftIdError,
-    PeerIdInvalidError,
-    TargetIdInvalidError,
-    TargetIdRequiredError,
-)
+from backend.shared.errors import (AccountNotFoundError,
+                                   ApiProfileMissingError, BadTgsError,
+                                   GiftNotFoundError, GiftUnavailableError,
+                                   InfrastructureError,
+                                   InsufficientBalanceError,
+                                   InvalidAccountIdError, InvalidGiftIdError,
+                                   PeerIdInvalidError, TargetIdInvalidError,
+                                   TargetIdRequiredError)
 from backend.shared.logging import logger
 from backend.shared.middleware.csrf import csrf_protect
 from backend.shared.utils.asyncio_utils import run_async as _run_async
@@ -82,7 +72,11 @@ async def _botapi_download(file_id: str, token: str) -> bytes:
         response = await http.get(f"{api}/getFile", params={"file_id": file_id})
         response.raise_for_status()
         payload = response.json()
-        if not (payload.get("ok") and payload.get("result") and payload["result"].get("file_path")):
+        if not (
+            payload.get("ok")
+            and payload.get("result")
+            and payload["result"].get("file_path")
+        ):
             raise RuntimeError("getFile error")
         file_path = payload["result"]["file_path"]
         response2 = await http.get(f"{base}/{file_path}", follow_redirects=True)
@@ -177,7 +171,9 @@ def _convert_gift_ids_to_strings(gifts: list[dict[str, Any]]) -> list[dict[str, 
 class GiftsController:
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("gifts", __name__, url_prefix="/api")
-        bp.add_url_rule("/gifts", view_func=self.list_gifts, methods=["GET"], endpoint="gifts_list")
+        bp.add_url_rule(
+            "/gifts", view_func=self.list_gifts, methods=["GET"], endpoint="gifts_list"
+        )
         bp.add_url_rule(
             "/gifts/refresh",
             view_func=self.refresh_gifts,
@@ -231,7 +227,7 @@ class GiftsController:
             try:
                 user_id = authed_request().user_id
                 items = refresh_once(user_id)
-                
+
                 audit_log(
                     AuditAction.GIFTS_REFRESH,
                     user_id=user_id,
@@ -239,7 +235,7 @@ class GiftsController:
                     details={"items_count": len(items)},
                     success=True,
                 )
-                
+
                 return jsonify({"items": _convert_gift_ids_to_strings(items)})
             except NoAccountsError:
                 return jsonify({"error": "no_accounts"}), 409
@@ -307,7 +303,8 @@ class GiftsController:
             (
                 row
                 for row in items
-                if isinstance(row.get("id"), int) and int(row.get("id", 0)) == gift_id_int
+                if isinstance(row.get("id"), int)
+                and int(row.get("id", 0)) == gift_id_int
             ),
             None,
         )
@@ -323,7 +320,9 @@ class GiftsController:
         lock_value = None
         if isinstance(locks, dict):
             lock_value = locks.get(str(account_id)) or locks.get(account_id)
-        lock_until = _parse_iso_to_utc(lock_value if isinstance(lock_value, str) else None)
+        lock_until = _parse_iso_to_utc(
+            lock_value if isinstance(lock_value, str) else None
+        )
         now_utc = datetime.now(UTC)
         if lock_until and lock_until > now_utc:
             remaining_seconds = int((lock_until - now_utc).total_seconds())
@@ -337,12 +336,16 @@ class GiftsController:
             }
             return jsonify(payload), 409
 
-        if bool(gift.get("require_premium")) and not bool(getattr(account, "is_premium", False)):
+        if bool(gift.get("require_premium")) and not bool(
+            getattr(account, "is_premium", False)
+        ):
             return jsonify({"error": "requires_premium"}), 409
 
         async def _send_once() -> None:
             async def _call(client):
-                return await client.send_gift(chat_id=int(target_id), gift_id=gift_id_int)
+                return await client.send_gift(
+                    chat_id=int(target_id), gift_id=gift_id_int
+                )
 
             await tg_call(
                 account.session_path,
@@ -359,7 +362,7 @@ class GiftsController:
                 f"gifts.buy failed user_id={user_id} gift_id={gift_id} account_id={account_id} "
                 f"target_id={target_id}"
             )
-            
+
             audit_log(
                 AuditAction.GIFT_SEND_FAILED,
                 user_id=user_id,
@@ -372,13 +375,14 @@ class GiftsController:
                 },
                 success=False,
             )
-            
+
             message = (str(exc) or "").upper()
             if "BALANCE_TOO_LOW" in message:
                 try:
+
                     async def _get_balance(client):
                         return await client.get_stars_balance()
-                    
+
                     balance = int(
                         _run_async(
                             tg_call(
@@ -407,7 +411,7 @@ class GiftsController:
             f"gifts.buy success user_id={user_id} gift_id={gift_id} account_id={account_id} "
             f"target_id={target_id}"
         )
-        
+
         audit_log(
             AuditAction.GIFT_SENT,
             user_id=user_id,
@@ -471,7 +475,9 @@ class GiftsController:
         user = db.get(User, authed_request().user_id)
         if not user:
             return jsonify({"error": "not_found"}), 404
-        return jsonify({"auto_refresh": bool(getattr(user, "gifts_autorefresh", False))})
+        return jsonify(
+            {"auto_refresh": bool(getattr(user, "gifts_autorefresh", False))}
+        )
 
     @auth_required
     @csrf_protect
@@ -484,8 +490,12 @@ class GiftsController:
             return jsonify({"error": "not_found"}), 404
         user.gifts_autorefresh = enabled
         db.commit()
-        
-        action = AuditAction.GIFTS_AUTO_REFRESH_ENABLED if enabled else AuditAction.GIFTS_AUTO_REFRESH_DISABLED
+
+        action = (
+            AuditAction.GIFTS_AUTO_REFRESH_ENABLED
+            if enabled
+            else AuditAction.GIFTS_AUTO_REFRESH_DISABLED
+        )
         audit_log(
             action,
             user_id=user_id,
@@ -493,7 +503,7 @@ class GiftsController:
             details={"auto_refresh": enabled},
             success=True,
         )
-        
+
         if enabled:
             start_user_gifts(user_id)
         else:
@@ -521,7 +531,9 @@ class GiftsController:
                         event = queue.get(timeout=10.0)
                         if event and event.get("items") is not None:
                             event_copy = event.copy()
-                            event_copy["items"] = _convert_gift_ids_to_strings(event["items"])
+                            event_copy["items"] = _convert_gift_ids_to_strings(
+                                event["items"]
+                            )
                             yield sse("gifts", event_copy)
                     except Exception:
                         pass

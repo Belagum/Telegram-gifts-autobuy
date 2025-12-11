@@ -13,13 +13,10 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from backend.application import AutobuyInput, AutobuyUseCase
-from backend.application.interfaces import (
-    AccountRepository,
-    ChannelRepository,
-    NotificationPort,
-    TelegramPort,
-    UserSettingsRepository,
-)
+from backend.application.interfaces import (AccountRepository,
+                                            ChannelRepository,
+                                            NotificationPort, TelegramPort,
+                                            UserSettingsRepository)
 from backend.domain import AccountSnapshot, ChannelFilter
 
 

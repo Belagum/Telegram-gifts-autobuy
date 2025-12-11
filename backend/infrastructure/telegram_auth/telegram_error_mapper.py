@@ -21,7 +21,6 @@ TELEGRAM_ERROR_CODES: dict[str, str] = {
     "SessionPasswordNeeded": "SESSION_PASSWORD_NEEDED",
     "PasswordHashInvalid": "PASSWORD_HASH_INVALID",
     "PasswordEmpty": "PASSWORD_EMPTY",
-    
     # Network/connection errors (420, 500)
     "FloodWait": "FLOOD_WAIT",
     "SlowmodeWait": "SLOWMODE_WAIT",
@@ -30,7 +29,6 @@ TELEGRAM_ERROR_CODES: dict[str, str] = {
     "SessionRevoked": "SESSION_REVOKED",
     "UserDeactivated": "USER_DEACTIVATED",
     "UserDeactivatedBan": "USER_DEACTIVATED_BAN",
-    
     # Peer/user errors (400)
     "PeerIdInvalid": "PEER_ID_INVALID",
     "UsernameInvalid": "USERNAME_INVALID",
@@ -40,21 +38,17 @@ TELEGRAM_ERROR_CODES: dict[str, str] = {
     "UserNotMutualContact": "USER_NOT_MUTUAL_CONTACT",
     "UserIsBlocked": "USER_IS_BLOCKED",
     "UserIsBot": "USER_IS_BOT",
-    
     # Channel/chat errors
     "ChannelInvalid": "CHANNEL_INVALID",
     "ChannelPrivate": "CHANNEL_PRIVATE",
     "ChatAdminRequired": "CHAT_ADMIN_REQUIRED",
     "ChatWriteForbidden": "CHAT_WRITE_FORBIDDEN",
-    
     # Gift/sticker errors
     "PremiumAccountRequired": "PREMIUM_ACCOUNT_REQUIRED",
     "StickerIdInvalid": "STICKER_ID_INVALID",
-    
     # Rate limiting
     "TakeoutInvalid": "TAKEOUT_INVALID",
     "Timeout": "TIMEOUT",
-    
     # Generic errors
     "BadRequest": "BAD_REQUEST",
     "Unauthorized": "UNAUTHORIZED",
@@ -103,22 +97,22 @@ ERROR_CATEGORIES = {
 def map_telegram_error(error: RPCError) -> tuple[str, dict | None]:
     error_class_name = error.__class__.__name__
     error_code = TELEGRAM_ERROR_CODES.get(error_class_name, error_class_name)
-    
+
     context = {}
-    
+
     if error_class_name == "FloodWait":
         wait_seconds = getattr(error, "value", None)
         if wait_seconds:
             context["wait_seconds"] = wait_seconds
-    
+
     elif error_class_name == "SlowmodeWait":
         wait_seconds = getattr(error, "value", None)
         if wait_seconds:
             context["wait_seconds"] = wait_seconds
-    
+
     if hasattr(error, "MESSAGE"):
         context["telegram_message"] = error.MESSAGE
-    
+
     return error_code, context if context else None
 
 
@@ -139,4 +133,3 @@ def is_retryable_error(error_code: str) -> bool:
         "AUTH_KEY_INVALID",
     }
     return error_code not in non_retryable
-

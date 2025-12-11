@@ -7,7 +7,9 @@ from datetime import UTC, datetime
 
 from backend.domain.users.entities import User
 from backend.domain.users.exceptions import UserAlreadyExistsError
-from backend.domain.users.repositories import PasswordHasher, SessionTokenRepository, UserRepository
+from backend.domain.users.repositories import (PasswordHasher,
+                                               SessionTokenRepository,
+                                               UserRepository)
 
 
 class RegisterUserUseCase:

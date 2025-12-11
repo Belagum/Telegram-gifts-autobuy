@@ -72,7 +72,9 @@ async def _safe_tg_call(acc: Account, fn, timeout: float):
     except Exception as e:
         fn_name = getattr(fn, "__name__", "lambda")
         err_name = type(e).__name__
-        logger.debug(f"channels.probe.call: err (acc_id={acc.id}, fn={fn_name}, {err_name})")
+        logger.debug(
+            f"channels.probe.call: err (acc_id={acc.id}, fn={fn_name}, {err_name})"
+        )
         return None
 
 
@@ -116,10 +118,17 @@ def _probe_one_account(acc: Account, ch_id: int) -> tuple[str | None, bool]:
         return None, False
 
 
-def _probe_any_account(db: Session, user_id: int, ch_id: int) -> tuple[str | None, bool]:
+def _probe_any_account(
+    db: Session, user_id: int, ch_id: int
+) -> tuple[str | None, bool]:
     title = None
     any_joined = False
-    accounts = db.query(Account).filter(Account.user_id == user_id).order_by(Account.id.asc()).all()
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.id.asc())
+        .all()
+    )
     if not accounts:
         logger.info(f"channels.probe: no_accounts (user_id={user_id})")
         return None, False
@@ -138,7 +147,12 @@ def _probe_any_account(db: Session, user_id: int, ch_id: int) -> tuple[str | Non
 
 
 def list_channels(db: Session, user_id: int) -> list[dict]:
-    rows = db.query(Channel).filter(Channel.user_id == user_id).order_by(Channel.id.desc()).all()
+    rows = (
+        db.query(Channel)
+        .filter(Channel.user_id == user_id)
+        .order_by(Channel.id.desc())
+        .all()
+    )
     return [
         {
             "id": r.id,
@@ -168,15 +182,21 @@ def create_channel(
     except ValueError:
         return {"error": "bad_channel_id"}
     try:
-        price_min, price_max = _coerce_range("price_min", "price_max", price_min, price_max)
-        supply_min, supply_max = _coerce_range("supply_min", "supply_max", supply_min, supply_max)
+        price_min, price_max = _coerce_range(
+            "price_min", "price_max", price_min, price_max
+        )
+        supply_min, supply_max = _coerce_range(
+            "supply_min", "supply_max", supply_min, supply_max
+        )
     except ValueError:
         return {
             "error": "bad_range",
             "context": {"fields": ["price_min", "price_max"]},
         }
     exists = (
-        db.query(Channel.id).filter(Channel.user_id == user_id, Channel.channel_id == ch_id).first()
+        db.query(Channel.id)
+        .filter(Channel.user_id == user_id, Channel.channel_id == ch_id)
+        .first()
     )
     if exists:
         return {"error": "duplicate_channel"}
@@ -199,7 +219,11 @@ def create_channel(
 
 
 def update_channel(db: Session, user_id: int, ch_id: int, **f) -> dict:
-    ch = db.query(Channel).filter(Channel.id == ch_id, Channel.user_id == user_id).first()
+    ch = (
+        db.query(Channel)
+        .filter(Channel.id == ch_id, Channel.user_id == user_id)
+        .first()
+    )
     if not ch:
         return {"error": "not_found"}
     if "title" in f:
@@ -241,7 +265,11 @@ def update_channel(db: Session, user_id: int, ch_id: int, **f) -> dict:
 
 
 def delete_channel(db: Session, user_id: int, ch_id: int) -> dict:
-    ch = db.query(Channel).filter(Channel.id == ch_id, Channel.user_id == user_id).first()
+    ch = (
+        db.query(Channel)
+        .filter(Channel.id == ch_id, Channel.user_id == user_id)
+        .first()
+    )
     if not ch:
         return {"error": "not_found"}
     db.delete(ch)

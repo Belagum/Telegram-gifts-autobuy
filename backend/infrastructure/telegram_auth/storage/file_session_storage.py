@@ -16,10 +16,10 @@ class FileSessionStorage:
         if base_directory is None:
             config = load_config()
             base_directory = config.sessions_dir
-        
+
         self._base_directory = str(base_directory)
         self._ensure_base_directory()
-        
+
         logger.debug(f"FileSessionStorage: initialized base_dir={self._base_directory}")
 
     def _ensure_base_directory(self) -> None:
@@ -28,50 +28,52 @@ class FileSessionStorage:
         except OSError as e:
             raise StorageError(
                 f"Failed to create base directory: {self._base_directory}",
-                error_code="directory_creation_failed"
+                error_code="directory_creation_failed",
             ) from e
 
     def get_session_path(self, user_id: int, phone: str) -> str:
         user_dir = os.path.join(self._base_directory, f"user_{user_id}")
-        
+
         try:
             os.makedirs(user_dir, exist_ok=True)
         except OSError as e:
-            logger.exception(f"FileSessionStorage: failed to create user_dir={user_dir}")
+            logger.exception(
+                f"FileSessionStorage: failed to create user_dir={user_dir}"
+            )
             raise StorageError(
                 f"Failed to create user directory for user_id={user_id}",
-                error_code="user_directory_creation_failed"
+                error_code="user_directory_creation_failed",
             ) from e
-        
+
         session_path = os.path.join(user_dir, f"{phone}.session")
-        
+
         logger.debug(
             f"FileSessionStorage: session path prepared "
             f"user_id={user_id} phone={phone} path={session_path}"
         )
-        
+
         return session_path
 
     def purge_session(self, session_path: str) -> None:
         logger.info(f"FileSessionStorage: purging session path={session_path}")
-        
+
         files_to_remove = [
             session_path,
             session_path + "-journal",
             session_path + "-shm",
             session_path + "-wal",
         ]
-        
+
         for file_path in files_to_remove:
             self._remove_file(file_path)
-        
+
         try:
             base, _ = os.path.splitext(session_path)
             pattern = base + "*.session*"
-            
+
             for file_path in glob.glob(pattern):
                 self._remove_file(file_path)
-                
+
         except Exception:
             logger.exception(
                 f"FileSessionStorage: glob purge failed "
@@ -81,7 +83,7 @@ class FileSessionStorage:
     def _remove_file(self, file_path: str) -> None:
         max_attempts = 3
         retry_delay = 0.1  # 100ms
-        
+
         for attempt in range(max_attempts):
             try:
                 os.remove(file_path)
@@ -104,6 +106,7 @@ class FileSessionStorage:
                     )
                     return
             except Exception:
-                logger.exception(f"FileSessionStorage: failed to remove path={file_path}")
+                logger.exception(
+                    f"FileSessionStorage: failed to remove path={file_path}"
+                )
                 return
-

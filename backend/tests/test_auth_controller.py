@@ -5,11 +5,13 @@ from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
-from backend.application.use_cases.users.register_user import RegisterUserUseCase
+from flask import Flask
+
+from backend.application.use_cases.users.register_user import \
+    RegisterUserUseCase
 from backend.domain.users.entities import User
 from backend.interfaces.http.controllers.auth_controller import AuthController
 from backend.shared.middleware.error_handler import configure_error_handling
-from flask import Flask
 
 
 @pytest.fixture()

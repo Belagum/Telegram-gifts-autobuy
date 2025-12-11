@@ -19,15 +19,17 @@ class AdminSetup:
     @staticmethod
     def setup_admin_user() -> None:
         config = load_config()
-        
+
         if not config.admin_username:
-            logger.info("admin_setup: No ADMIN_USERNAME configured, skipping admin setup")
+            logger.info(
+                "admin_setup: No ADMIN_USERNAME configured, skipping admin setup"
+            )
             return
-        
+
         db = SessionLocal()
         try:
             user = db.query(User).filter(User.username == config.admin_username).first()
-            
+
             if not user:
                 error_msg = (
                     f"ADMIN_USERNAME '{config.admin_username}' not found in database. "
@@ -36,14 +38,18 @@ class AdminSetup:
                 logger.error(f"admin_setup: {error_msg}")
                 print(f"\n❌ ADMIN SETUP ERROR: {error_msg}\n", file=sys.stderr)
                 sys.exit(1)
-            
+
             if not user.is_admin:
                 user.is_admin = True
                 db.commit()
-                logger.info(f"admin_setup: Granted admin privileges to user '{config.admin_username}'")
+                logger.info(
+                    f"admin_setup: Granted admin privileges to user '{config.admin_username}'"
+                )
             else:
-                logger.info(f"admin_setup: User '{config.admin_username}' already has admin privileges")
-                
+                logger.info(
+                    f"admin_setup: User '{config.admin_username}' already has admin privileges"
+                )
+
         except Exception as e:
             db.rollback()
             logger.error(f"admin_setup: Failed to setup admin user: {e}")
@@ -61,4 +67,3 @@ __all__ = [
     "AdminSetupError",
     "setup_admin_user",
 ]
-

@@ -12,17 +12,18 @@ from backend.shared.logging import logger
 class UnlockUserUseCase:
     def __init__(self, user_repo: UserRepository) -> None:
         self._user_repo = user_repo
-    
+
     def execute(self, user_id: int) -> None:
         user = self._user_repo.find_by_id(user_id)
-        
+
         if not user:
             raise UserNotFoundError()
-        
+
         clear_login_attempts(user.username)
-        
-        logger.info(f"admin: Unlocked user account user_id={user_id} username={user.username}")
+
+        logger.info(
+            f"admin: Unlocked user account user_id={user_id} username={user.username}"
+        )
 
 
 __all__ = ["UnlockUserUseCase"]
-

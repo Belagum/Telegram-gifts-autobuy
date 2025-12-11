@@ -18,15 +18,12 @@ from backend.infrastructure.db import SessionLocal
 from backend.infrastructure.db.models import Account, ApiProfile, User
 from backend.infrastructure.telegram_auth import PyroLoginManager
 from backend.infrastructure.telegram_auth.factory import create_login_manager
-from backend.services.accounts_service import (
-    any_stale,
-    begin_user_refresh,
-    end_user_refresh,
-    iter_refresh_steps_core,
-    read_accounts,
-    schedule_user_refresh,
-    wait_until_ready,
-)
+from backend.services.accounts_service import (any_stale, begin_user_refresh,
+                                               end_user_refresh,
+                                               iter_refresh_steps_core,
+                                               read_accounts,
+                                               schedule_user_refresh,
+                                               wait_until_ready)
 from backend.shared.logging import logger
 from backend.shared.middleware.csrf import csrf_protect
 
@@ -34,15 +31,22 @@ from backend.shared.middleware.csrf import csrf_protect
 class AccountsController:
     def __init__(self, *, login_manager: PyroLoginManager | None = None) -> None:
         self._login_manager = login_manager
-        self._login_manager_factory = create_login_manager if login_manager is None else None
+        self._login_manager_factory = (
+            create_login_manager if login_manager is None else None
+        )
 
     def as_blueprint(self) -> Blueprint:
         bp = Blueprint("accounts", __name__, url_prefix="/api")
 
         bp.add_url_rule(
-            "/accounts", view_func=self.list_accounts, methods=["GET"], endpoint="accounts_list"
+            "/accounts",
+            view_func=self.list_accounts,
+            methods=["GET"],
+            endpoint="accounts_list",
         )
-        bp.add_url_rule("/me", view_func=self.current_user, methods=["GET"], endpoint="me_info")
+        bp.add_url_rule(
+            "/me", view_func=self.current_user, methods=["GET"], endpoint="me_info"
+        )
         bp.add_url_rule(
             "/apiprofiles",
             view_func=self.list_api_profiles,
@@ -117,7 +121,10 @@ class AccountsController:
         logger.info(f"accounts.list: start (user_id={user_id}, wait={wait})")
         try:
             has_any = (
-                db.query(func.count(Account.id)).filter(Account.user_id == user_id).scalar() or 0
+                db.query(func.count(Account.id))
+                .filter(Account.user_id == user_id)
+                .scalar()
+                or 0
             )
             if not has_any:
                 response, code = jsonify({"state": "ready", "accounts": []}), 200
@@ -126,12 +133,21 @@ class AccountsController:
                     schedule_user_refresh(user_id)
                     if wait and wait_until_ready(user_id, timeout_sec=25.0):
                         accounts = read_accounts(db, user_id)
-                        response, code = jsonify({"state": "ready", "accounts": accounts}), 200
+                        response, code = (
+                            jsonify({"state": "ready", "accounts": accounts}),
+                            200,
+                        )
                     else:
-                        response, code = jsonify({"state": "refreshing", "accounts": None}), 202
+                        response, code = (
+                            jsonify({"state": "refreshing", "accounts": None}),
+                            202,
+                        )
                 else:
                     accounts = read_accounts(db, user_id)
-                    response, code = jsonify({"state": "ready", "accounts": accounts}), 200
+                    response, code = (
+                        jsonify({"state": "ready", "accounts": accounts}),
+                        200,
+                    )
             response.headers["Cache-Control"] = "no-store"
             dt = (perf_counter() - t0) * 1000
             status = "ready" if code == 200 else "refreshing"
@@ -158,7 +174,9 @@ class AccountsController:
             logger.info(
                 f"me: ok (user_id={user_id}, username='{uname}', is_admin={is_admin}, dt_ms={dt_ms})"
             )
-            return jsonify({"id": user.id, "username": user.username, "is_admin": user.is_admin})
+            return jsonify(
+                {"id": user.id, "username": user.username, "is_admin": user.is_admin}
+            )
         except Exception:
             logger.exception(f"me: error (user_id={user_id})")
             return jsonify({"error": "internal_error"}), 500
@@ -175,7 +193,10 @@ class AccountsController:
                 .order_by(ApiProfile.id.desc())
                 .all()
             )
-            items = [{"id": row.id, "api_id": row.api_id, "name": row.name or ""} for row in rows]
+            items = [
+                {"id": row.id, "api_id": row.api_id, "name": row.name or ""}
+                for row in rows
+            ]
             dt = (perf_counter() - t0) * 1000
             logger.info(
                 f"apiprofiles.list: ok (user_id={user_id}, count={len(items)}, dt_ms={dt:.0f})"
@@ -223,7 +244,9 @@ class AccountsController:
 
             existing_by_hash = (
                 db.query(ApiProfile)
-                .filter(ApiProfile.user_id == user_id, ApiProfile.api_hash == str(api_hash))
+                .filter(
+                    ApiProfile.user_id == user_id, ApiProfile.api_hash == str(api_hash)
+                )
                 .first()
             )
             if existing_by_hash:
@@ -279,7 +302,7 @@ class AccountsController:
                 return jsonify({"error": "not_found"}), 404
             api_profile.name = name or None
             db.commit()
-            
+
             audit_log(
                 AuditAction.API_PROFILE_RENAMED,
                 user_id=user_id,
@@ -290,7 +313,7 @@ class AccountsController:
                 },
                 success=True,
             )
-            
+
             dt = (perf_counter() - t0) * 1000
             logger.info(
                 f"apiprofile.rename: ok (user_id={user_id}, ap_id={api_profile_id}, dt_ms={dt:.0f})"
@@ -307,7 +330,9 @@ class AccountsController:
     def delete_api_profile(self, api_profile_id: int, db: Session):
         t0 = perf_counter()
         user_id = authed_request().user_id
-        logger.info(f"apiprofile.delete: start (user_id={user_id}, ap_id={api_profile_id})")
+        logger.info(
+            f"apiprofile.delete: start (user_id={user_id}, ap_id={api_profile_id})"
+        )
         try:
             api_profile = (
                 db.query(ApiProfile)
@@ -321,7 +346,9 @@ class AccountsController:
                 return jsonify({"error": "not_found"}), 404
             count = (
                 db.query(func.count(Account.id))
-                .filter(Account.api_profile_id == api_profile.id, Account.user_id == user_id)
+                .filter(
+                    Account.api_profile_id == api_profile.id, Account.user_id == user_id
+                )
                 .scalar()
                 or 0
             )
@@ -379,7 +406,8 @@ class AccountsController:
                 db.query(Account.id, Account.phone)
                 .filter(
                     Account.user_id == user_id,
-                    func.replace(func.replace(Account.phone, "+", ""), " ", "") == normalized_phone,
+                    func.replace(func.replace(Account.phone, "+", ""), " ", "")
+                    == normalized_phone,
                 )
                 .first()
             )
@@ -407,7 +435,7 @@ class AccountsController:
                 api_profile_id=int(api_profile_id),
                 phone=normalized_phone,
             )
-            
+
             result_dict = result.to_dict()
             if "error" in result_dict:
                 logger.warning(
@@ -429,16 +457,18 @@ class AccountsController:
         user_id = authed_request().user_id
         payload = request.get_json(silent=True) or {}
         login_id, code = payload.get("login_id"), payload.get("code")
-        logger.info(f"auth.confirm_code: start (user_id={user_id}, login_id={bool(login_id)})")
+        logger.info(
+            f"auth.confirm_code: start (user_id={user_id}, login_id={bool(login_id)})"
+        )
         try:
             if not login_id or not code:
                 logger.warning(f"auth.confirm_code: missing fields (user_id={user_id})")
                 return jsonify({"error": "login_id_and_code_required"}), 400
-            
+
             login_manager = self._get_login_manager(db)
             result = login_manager.confirm_code(login_id, code)
             result_dict = result.to_dict()
-            
+
             if "error" in result_dict:
                 logger.warning(
                     f"auth.confirm_code: fail (user_id={user_id}, error='{result_dict.get('error')}')"
@@ -458,23 +488,27 @@ class AccountsController:
         user_id = authed_request().user_id
         payload = request.get_json(silent=True) or {}
         login_id, password = payload.get("login_id"), payload.get("password")
-        logger.info(f"auth.confirm_password: start (user_id={user_id}, login_id={bool(login_id)})")
+        logger.info(
+            f"auth.confirm_password: start (user_id={user_id}, login_id={bool(login_id)})"
+        )
         try:
             if not login_id or not password:
-                logger.warning(f"auth.confirm_password: missing fields (user_id={user_id})")
+                logger.warning(
+                    f"auth.confirm_password: missing fields (user_id={user_id})"
+                )
                 return jsonify({"error": "login_id_and_password_required"}), 400
-            
+
             login_manager = self._get_login_manager(db)
             result = login_manager.confirm_password(login_id, password)
             result_dict = result.to_dict()
-            
+
             if "error" in result_dict:
                 logger.warning(
                     f"auth.confirm_password: fail (user_id={user_id}, "
                     f"error='{result_dict.get('error')}')"
                 )
                 return jsonify(result_dict), int(result_dict.get("http", 400))
-            
+
             if "account_id" in result_dict:
                 audit_log(
                     AuditAction.ACCOUNT_ADDED,
@@ -482,13 +516,15 @@ class AccountsController:
                     ip_address=request.remote_addr,
                     details={
                         "account_id": result_dict.get("account_id"),
-                        "phone": "***",  
+                        "phone": "***",
                     },
                     success=True,
                 )
-            
+
             dt = (perf_counter() - t0) * 1000
-            logger.info(f"auth.confirm_password: ok (user_id={user_id}, dt_ms={dt:.0f})")
+            logger.info(
+                f"auth.confirm_password: ok (user_id={user_id}, dt_ms={dt:.0f})"
+            )
             return jsonify(result_dict)
         except Exception:
             logger.exception(f"auth.confirm_password: error (user_id={user_id})")
@@ -501,16 +537,18 @@ class AccountsController:
         user_id = authed_request().user_id
         payload = request.get_json(silent=True) or {}
         login_id = payload.get("login_id")
-        logger.info(f"auth.cancel: start (user_id={user_id}, login_id={bool(login_id)})")
+        logger.info(
+            f"auth.cancel: start (user_id={user_id}, login_id={bool(login_id)})"
+        )
         try:
             if not login_id:
                 logger.warning(f"auth.cancel: missing log_id (user_id={user_id})")
                 return jsonify({"error": "log_id_required"}), 400
-            
+
             login_manager = self._get_login_manager(db)
             result = login_manager.cancel(login_id)
             result_dict = result.to_dict()
-            
+
             dt = (perf_counter() - t0) * 1000
             logger.info(f"auth.cancel: ok (user_id={user_id}, dt_ms={dt:.0f})")
             return jsonify(result_dict)
@@ -526,15 +564,21 @@ class AccountsController:
         logger.info(f"account.refresh: start (user_id={user_id}, acc_id={account_id})")
 
         account = (
-            db.query(Account).filter(Account.id == account_id, Account.user_id == user_id).first()
+            db.query(Account)
+            .filter(Account.id == account_id, Account.user_id == user_id)
+            .first()
         )
         if not account:
-            logger.warning(f"account.refresh: not_found (user_id={user_id}, acc_id={account_id})")
+            logger.warning(
+                f"account.refresh: not_found (user_id={user_id}, acc_id={account_id})"
+            )
             return jsonify({"error": "not_found"}), 404
 
         api_profile = (
             db.query(ApiProfile.api_id, ApiProfile.api_hash)
-            .filter(ApiProfile.id == account.api_profile_id, ApiProfile.user_id == user_id)
+            .filter(
+                ApiProfile.id == account.api_profile_id, ApiProfile.user_id == user_id
+            )
             .first()
         )
         if not api_profile:
@@ -563,7 +607,10 @@ class AccountsController:
                     f"account.refresh.stream: begin (user_id={user_id}, acc_id={account_id})"
                 )
                 for event in iter_refresh_steps_core(
-                    db2, acc=account_copy, api_id=api_profile.api_id, api_hash=api_profile.api_hash
+                    db2,
+                    acc=account_copy,
+                    api_id=api_profile.api_id,
+                    api_hash=api_profile.api_hash,
                 ):
                     if event.get("stage"):
                         logger.debug(
@@ -579,7 +626,7 @@ class AccountsController:
                 logger.debug(
                     f"account.refresh.stream: end (user_id={user_id}, acc_id={account_id})"
                 )
-                
+
                 audit_log(
                     AuditAction.ACCOUNT_REFRESH,
                     user_id=user_id,

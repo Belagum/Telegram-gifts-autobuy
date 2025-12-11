@@ -7,12 +7,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from backend.domain import (
-    AccountSnapshot,
-    ChannelFilter,
-    GiftCandidate,
-    PurchaseOperation,
-)
+from backend.domain import (AccountSnapshot, ChannelFilter, GiftCandidate,
+                            PurchaseOperation)
 
 
 @dataclass(slots=True)
@@ -36,9 +32,13 @@ class UserSettingsRepository(Protocol):
 class TelegramPort(Protocol):
     async def fetch_balance(self, account: AccountSnapshot) -> int: ...
 
-    async def send_gift(self, operation: PurchaseOperation, account: AccountSnapshot) -> None: ...
+    async def send_gift(
+        self, operation: PurchaseOperation, account: AccountSnapshot
+    ) -> None: ...
 
-    async def resolve_self_ids(self, accounts: Iterable[AccountSnapshot]) -> list[int]: ...
+    async def resolve_self_ids(
+        self, accounts: Iterable[AccountSnapshot]
+    ) -> list[int]: ...
 
 
 class NotificationPort(Protocol):

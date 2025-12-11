@@ -7,6 +7,7 @@ import asyncio
 from collections.abc import Iterable, Sequence
 
 import httpx
+
 from backend.application import NotificationPort, TelegramPort
 from backend.domain import AccountSnapshot, PurchaseOperation
 from backend.infrastructure.resilience import CircuitBreaker, resilient_call
@@ -25,7 +26,7 @@ class TelegramRpcPort(TelegramPort):
     async def fetch_balance(self, account: AccountSnapshot) -> int:
         async def _get_balance(client):
             return await client.get_stars_balance()
-        
+
         balance = await tg_call(
             account.session_path,
             account.api_id,
@@ -35,7 +36,9 @@ class TelegramRpcPort(TelegramPort):
         )
         return int(balance or 0)
 
-    async def send_gift(self, operation: PurchaseOperation, account: AccountSnapshot) -> None:
+    async def send_gift(
+        self, operation: PurchaseOperation, account: AccountSnapshot
+    ) -> None:
         async def _call(client):
             return await client.send_gift(
                 chat_id=int(operation.channel_id), gift_id=int(operation.gift_id)
@@ -68,7 +71,9 @@ class TelegramRpcPort(TelegramPort):
                 if value > 0:
                     resolved.add(value)
             except Exception as exc:
-                logger.opt(exception=exc).debug(f"autobuy:dm get_me fail acc_id={account.id}")
+                logger.opt(exception=exc).debug(
+                    f"autobuy:dm get_me fail acc_id={account.id}"
+                )
             await asyncio.sleep(0.05)
         return sorted(resolved)
 

@@ -34,6 +34,9 @@ class LoginUserUseCase:
         self._users = users
         self._tokens = tokens
         self._password_hasher = password_hasher
+        # Фейковый хэш для несуществующих пользователей: verify выполняется всегда
+        # одинаковым алгоритмом, чтобы время ответа не выдавало существование логина.
+        self._dummy_hash = password_hasher.hash("timing-attack-dummy-password")
 
     def execute(
         self, username: str, password: str, ip_address: str | None = None
@@ -47,9 +50,10 @@ class LoginUserUseCase:
 
         user = self._users.find_by_username(username)
 
-        if user is None or not self._password_hasher.verify(
-            password, user.password_hash
-        ):
+        password_hash = user.password_hash if user is not None else self._dummy_hash
+        password_ok = self._password_hasher.verify(password, password_hash)
+
+        if user is None or not password_ok:
             record_login_attempt(username, success=False, ip_address=ip_address)
             raise InvalidCredentialsError()
 

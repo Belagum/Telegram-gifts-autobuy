@@ -6,6 +6,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 
 from backend.infrastructure.health import check_database
+from backend.shared.logging import logger
 
 
 class MiscController:
@@ -19,7 +20,8 @@ class MiscController:
         try:
             check_database()
             status["database"] = "ok"
-        except Exception as exc:  # pragma: no cover
+        except Exception:  # pragma: no cover
+            logger.exception("health: database check failed")
             status["ok"] = False
-            status["database"] = f"error: {exc}"
+            status["database"] = "error"
         return jsonify(status)

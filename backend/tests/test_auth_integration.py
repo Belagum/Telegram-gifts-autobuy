@@ -22,12 +22,12 @@ def test_register_login_logout_flow() -> None:
 
     with app.test_client() as client:
         register = client.post(
-            "/api/auth/register", json={"username": "alice", "password": "secret123"}
+            "/api/auth/register", json={"username": "alice", "password": "Secret123!@#x"}
         )
         assert register.status_code == 200
 
         login = client.post(
-            "/api/auth/login", json={"username": "alice", "password": "secret123"}
+            "/api/auth/login", json={"username": "alice", "password": "Secret123!@#x"}
         )
         assert login.status_code == 200
         token_cookie = login.headers.get("Set-Cookie")

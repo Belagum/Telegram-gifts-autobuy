@@ -46,11 +46,11 @@ def test_register_endpoint_sets_cookie(flask_app: Flask) -> None:
 
     with flask_app.test_client() as client:
         response = client.post(
-            "/api/auth/register", json={"username": "alice", "password": "secret123"}
+            "/api/auth/register", json={"username": "alice", "password": "Secret123!@#x"}
         )
 
     assert response.status_code == 200
-    assert register_called["args"] == ("alice", "secret123")
+    assert register_called["args"] == ("alice", "Secret123!@#x")
     assert response.headers["Set-Cookie"].startswith("auth_token=")
 
 

@@ -169,33 +169,28 @@ class AppConfig(BaseSettings):
         if not self.is_production():
             return self
 
+        errors = []
         if self.secret_key in ("dev", "development", "test", ""):
-            print(
-                (
-                    "\n❌ CRITICAL SECURITY ERROR: Insecure SECRET_KEY detected in production!\n"
-                    "   SECRET_KEY must be a strong random value in production.\n"
-                    '   Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"\n'
-                ),
-                file=sys.stderr,
+            errors.append(
+                'SECRET_KEY небезопасен. Сгенерируйте: python -c "import secrets; '
+                'print(secrets.token_urlsafe(32))"'
             )
+        if not self.security.enable_csrf:
+            errors.append("CSRF выключен. Установите ENABLE_CSRF=true")
+        if not self.security.cookie_secure:
+            errors.append("Cookie Secure выключен. Установите COOKIE_SECURE=true (нужен HTTPS)")
+        if "*" in self.security.allowed_origins:
+            errors.append("CORS разрешает '*'. Укажите явные ALLOWED_ORIGINS=https://...")
+
+        if errors:
+            print("\n❌ CRITICAL SECURITY ERRORS (production):", file=sys.stderr)
+            for err in errors:
+                print(f"   - {err}", file=sys.stderr)
             sys.exit(1)
 
-        warnings = []
-        if not self.security.enable_csrf:
-            warnings.append("⚠️  CSRF protection is DISABLED")
-        if not self.security.cookie_secure:
-            warnings.append("⚠️  Cookie Secure flag is DISABLED (use HTTPS!)")
-        if "*" in self.security.allowed_origins:
-            warnings.append("⚠️  CORS allows wildcard (*) origins")
         if not self.security.enable_hsts:
-            warnings.append("⚠️  HSTS is DISABLED (recommended for HTTPS)")
-
-        if warnings:
-            print("\n⚠️  PRODUCTION SECURITY WARNINGS:", file=sys.stderr)
-            for warning in warnings:
-                print(f"   {warning}", file=sys.stderr)
             print(
-                "   Consider enabling these security features in production.\n",
+                "\n⚠️  HSTS выключен (ENABLE_HSTS=true рекомендуется для HTTPS)\n",
                 file=sys.stderr,
             )
 

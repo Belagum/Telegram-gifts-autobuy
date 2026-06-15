@@ -55,7 +55,9 @@ def _shard_dir(key: str) -> Path:
 
 
 def _cached_path_for(key: str) -> Path:
-    return _shard_dir(key) / f"{key}.tgs"
+    # имя файла — хэш ключа, иначе file_id/uniq из query дают path traversal
+    safe = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return _shard_dir(key) / f"{safe}.tgs"
 
 
 def _find_cached_tgs(key: str) -> Path | None:

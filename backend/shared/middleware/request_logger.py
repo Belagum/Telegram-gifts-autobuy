@@ -12,14 +12,7 @@ from flask import Flask, Response, g, request
 from backend.shared.config import load_config
 from backend.shared.logging import (clear_correlation_id, logger,
                                     set_correlation_id)
-
-
-def _get_client_ip() -> str:
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-
-    return request.remote_addr or "unknown"
+from backend.shared.utils.http import client_ip
 
 
 def _get_user_id() -> int | None:
@@ -64,7 +57,7 @@ def _sanitize_query_params(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _log_request_start(debug_mode: bool) -> None:
-    ip_address = _get_client_ip()
+    ip_address = client_ip()
     user_id = _get_user_id()
 
     if debug_mode:
@@ -85,7 +78,7 @@ def _log_request_start(debug_mode: bool) -> None:
 def _log_request_end(debug_mode: bool, start_time: float) -> None:
     duration = time.time() - start_time
     status_code = getattr(g, "response_status", 200)
-    ip_address = _get_client_ip()
+    ip_address = client_ip()
     user_id = _get_user_id()
 
     if debug_mode:
@@ -130,7 +123,7 @@ def configure_request_logging(app: Flask) -> None:
     @app.teardown_request
     def _teardown_request(exc: BaseException | None) -> None:
         if exc is not None:
-            ip_address = _get_client_ip()
+            ip_address = client_ip()
             user_id = _get_user_id()
 
             if debug_mode:

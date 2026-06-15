@@ -53,8 +53,6 @@ class AdminController:
 
     @require_admin
     def audit_logs(self) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
 
@@ -136,8 +134,6 @@ class AdminController:
 
     @require_admin
     def action_categories(self) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
 
@@ -167,8 +163,6 @@ class AdminController:
 
     @require_admin
     def user_audit(self, user_id: int) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         admin_user_id = getattr(g, "user_id", None)
 
@@ -205,8 +199,6 @@ class AdminController:
 
     @require_admin
     def suspicious_activity(self) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
 
@@ -246,8 +238,6 @@ class AdminController:
 
     @require_admin
     def error_stats(self) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
 
@@ -278,8 +268,6 @@ class AdminController:
 
     @require_admin
     def users(self) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         user_id = getattr(g, "user_id", None)
 
@@ -310,8 +298,6 @@ class AdminController:
     @require_admin
     @csrf_protect
     def unlock_user(self, user_id: int) -> tuple[Response, int]:
-        from flask import g
-
         debug_mode = getattr(g, "debug_mode", False)
         admin_user_id = getattr(g, "user_id", None)
 

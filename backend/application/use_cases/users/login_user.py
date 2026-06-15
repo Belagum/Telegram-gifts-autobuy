@@ -40,7 +40,7 @@ class LoginUserUseCase:
 
     def execute(
         self, username: str, password: str, ip_address: str | None = None
-    ) -> str:
+    ) -> tuple[int, str]:
         if is_account_locked(username):
             from backend.infrastructure.auth.login_attempts import \
                 get_lockout_remaining
@@ -60,4 +60,4 @@ class LoginUserUseCase:
         record_login_attempt(username, success=True, ip_address=ip_address)
 
         token = self._tokens.replace_for_user(user.id)
-        return token.token
+        return user.id, token.token

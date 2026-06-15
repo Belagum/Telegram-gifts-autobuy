@@ -111,7 +111,7 @@ def test_login_user_success(
     login = LoginUserUseCase(
         users=users, tokens=tokens, password_hasher=DeterministicHasher()
     )
-    assert login.execute("alice", "secret123") == "token-1"
+    assert login.execute("alice", "secret123") == (1, "token-1")
 
 
 def test_login_user_invalid_credentials(

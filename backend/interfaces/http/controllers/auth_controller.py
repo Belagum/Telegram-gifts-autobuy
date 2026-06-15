@@ -6,7 +6,8 @@ from __future__ import annotations
 from flask import Blueprint, Response, jsonify, request
 from pydantic import ValidationError
 
-from backend.application.use_cases.users.login_user import LoginUserUseCase
+from backend.application.use_cases.users.login_user import (AccountLockedError,
+                                                            LoginUserUseCase)
 from backend.application.use_cases.users.logout_user import LogoutUserUseCase
 from backend.application.use_cases.users.register_user import \
     RegisterUserUseCase
@@ -94,14 +95,25 @@ class AuthController:
         ip_address = _get_client_ip()
 
         try:
-            token = self._login_use_case.execute(dto.username, dto.password, ip_address)
+            user_id, token = self._login_use_case.execute(
+                dto.username, dto.password, ip_address
+            )
             audit_log(
                 AuditAction.LOGIN_SUCCESS,
-                user_id=None,
+                user_id=user_id,
                 ip_address=ip_address,
                 details={"username": dto.username, "remember_me": dto.remember_me},
                 success=True,
             )
+        except AccountLockedError:
+            audit_log(
+                AuditAction.LOGIN_LOCKED,
+                user_id=None,
+                ip_address=ip_address,
+                details={"username": dto.username},
+                success=False,
+            )
+            raise
         except Exception as exc:
             audit_log(
                 AuditAction.LOGIN_FAILED,

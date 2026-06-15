@@ -28,6 +28,7 @@ from backend.services.gifts_service import (GIFTS_THREADS, start_user_gifts,
                                             stop_user_gifts)
 from backend.shared.config import load_config
 from backend.shared.logging import logger, setup_logging
+from backend.shared.middleware.cors import build_cors_kwargs
 from backend.shared.middleware.csrf import configure_csrf
 from backend.shared.middleware.error_handler import configure_error_handling
 from backend.shared.middleware.request_logger import configure_request_logging
@@ -98,12 +99,7 @@ def create_app() -> Flask:
         PERMANENT_SESSION_LIFETIME=timedelta(seconds=_config.security.session_lifetime),
     )
 
-    cors_kwargs: dict[str, object] = {
-        "resources": {r"/api/*": {"origins": _config.security.allowed_origins}}
-    }
-    if any(o != "*" for o in _config.security.allowed_origins):
-        cors_kwargs["supports_credentials"] = True
-    CORS(app, **cors_kwargs)
+    CORS(app, **build_cors_kwargs(_config.security.allowed_origins))
     app.register_blueprint(MiscController().as_blueprint())
     app.register_blueprint(container.auth_controller.as_blueprint())
     app.register_blueprint(container.admin_controller.as_blueprint())

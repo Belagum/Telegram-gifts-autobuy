@@ -4,9 +4,7 @@
 import asyncio
 import hashlib
 import os
-import threading
 from contextlib import closing
-from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
@@ -343,28 +341,3 @@ async def broadcast_new_gifts(gifts: list[dict]) -> int:
 
     logger.info(f"notify:done sent={sent}")
     return sent
-
-
-def broadcast_new_gifts_sync(gifts: list[dict[str, Any]]) -> int:
-    try:
-        loop = asyncio.get_running_loop()
-        if loop.is_running():
-            result_n = 0
-            result_err: Exception | None = None
-
-            def runner() -> None:
-                nonlocal result_n, result_err
-                try:
-                    result_n = asyncio.run(broadcast_new_gifts(gifts))
-                except Exception as exc:
-                    result_err = exc
-
-            t = threading.Thread(target=runner, daemon=True)
-            t.start()
-            t.join()
-            if result_err is not None:
-                raise result_err
-            return result_n
-    except RuntimeError:
-        pass
-    return asyncio.run(broadcast_new_gifts(gifts))

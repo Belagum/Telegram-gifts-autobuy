@@ -72,7 +72,7 @@ class AuthController:
             csrf_token = _secrets.token_urlsafe(32)
         except Exception:
             csrf_token = ""
-        if csrf_token:
+        if config.security.enable_csrf and csrf_token:
             response.set_cookie(
                 "csrf_token",
                 csrf_token,
@@ -131,7 +131,7 @@ class AuthController:
             csrf_token = _secrets.token_urlsafe(32)
         except Exception:
             csrf_token = ""
-        if csrf_token:
+        if config.security.enable_csrf and csrf_token:
             response.set_cookie(
                 "csrf_token",
                 csrf_token,

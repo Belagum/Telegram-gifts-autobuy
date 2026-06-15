@@ -6,8 +6,11 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
+
 from backend.domain.users.entities import SessionToken as DomainSessionToken
 from backend.domain.users.entities import User as DomainUser
+from backend.domain.users.exceptions import UserAlreadyExistsError
 from backend.domain.users.repositories import (SessionTokenRepository,
                                                UserRepository)
 from backend.infrastructure.db.models import SessionToken, User
@@ -43,7 +46,11 @@ class SqlAlchemyUserRepository(UserRepository):
         with session_scope() as session:
             row = User(username=user.username, password_hash=user.password_hash)
             session.add(row)
-            session.flush()
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                # гонка двух регистраций с одним username -> чистый 409 вместо 500
+                raise UserAlreadyExistsError() from exc
             session.refresh(row)
             return DomainUser(
                 id=row.id,

@@ -4,39 +4,43 @@
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import (BaseModel, ConfigDict, Field, field_validator,
-                      model_validator)
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
-class DatabaseConfig(BaseModel):
+class _EnvSettings(BaseSettings):
+    """База для вложенных конфигов: читает env и .env по alias-именам."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        validate_by_name=True,
+        extra="ignore",
+    )
+
+
+class DatabaseConfig(_EnvSettings):
     url: str = Field("sqlite:///app.db", alias="DATABASE_URL")
     pool_size: int = Field(10, ge=1, alias="DATABASE_POOL_SIZE")
     max_overflow: int = Field(5, ge=0, alias="DATABASE_MAX_OVERFLOW")
     pool_timeout: float = Field(30.0, ge=0.1, alias="DATABASE_POOL_TIMEOUT")
 
-    model_config = ConfigDict(validate_by_name=True)
 
-
-class CacheConfig(BaseModel):
+class CacheConfig(_EnvSettings):
     directory: Path = Field(
         Path("backend/instance/gifts_cache"), alias="GIFTS_CACHE_DIR"
     )
     ttl_seconds: int = Field(3600, ge=1, alias="CACHE_TTL")
 
-    model_config = ConfigDict(validate_by_name=True)
 
-
-class QueueConfig(BaseModel):
+class QueueConfig(_EnvSettings):
     max_size: int = Field(1000, ge=1, alias="QUEUE_MAX_SIZE")
     visibility_timeout: float = Field(30.0, ge=0.1, alias="QUEUE_VISIBILITY_TIMEOUT")
 
-    model_config = ConfigDict(validate_by_name=True)
 
-
-class ResilienceConfig(BaseModel):
+class ResilienceConfig(_EnvSettings):
     default_timeout: float = Field(15.0, ge=0.1, alias="RESILIENCE_TIMEOUT")
     max_retries: int = Field(3, ge=0, alias="RESILIENCE_RETRIES")
     backoff_base: float = Field(0.5, ge=0.1, alias="RESILIENCE_BACKOFF_BASE")
@@ -44,24 +48,20 @@ class ResilienceConfig(BaseModel):
     circuit_fail_threshold: int = Field(5, ge=1, alias="RESILIENCE_CIRCUIT_THRESHOLD")
     circuit_reset_timeout: float = Field(60.0, ge=1.0, alias="RESILIENCE_CIRCUIT_RESET")
 
-    model_config = ConfigDict(validate_by_name=True)
 
-
-class ObservabilityConfig(BaseModel):
+class ObservabilityConfig(_EnvSettings):
     metrics_enabled: bool = Field(True, alias="METRICS_ENABLED")
     tracing_enabled: bool = Field(False, alias="TRACING_ENABLED")
     service_name: str = Field("giftbuyer-backend", alias="SERVICE_NAME")
 
-    model_config = ConfigDict(validate_by_name=True)
 
-
-class SecurityConfig(BaseModel):
+class SecurityConfig(_EnvSettings):
     # Cookie security
     cookie_secure: bool = Field(False, alias="COOKIE_SECURE")
     cookie_samesite: str = Field("Strict", alias="COOKIE_SAMESITE")
 
-    # CORS
-    allowed_origins: list[str] = Field(["*"], alias="ALLOWED_ORIGINS")
+    # CORS (NoDecode: парсим как CSV в _parse_origins, не как JSON)
+    allowed_origins: Annotated[list[str], NoDecode] = Field(["*"], alias="ALLOWED_ORIGINS")
 
     # CSRF protection
     enable_csrf: bool = Field(False, alias="ENABLE_CSRF")
@@ -80,8 +80,6 @@ class SecurityConfig(BaseModel):
 
     # Session lifetime (in seconds, default 7 days)
     session_lifetime: int = Field(604800, alias="SESSION_LIFETIME", ge=60)
-
-    model_config = ConfigDict(validate_by_name=True)
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

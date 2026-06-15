@@ -374,12 +374,18 @@ async def _worker_async(uid: int) -> None:
 
 
 def _run_worker(uid: int) -> None:
-    asyncio.run(_worker_async(uid))
+    try:
+        asyncio.run(_worker_async(uid))
+    except Exception:
+        # иначе падение демон-потока проходит молча, и autobuy тихо встаёт
+        logger.exception(f"gifts.worker: fatal crash (user_id={uid})")
 
 
 def start_user_gifts(uid: int) -> None:
-    if uid in GIFTS_THREADS:
+    existing = GIFTS_THREADS.get(uid)
+    if existing is not None and existing.thread is not None and existing.thread.is_alive():
         return
+    # воркера нет либо прошлый поток умер — (пере)запускаем
     state = _WorkerState(stop=threading.Event())
     GIFTS_THREADS[uid] = state
     th = threading.Thread(target=_run_worker, args=(uid,), daemon=True)

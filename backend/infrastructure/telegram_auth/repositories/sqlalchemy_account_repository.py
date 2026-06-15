@@ -68,6 +68,8 @@ class SQLAlchemyAccountRepository:
 
             self._commit_account(account, user_id, phone, telegram_id)
 
+        except RepositoryError:
+            raise
         except Exception as e:
             logger.exception(
                 f"SQLAlchemyAccountRepository: failed to save account "
@@ -87,7 +89,15 @@ class SQLAlchemyAccountRepository:
         )
 
         if not account and telegram_id:
-            account = self._db.get(Account, telegram_id)
+            by_pk = self._db.get(Account, telegram_id)
+            if by_pk is not None and by_pk.user_id != user_id:
+                # этот Telegram-аккаунт уже привязан к другому пользователю —
+                # нельзя перезаписывать/уводить чужую строку
+                raise RepositoryError(
+                    "Account already linked to another user",
+                    error_code="account_owned_by_other_user",
+                )
+            account = by_pk
 
         return account
 

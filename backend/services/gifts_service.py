@@ -53,6 +53,45 @@ def _ensure_dir() -> None:
         pass
 
 
+_FILE_LOCKS: dict[int, threading.Lock] = {}
+_FILE_LOCKS_GUARD = threading.Lock()
+
+
+def _file_lock(uid: int) -> threading.Lock:
+    with _FILE_LOCKS_GUARD:
+        lock = _FILE_LOCKS.get(uid)
+        if lock is None:
+            lock = threading.Lock()
+            _FILE_LOCKS[uid] = lock
+        return lock
+
+
+def _merge_persist_locked(
+    uid: int, gifts: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
+    """Атомарно (под per-user локом) read→merge→write файла подарков.
+
+    Лок держится только на быстрых файловых операциях, не на медленном RPC.
+    Возвращает (merged, added, changed), где added — реально новые подарки
+    относительно того, что лежало на диске в момент мёржа.
+    """
+    with _file_lock(uid):
+        disk_items = read_json_list_of_dicts(_gifts_path(uid))
+        prev_ids = {
+            int(x.get("id", 0)) for x in disk_items if isinstance(x.get("id"), int)
+        }
+        merged = merge_new(disk_items or [], gifts)
+        added = [
+            g
+            for g in merged
+            if isinstance(g.get("id"), int) and g["id"] not in prev_ids
+        ]
+        changed = hash_items(merged) != hash_items(disk_items)
+        if changed:
+            write_json_list(_gifts_path(uid), merged)
+        return merged, added, changed
+
+
 class _GiftsEventBus:
     def __init__(self):
         self._lock = threading.Lock()
@@ -213,7 +252,6 @@ async def _worker_async(uid: int) -> None:
     accs_loaded_at = 0.0
     i = 0
     merged_all = read_json_list_of_dicts(_gifts_path(uid))
-    last_hash = hash_items(merged_all)
     try:
         while not stop_evt.is_set():
             now = time.perf_counter()
@@ -240,25 +278,15 @@ async def _worker_async(uid: int) -> None:
             step = max(3.0 / float(n), 0.2)
             a = accs[i]
             try:
-                disk_items = read_json_list_of_dicts(_gifts_path(uid))
-                prev_ids = {
-                    int(x.get("id", 0))
-                    for x in disk_items
-                    if isinstance(x.get("id"), int)
-                }
                 gifts = await _list_gifts_for_account_persist(
                     a.session_path, a.api_profile.api_id, a.api_profile.api_hash
                 )
-                merged_all = merge_new(disk_items or [], gifts)
-                added = [
-                    g
-                    for g in merged_all
-                    if isinstance(g.get("id"), int) and g["id"] not in prev_ids
-                ]
+                merged_all, added, changed = _merge_persist_locked(uid, gifts)
             except Exception:
                 logger.exception(f"gifts.worker: fetch failed (acc_id={a.id})")
                 gifts = []
                 added = []
+                changed = False
             try:
                 logger.info(
                     f"gifts.worker: iter user_id={uid} acc_id={a.id} "
@@ -266,13 +294,14 @@ async def _worker_async(uid: int) -> None:
                 )
             except Exception:
                 pass
-            new_hash = hash_items(merged_all)
-            if new_hash != last_hash:
-                last_hash = new_hash
-                write_json_list(_gifts_path(uid), merged_all)
+            if changed:
                 gifts_event_bus.publish(
                     uid,
-                    {"items": merged_all, "count": len(merged_all), "hash": new_hash},
+                    {
+                        "items": merged_all,
+                        "count": len(merged_all),
+                        "hash": hash_items(merged_all),
+                    },
                 )
 
                 if added:
@@ -423,10 +452,7 @@ def refresh_once(uid: int) -> list[dict[str, Any]]:
                 acc.session_path, acc.api_profile.api_id, acc.api_profile.api_hash
             )
         )
-        path = _gifts_path(uid)
-        prev = read_json_list_of_dicts(path)
-        merged = merge_new(prev, gifts)
-        write_json_list(path, merged)
+        merged, _added, _changed = _merge_persist_locked(uid, gifts)
         gifts_event_bus.publish(
             uid, {"items": merged, "count": len(merged), "hash": hash_items(merged)}
         )

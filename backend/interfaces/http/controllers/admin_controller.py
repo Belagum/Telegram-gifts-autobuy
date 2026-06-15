@@ -19,6 +19,7 @@ from backend.application.use_cases.admin.get_user_audit import \
 from backend.application.use_cases.admin.list_users import ListUsersUseCase
 from backend.application.use_cases.admin.unlock_user import UnlockUserUseCase
 from backend.infrastructure.admin_middleware import require_admin
+from backend.shared.middleware.csrf import csrf_protect
 from backend.interfaces.http.dto.admin import (ActionCategoriesDTO,
                                                AuditLogDTO, AuditLogListDTO,
                                                AuditLogsFilterDTO,
@@ -307,6 +308,7 @@ class AdminController:
             raise
 
     @require_admin
+    @csrf_protect
     def unlock_user(self, user_id: int) -> tuple[Response, int]:
         from flask import g
 

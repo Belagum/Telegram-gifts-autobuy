@@ -402,14 +402,18 @@ class AccountsController:
                 logger.warning(f"auth.send_code: missing fields (user_id={user_id})")
                 return jsonify({"error": "phone_and_api_profile_id_required"}), 400
 
-            existing = (
-                db.query(Account.id, Account.phone)
-                .filter(
-                    Account.user_id == user_id,
-                    func.replace(func.replace(Account.phone, "+", ""), " ", "")
-                    == normalized_phone,
-                )
-                .first()
+            # phone — EncryptedString с недетерминированным шифрованием, поэтому
+            # сравнивать его в SQL бесполезно (ciphertext != plaintext). Грузим
+            # аккаунты пользователя и сравниваем расшифрованные телефоны в Python.
+            existing = next(
+                (
+                    acc
+                    for acc in db.query(Account)
+                    .filter(Account.user_id == user_id)
+                    .all()
+                    if self._normalize_phone(acc.phone or "") == normalized_phone
+                ),
+                None,
             )
             if existing:
                 logger.warning(

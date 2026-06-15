@@ -2,37 +2,15 @@
 # Copyright 2025 Vova Orig
 
 import inspect
-import secrets
 from datetime import UTC, datetime
 from functools import wraps
 from typing import cast
 
 from flask import Request, jsonify, request
-from sqlalchemy.orm import Session
-from werkzeug.security import check_password_hash, generate_password_hash
 
 from backend.infrastructure.db import get_db
-from backend.infrastructure.db.models import SessionToken, token_default_exp
+from backend.infrastructure.db.models import SessionToken
 from backend.shared.logging import logger
-
-
-def hash_password(p: str) -> str:
-    return str(generate_password_hash(p))
-
-
-def verify_password(h: str, p: str) -> bool:
-    return bool(check_password_hash(h, p))
-
-
-def issue_token(db: Session, user_id: int) -> str:
-    db.query(SessionToken).filter(SessionToken.user_id == user_id).delete()
-    token = secrets.token_urlsafe(48)
-    row = SessionToken(user_id=user_id, token=token, expires_at=token_default_exp())
-    db.add(row)
-    db.commit()
-
-    logger.info(f"Issued token for user={user_id} exp={row.expires_at.isoformat()}")
-    return token
 
 
 class AuthedRequest(Request):

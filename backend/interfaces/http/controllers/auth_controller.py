@@ -19,13 +19,11 @@ from backend.shared.logging import logger
 from backend.shared.middleware.csrf import \
     configure_csrf  # noqa: F401 (import side-effect for type hints)
 from backend.shared.middleware.rate_limit import rate_limit
+from backend.shared.utils.http import client_ip
 
 
 def _get_client_ip() -> str | None:
-    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr)
-    if ip_address and "," in ip_address:
-        ip_address = ip_address.split(",")[0].strip()
-    return ip_address
+    return client_ip()
 
 
 class AuthController:

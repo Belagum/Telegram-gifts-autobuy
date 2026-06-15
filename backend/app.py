@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from flask import Flask
 from typing import Any, Protocol, cast
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backend.infrastructure.admin_setup import setup_admin_user
 from backend.infrastructure.container import container
@@ -79,6 +80,13 @@ def create_app() -> Flask:
     setup_admin_user()
 
     app = Flask(__name__)
+
+    proxy_count = _config.security.trusted_proxy_count
+    if proxy_count > 0:
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=proxy_count, x_proto=proxy_count, x_host=proxy_count
+        )
+
     configure_error_handling(app)
     configure_csrf(app)
 

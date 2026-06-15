@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 from flask import Blueprint, Response, jsonify, request
 from pydantic import ValidationError
 
@@ -14,7 +16,7 @@ from backend.application.use_cases.users.register_user import \
 from backend.infrastructure.audit import AuditAction, audit_log
 from backend.interfaces.http.dto.auth import (AuthSuccessDTO, LoginRequestDTO,
                                               RegisterRequestDTO)
-from backend.shared.config import load_config
+from backend.shared.config import AppConfig, load_config
 from backend.shared.errors.validation import raise_validation_error
 from backend.shared.logging import logger
 from backend.shared.middleware.csrf import \
@@ -25,6 +27,30 @@ from backend.shared.utils.http import client_ip
 
 def _get_client_ip() -> str | None:
     return client_ip()
+
+
+def _attach_session_cookies(
+    response: Response, token: str, config: AppConfig, auth_max_age: int | None
+) -> None:
+    samesite = config.security.cookie_samesite
+    secure = config.security.cookie_secure
+    response.set_cookie(
+        "auth_token",
+        token,
+        httponly=True,
+        samesite=samesite,
+        secure=secure,
+        max_age=auth_max_age,
+    )
+    if config.security.enable_csrf:
+        response.set_cookie(
+            "csrf_token",
+            secrets.token_urlsafe(32),
+            httponly=False,
+            samesite=samesite,
+            secure=secure,
+            max_age=60 * 60 * 24 * 7,
+        )
 
 
 class AuthController:
@@ -58,30 +84,7 @@ class AuthController:
 
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
-        config = load_config()
-        response.set_cookie(
-            "auth_token",
-            token,
-            httponly=True,
-            samesite=config.security.cookie_samesite,
-            secure=config.security.cookie_secure,
-            max_age=60 * 60 * 24 * 7,
-        )
-        try:
-            import secrets as _secrets
-
-            csrf_token = _secrets.token_urlsafe(32)
-        except Exception:
-            csrf_token = ""
-        if config.security.enable_csrf and csrf_token:
-            response.set_cookie(
-                "csrf_token",
-                csrf_token,
-                httponly=False,
-                samesite=config.security.cookie_samesite,
-                secure=config.security.cookie_secure,
-                max_age=60 * 60 * 24 * 7,
-            )
+        _attach_session_cookies(response, token, load_config(), 60 * 60 * 24 * 7)
         logger.info(f"auth.register: ok user_id={user.id}")
         return response, 200
 
@@ -126,32 +129,8 @@ class AuthController:
 
         payload = AuthSuccessDTO().model_dump()
         response = jsonify(payload)
-
-        config = load_config()
         remember_max_age = 60 * 60 * 24 * 7 if dto.remember_me else None
-        response.set_cookie(
-            "auth_token",
-            token,
-            httponly=True,
-            samesite=config.security.cookie_samesite,
-            secure=config.security.cookie_secure,
-            max_age=remember_max_age,
-        )
-        try:
-            import secrets as _secrets
-
-            csrf_token = _secrets.token_urlsafe(32)
-        except Exception:
-            csrf_token = ""
-        if config.security.enable_csrf and csrf_token:
-            response.set_cookie(
-                "csrf_token",
-                csrf_token,
-                httponly=False,
-                samesite=config.security.cookie_samesite,
-                secure=config.security.cookie_secure,
-                max_age=60 * 60 * 24 * 7,
-            )
+        _attach_session_cookies(response, token, load_config(), remember_max_age)
         logger.info(
             f"auth.login: ok username={dto.username} remember_me={dto.remember_me}"
         )

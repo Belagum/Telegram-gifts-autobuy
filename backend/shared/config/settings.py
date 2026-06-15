@@ -28,18 +28,6 @@ class DatabaseConfig(_EnvSettings):
     pool_timeout: float = Field(30.0, ge=0.1, alias="DATABASE_POOL_TIMEOUT")
 
 
-class CacheConfig(_EnvSettings):
-    directory: Path = Field(
-        Path("backend/instance/gifts_cache"), alias="GIFTS_CACHE_DIR"
-    )
-    ttl_seconds: int = Field(3600, ge=1, alias="CACHE_TTL")
-
-
-class QueueConfig(_EnvSettings):
-    max_size: int = Field(1000, ge=1, alias="QUEUE_MAX_SIZE")
-    visibility_timeout: float = Field(30.0, ge=0.1, alias="QUEUE_VISIBILITY_TIMEOUT")
-
-
 class ResilienceConfig(_EnvSettings):
     default_timeout: float = Field(15.0, ge=0.1, alias="RESILIENCE_TIMEOUT")
     max_retries: int = Field(3, ge=0, alias="RESILIENCE_RETRIES")
@@ -47,12 +35,6 @@ class ResilienceConfig(_EnvSettings):
     backoff_cap: float = Field(8.0, ge=0.1, alias="RESILIENCE_BACKOFF_CAP")
     circuit_fail_threshold: int = Field(5, ge=1, alias="RESILIENCE_CIRCUIT_THRESHOLD")
     circuit_reset_timeout: float = Field(60.0, ge=1.0, alias="RESILIENCE_CIRCUIT_RESET")
-
-
-class ObservabilityConfig(_EnvSettings):
-    metrics_enabled: bool = Field(True, alias="METRICS_ENABLED")
-    tracing_enabled: bool = Field(False, alias="TRACING_ENABLED")
-    service_name: str = Field("giftbuyer-backend", alias="SERVICE_NAME")
 
 
 class SecurityConfig(_EnvSettings):
@@ -106,20 +88,8 @@ def _database_config_factory() -> DatabaseConfig:
     return DatabaseConfig()  # type: ignore[call-arg]
 
 
-def _cache_config_factory() -> CacheConfig:
-    return CacheConfig()  # type: ignore[call-arg]
-
-
-def _queue_config_factory() -> QueueConfig:
-    return QueueConfig()  # type: ignore[call-arg]
-
-
 def _resilience_config_factory() -> ResilienceConfig:
     return ResilienceConfig()  # type: ignore[call-arg]
-
-
-def _observability_config_factory() -> ObservabilityConfig:
-    return ObservabilityConfig()  # type: ignore[call-arg]
 
 
 def _security_config_factory() -> SecurityConfig:
@@ -136,12 +106,7 @@ class AppConfig(BaseSettings):
     debug_logging: bool = Field(False, alias="DEBUG_LOGGING")
 
     database: DatabaseConfig = Field(default_factory=_database_config_factory)
-    cache: CacheConfig = Field(default_factory=_cache_config_factory)
-    queue: QueueConfig = Field(default_factory=_queue_config_factory)
     resilience: ResilienceConfig = Field(default_factory=_resilience_config_factory)
-    observability: ObservabilityConfig = Field(
-        default_factory=_observability_config_factory
-    )
     security: SecurityConfig = Field(default_factory=_security_config_factory)
 
     model_config = SettingsConfigDict(

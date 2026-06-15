@@ -71,6 +71,10 @@ class SecurityConfig(BaseModel):
     rate_limit_requests: int = Field(10, alias="RL_LIMIT")
     rate_limit_window: float = Field(60.0, alias="RL_WINDOW")
 
+    # Число доверенных reverse-proxy хопов для X-Forwarded-For.
+    # 0 = прямой доступ, заголовок игнорируется (берётся remote_addr).
+    trusted_proxy_count: int = Field(0, alias="TRUSTED_PROXY_COUNT", ge=0)
+
     # HSTS
     enable_hsts: bool = Field(False, alias="ENABLE_HSTS")
 

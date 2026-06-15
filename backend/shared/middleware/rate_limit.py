@@ -8,9 +8,10 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from flask import Request, jsonify, request
+from flask import jsonify, request
 
 from backend.shared.config import load_config
+from backend.shared.utils.http import client_ip
 
 
 @dataclass
@@ -37,11 +38,6 @@ class InMemoryRateLimiter:
         return True
 
 
-def _client_key(req: Request) -> str:
-    forwarded = req.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    return forwarded or (req.remote_addr or "unknown")
-
-
 def rate_limit(limit: int | None = None, window_seconds: float | None = None):
     config = load_config()
     enabled = config.security.enable_rate_limit
@@ -55,7 +51,7 @@ def rate_limit(limit: int | None = None, window_seconds: float | None = None):
             return f
 
         def wrapper(*args, **kwargs):
-            key = f"{request.path}:{_client_key(request)}"
+            key = f"{request.path}:{client_ip()}"
             if not limiter.allow(key):
                 return jsonify({"error": "rate_limited"}), 429
             return f(*args, **kwargs)

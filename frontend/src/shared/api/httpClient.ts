@@ -46,8 +46,10 @@ export const readCsrfToken = () => {
   if (typeof document === "undefined") {
     return "";
   }
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
-  return meta?.content ?? "";
+  // Бэкенд кладёт токен в cookie csrf_token (httponly=false) для double-submit,
+  // а не в meta-тег — читаем именно cookie, иначе заголовок уйдёт пустым.
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
 };
 
 const sanitizeBody = (data: unknown) => {
